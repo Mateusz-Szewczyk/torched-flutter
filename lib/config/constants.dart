@@ -2,22 +2,39 @@
 
 class AppConfig {
   // API Configuration
-  static const String defaultApiBaseUrl = 'http://localhost:14440/api/v1';
-  static const String defaultRagBaseUrl = 'http://localhost:8000';
+  // Flask API (localhost:14440) - User management, auth
+  static const String defaultFlaskApiUrl = 'http://localhost:14440/api/v1';
+  // RAG API (localhost:8043) - Chat, flashcards, exams, files
+  static const String defaultRagApiUrl = 'http://localhost:8043/api';
 
   // Get from environment or use default
-  static String get apiBaseUrl =>
-      const String.fromEnvironment('API_BASE_URL', defaultValue: defaultApiBaseUrl);
+  static String get flaskApiUrl =>
+      const String.fromEnvironment('FLASK_API_URL', defaultValue: defaultFlaskApiUrl);
 
-  static String get ragBaseUrl =>
-      const String.fromEnvironment('RAG_BASE_URL', defaultValue: defaultRagBaseUrl);
+  static String get ragApiUrl =>
+      const String.fromEnvironment('RAG_API_URL', defaultValue: defaultRagApiUrl);
 
-  // API Endpoints
-  static const String authEndpoint = '/auth';
-  static const String conversationEndpoint = '/conversation';
-  static const String flashcardsEndpoint = '/flashcards';
-  static const String examsEndpoint = '/exams';
-  static const String filesEndpoint = '/files';
+  // Legacy aliases for compatibility
+  static String get apiBaseUrl => flaskApiUrl;
+  static String get ragBaseUrl => ragApiUrl;
+
+  // ============================================================================
+  // FLASK API ENDPOINTS (User management)
+  // ============================================================================
+  static const String authEndpoint = '/auth';  // Login, register, OAuth, password reset
+
+  // ============================================================================
+  // RAG API ENDPOINTS (Main functionality)
+  // ============================================================================
+  static const String chatsEndpoint = '/chats';           // Conversations & messages
+  static const String decksEndpoint = '/decks';           // Flashcard decks
+  static const String flashcardsEndpoint = '/flashcards'; // Individual flashcards
+  static const String examsEndpoint = '/exams';           // Exams/tests
+  static const String filesEndpoint = '/files';           // File uploads
+  static const String studySessionsEndpoint = '/study_sessions'; // Study sessions
+
+  // Legacy endpoint names (for compatibility)
+  static const String conversationEndpoint = '/chats';
   static const String sharingEndpoint = '/sharing';
 
   // Storage Keys
@@ -25,7 +42,7 @@ class AppConfig {
   static const String themeKey = 'theme_mode';
   static const String languageKey = 'language';
 
-  // OAuth Configuration
+  // OAuth Configuration (via Flask API)
   static const String googleOAuthUrl = '/auth/google';
   static const String githubOAuthUrl = '/auth/github';
   static const String oauthCallbackScheme = 'torched';

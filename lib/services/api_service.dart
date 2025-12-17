@@ -7,20 +7,33 @@ import 'storage_service.dart';
 
 // API Service - handles all HTTP requests
 // Equivalent to fetchJson.ts and axios usage in React app
+//
+// Two separate APIs:
+// - Flask API (localhost:14440) - User management, auth
+// - RAG API (localhost:8043) - Chat, flashcards, exams, files
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
-  late final Dio _dio;
+  late final Dio _flaskDio;  // For auth/user management
+  late final Dio _ragDio;    // For chat, flashcards, exams, files
   final _cookieJar = CookieJar();
   final _storage = StorageService();
 
   void init() {
-    _dio = Dio(
+    // Initialize Flask API client (auth, user management)
+    _flaskDio = _createDio(AppConfig.flaskApiUrl);
+
+    // Initialize RAG API client (chat, flashcards, exams, files)
+    _ragDio = _createDio(AppConfig.ragApiUrl);
+  }
+
+  Dio _createDio(String baseUrl) {
+    final dio = Dio(
       BaseOptions(
-        baseUrl: AppConfig.apiBaseUrl,
+        baseUrl: baseUrl,
         connectTimeout: AppConfig.apiTimeout,
         receiveTimeout: AppConfig.apiTimeout,
         headers: {
@@ -32,17 +45,18 @@ class ApiService {
     );
 
     if (!kIsWeb) {
-      _dio.interceptors.add(CookieManager(_cookieJar));
+      dio.interceptors.add(CookieManager(_cookieJar));
     }
 
     // Add auth interceptor
-    _dio.interceptors.add(
+    dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           // Add JWT token from storage if available
           final token = await _storage.getToken();
           if (token != null) {
             options.headers['Cookie'] = 'TorchED_auth=$token';
+            options.headers['Authorization'] = 'TorchED_AUTH';
           }
           return handler.next(options);
         },
@@ -71,13 +85,15 @@ class ApiService {
     );
 
     // Add logging in debug mode
-    _dio.interceptors.add(
+    dio.interceptors.add(
       LogInterceptor(
         requestBody: true,
         responseBody: true,
         error: true,
       ),
     );
+
+    return dio;
   }
 
   String? _extractToken(String cookie) {
@@ -86,7 +102,22 @@ class ApiService {
   }
 
   // ============================================================================
-  // GENERIC HTTP METHODS
+  // API SELECTION HELPER
+  // ============================================================================
+
+  /// Determines which API to use based on the endpoint path
+  Dio _getDioForPath(String path) {
+    // Flask API endpoints (auth-related)
+    if (path.startsWith('/auth') ||
+        path.startsWith(AppConfig.authEndpoint)) {
+      return _flaskDio;
+    }
+    // RAG API endpoints (everything else)
+    return _ragDio;
+  }
+
+  // ============================================================================
+  // GENERIC HTTP METHODS (auto-select API based on path)
   // ============================================================================
 
   Future<Response<T>> get<T>(
@@ -94,7 +125,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    return await _dio.get<T>(
+    return await _getDioForPath(path).get<T>(
       path,
       queryParameters: queryParameters,
       options: options,
@@ -107,7 +138,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    return await _dio.post<T>(
+    return await _getDioForPath(path).post<T>(
       path,
       data: data,
       queryParameters: queryParameters,
@@ -121,7 +152,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    return await _dio.put<T>(
+    return await _getDioForPath(path).put<T>(
       path,
       data: data,
       queryParameters: queryParameters,
@@ -135,7 +166,7 @@ class ApiService {
     Map<String, dynamic>? queryParameters,
     Options? options,
   }) async {
-    return await _dio.delete<T>(
+    return await _getDioForPath(path).delete<T>(
       path,
       data: data,
       queryParameters: queryParameters,
@@ -144,7 +175,37 @@ class ApiService {
   }
 
   // ============================================================================
-  // FILE UPLOAD
+  // EXPLICIT API METHODS (for cases where you want to specify which API)
+  // ============================================================================
+
+  /// Make a request to the Flask API (auth, user management)
+  Future<Response<T>> flaskGet<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+    return await _flaskDio.get<T>(path, queryParameters: queryParameters);
+  }
+
+  Future<Response<T>> flaskPost<T>(String path, {dynamic data}) async {
+    return await _flaskDio.post<T>(path, data: data);
+  }
+
+  /// Make a request to the RAG API (chat, flashcards, exams, files)
+  Future<Response<T>> ragGet<T>(String path, {Map<String, dynamic>? queryParameters}) async {
+    return await _ragDio.get<T>(path, queryParameters: queryParameters);
+  }
+
+  Future<Response<T>> ragPost<T>(String path, {dynamic data}) async {
+    return await _ragDio.post<T>(path, data: data);
+  }
+
+  Future<Response<T>> ragPut<T>(String path, {dynamic data}) async {
+    return await _ragDio.put<T>(path, data: data);
+  }
+
+  Future<Response<T>> ragDelete<T>(String path, {dynamic data}) async {
+    return await _ragDio.delete<T>(path, data: data);
+  }
+
+  // ============================================================================
+  // FILE UPLOAD (RAG API)
   // ============================================================================
 
   Future<Response<T>> uploadFile<T>(
@@ -158,7 +219,7 @@ class ApiService {
       ...?data,
     });
 
-    return await _dio.post<T>(
+    return await _ragDio.post<T>(
       path,
       data: formData,
       options: Options(
