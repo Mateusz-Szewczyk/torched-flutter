@@ -2,17 +2,27 @@ workflows:
   ios-workflow:
     name: iOS Workflow
     environment:
-      groups:
-        - production_secrets  # Your env variables
       flutter: stable
       xcode: latest
+      groups:
+        - production_secrets
     scripts:
-      - name: Generate iOS folder
+      - name: Check and create iOS folder
         script: |
-          flutter create --platforms ios .
-      - name: Get dependencies
+          echo "Checking for iOS folder..."
+          if [ ! -d "ios" ]; then
+            echo "iOS folder not found, creating..."
+            flutter create --platforms=ios .
+          else
+            echo "iOS folder exists"
+          fi
+          ls -la ios/
+      - name: Get Flutter packages
         script: |
           flutter pub get
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios && pod install
       - name: Build iOS
         script: |
           flutter build ipa --release
