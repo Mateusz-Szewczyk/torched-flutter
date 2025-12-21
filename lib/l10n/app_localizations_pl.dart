@@ -15,6 +15,10 @@ class AppLocalizationsPl extends AppLocalizations {
   String get flashcards => 'Fiszki';
 
   @override
+  String get flashcardsDescription =>
+      'Twórz i ucz się z talii fiszek, aby zwiększyć efektywność nauki';
+
+  @override
   String get chat => 'Czat';
 
   @override
@@ -116,6 +120,9 @@ class AppLocalizationsPl extends AppLocalizations {
   String get error => 'Błąd';
 
   @override
+  String get errorOccurred => 'Wystąpił błąd';
+
+  @override
   String get try_again => 'Spróbuj ponownie';
 
   @override
@@ -131,6 +138,9 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get create_your_first_deck => 'Utwórz swoją pierwszą talię';
+
+  @override
+  String get createDeck => 'Utwórz Talię';
 
   @override
   String get create_new_deck => 'Utwórz nową talię';
@@ -219,7 +229,13 @@ class AppLocalizationsPl extends AppLocalizations {
   String get edit_deck => 'Edytuj talię';
 
   @override
+  String get editDeck => 'Edytuj Talię';
+
+  @override
   String get deck_name => 'Nazwa talii';
+
+  @override
+  String get deckName => 'Nazwa Talii';
 
   @override
   String get enter_deck_name => 'Wprowadź nazwę talii';
@@ -283,4 +299,287 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get profile => 'Profil';
+
+  @override
+  String get searchDecks => 'Szukaj talii...';
+
+  @override
+  String get cards => 'fiszek';
+
+  @override
+  String get shared => 'Udostępniona';
+
+  @override
+  String get share => 'Udostępnij';
+
+  @override
+  String get addByCode => 'Dodaj Kodem';
+
+  @override
+  String get manageShares => 'Zarządzaj Udostępnieniami';
+
+  @override
+  String get name => 'Nazwa';
+
+  @override
+  String get cardCount => 'Liczba Fiszek';
+
+  @override
+  String get recent => 'Ostatnie';
+
+  @override
+  String get lastSession => 'Ostatnia Sesja';
+
+  @override
+  String get ascending => 'Rosnąco';
+
+  @override
+  String get descending => 'Malejąco';
+
+  @override
+  String get deleteDeck => 'Usuń Talię';
+
+  @override
+  String deleteDeckConfirm(String name) {
+    return 'Czy na pewno chcesz usunąć \"$name\"? Tej operacji nie można cofnąć.';
+  }
+
+  @override
+  String get deckDeleted => 'Talia usunięta';
+
+  @override
+  String get removeSharedDeck => 'Usuń Udostępnioną Talię';
+
+  @override
+  String get removeSharedDeckConfirm =>
+      'Czy na pewno chcesz usunąć tę udostępnioną talię z biblioteki?';
+
+  @override
+  String get remove => 'Usuń';
+
+  @override
+  String get removeFromLibrary => 'Usuń z biblioteki';
+
+  @override
+  String get showAnswer => 'Pokaż Odpowiedź';
+
+  @override
+  String get tapToFlip => 'Dotknij, aby odwrócić';
+
+  @override
+  String get hard => 'Trudne';
+
+  @override
+  String get tryAgain => 'Spróbuj ponownie';
+
+  @override
+  String get good => 'Dobrze';
+
+  @override
+  String get reviewLater => 'Powtórz później';
+
+  @override
+  String get easy => 'Łatwe';
+
+  @override
+  String get gotIt => 'Znam!';
+
+  @override
+  String get exit => 'Wyjdź';
+
+  @override
+  String get sessionComplete => 'Sesja Zakończona!';
+
+  @override
+  String cardsReviewed(String count) {
+    return 'Przejrzałeś $count fiszek';
+  }
+
+  @override
+  String nextSession(String date) {
+    return 'Następna sesja: $date';
+  }
+
+  @override
+  String get retakeHardCards => 'Powtórz Trudne';
+
+  @override
+  String get retakeSession => 'Powtórz Sesję';
+
+  @override
+  String get saveAndExit => 'Zapisz i Wyjdź';
+
+  @override
+  String get backToDecks => 'Powrót do Talii';
+
+  @override
+  String get noCardsToRetake => 'Brak fiszek do powtórzenia';
+
+  @override
+  String get finish => 'Zakończ';
+
+  @override
+  String get noHardCardsFound => 'Nie znaleziono trudnych fiszek';
+
+  @override
+  String get addDeckByCode => 'Dodaj Talię Kodem';
+
+  @override
+  String get shareCode => 'Kod Udostępniania';
+
+  @override
+  String get alreadyAdded => 'Już w Twojej bibliotece';
+
+  @override
+  String get add => 'Dodaj';
+
+  @override
+  String get deckAddedSuccessfully => 'Talia dodana pomyślnie';
+
+  @override
+  String get noSharedDecks => 'Brak udostępnionych talii';
+
+  @override
+  String get close => 'Zamknij';
+
+  @override
+  String get description => 'Opis (opcjonalny)';
+
+  @override
+  String get nameRequired => 'Nazwa jest wymagana';
+
+  @override
+  String get addCard => 'Dodaj Fiszkę';
+
+  @override
+  String get card => 'Fiszka';
+
+  @override
+  String get testsDescription =>
+      'Create and take practice exams to test your knowledge';
+
+  @override
+  String get searchExams => 'Search exams...';
+
+  @override
+  String get welcomeTests => 'Welcome to Tests';
+
+  @override
+  String get getStartedCreateTest =>
+      'Create your first exam or add one using a share code';
+
+  @override
+  String get createExam => 'Create Exam';
+
+  @override
+  String get editExam => 'Edit Exam';
+
+  @override
+  String get deleteExam => 'Delete Exam';
+
+  @override
+  String get examDeleted => 'Exam deleted';
+
+  @override
+  String get examName => 'Exam Name';
+
+  @override
+  String get questions => 'Questions';
+
+  @override
+  String get addQuestion => 'Add Question';
+
+  @override
+  String get questionText => 'Question text';
+
+  @override
+  String get answers => 'Answers';
+
+  @override
+  String get selectNumberOfQuestions => 'Select Number of Questions';
+
+  @override
+  String get estimatedTime => 'Est. Time';
+
+  @override
+  String get startExam => 'Start Exam';
+
+  @override
+  String get examComplete => 'Exam Complete!';
+
+  @override
+  String get congratulationsPassed => 'Congratulations! You passed!';
+
+  @override
+  String get keepPracticing => 'Keep practicing!';
+
+  @override
+  String get correct => 'Correct';
+
+  @override
+  String get correctAnswers => 'Correct';
+
+  @override
+  String get incorrectAnswers => 'Incorrect';
+
+  @override
+  String get timeTaken => 'Time';
+
+  @override
+  String get submittingResults => 'Submitting results...';
+
+  @override
+  String get resultsSaved => 'Results saved!';
+
+  @override
+  String get backToExams => 'Back to Exams';
+
+  @override
+  String get previous => 'Previous';
+
+  @override
+  String get next => 'Next';
+
+  @override
+  String get addExamByCode => 'Add Exam by Code';
+
+  @override
+  String get examAddedSuccessfully => 'Exam added successfully';
+
+  @override
+  String get noSharedExams => 'No shared exams yet';
+
+  @override
+  String get removeSharedExam => 'Remove Shared Exam';
+
+  @override
+  String get removeSharedExamConfirm =>
+      'Are you sure you want to remove this shared exam from your library?';
+
+  @override
+  String get examHasNoQuestions => 'This exam has no questions.';
+
+  @override
+  String get selectConversation => 'Select a conversation';
+
+  @override
+  String get orCreateNew => 'or create a new one from the sidebar';
+
+  @override
+  String get startChatting => 'Start chatting';
+
+  @override
+  String get askAnything => 'Ask me anything!';
+
+  @override
+  String get tools => 'Tools';
+
+  @override
+  String get selectTools => 'Select Tools';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get done => 'Done';
 }

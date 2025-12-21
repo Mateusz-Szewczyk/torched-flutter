@@ -6,8 +6,12 @@ import 'config/router.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/conversation_provider.dart';
+import 'providers/flashcards_provider.dart';
+import 'providers/exams_provider.dart';
 import 'services/api_service.dart';
 import 'services/storage_service.dart';
+import 'data/cache/cache_manager.dart';
+import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +22,10 @@ void main() async {
 
   final apiService = ApiService();
   apiService.init();
+
+  // Initialize local cache
+  final cacheManager = CacheManager();
+  await cacheManager.init();
 
   runApp(const TorchEdApp());
 }
@@ -32,6 +40,8 @@ class TorchEdApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..init()),
         ChangeNotifierProvider(create: (_) => ConversationProvider()),
+        ChangeNotifierProvider(create: (_) => FlashcardsProvider()),
+        ChangeNotifierProvider(create: (_) => ExamsProvider()),
       ],
       child: const _AppContent(),
     );
@@ -62,6 +72,7 @@ class _AppContent extends StatelessWidget {
 
       // Localization
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,

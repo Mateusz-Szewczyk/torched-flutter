@@ -3,29 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
-import '../providers/flashcards_provider.dart';
-import '../services/deck_service.dart';
-import '../widgets/study_deck_widget.dart';
+import '../providers/exams_provider.dart';
+import '../services/exam_service.dart';
+import '../widgets/study_exam_widget.dart';
 
-/// Flashcards screen - equivalent to app/flashcards/page.tsx
-/// Main screen for managing and studying flashcard decks
-class FlashcardsScreen extends StatefulWidget {
-  const FlashcardsScreen({super.key});
+/// Exams screen - equivalent to app/tests/page.tsx
+/// Main screen for managing and taking exams
+class ExamsScreen extends StatefulWidget {
+  const ExamsScreen({super.key});
 
   @override
-  State<FlashcardsScreen> createState() => _FlashcardsScreenState();
+  State<ExamsScreen> createState() => _ExamsScreenState();
 }
 
-class _FlashcardsScreenState extends State<FlashcardsScreen> {
+class _ExamsScreenState extends State<ExamsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
-    // Fetch decks on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FlashcardsProvider>().fetchDeckInfos();
+      context.read<ExamsProvider>().fetchExamInfos();
     });
   }
 
@@ -38,16 +37,12 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<FlashcardsProvider>(
+    return Consumer<ExamsProvider>(
       builder: (context, provider, _) {
         // Study mode
-        if (provider.isStudying && provider.studyingDeck != null) {
-          return StudyDeckWidget(
-            deck: provider.studyingDeck!,
-            studySessionId: provider.studySessionId,
-            availableCards: provider.availableCards,
-            nextSessionDate: provider.nextSessionDate,
-            conversationId: provider.conversationId,
+        if (provider.isStudying && provider.studyingExam != null) {
+          return StudyExamWidget(
+            exam: provider.studyingExam!,
             onExit: provider.exitStudy,
             provider: provider,
           );
@@ -59,24 +54,24 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     );
   }
 
-  Widget _buildMainContent(BuildContext context, FlashcardsProvider provider) {
+  Widget _buildMainContent(BuildContext context, ExamsProvider provider) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     // Loading state
-    if (provider.isLoading && provider.deckInfos.isEmpty) {
+    if (provider.isLoading && provider.examInfos.isEmpty) {
       return _buildLoadingState(colorScheme);
     }
 
     // Error state
-    if (provider.error != null && provider.deckInfos.isEmpty) {
+    if (provider.error != null && provider.examInfos.isEmpty) {
       return _buildErrorState(context, provider, l10n, colorScheme);
     }
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: provider.fetchDeckInfos,
+        onRefresh: provider.fetchExamInfos,
         child: CustomScrollView(
           slivers: [
             // Header
@@ -85,7 +80,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             ),
 
             // Empty state or content
-            if (provider.deckInfos.isEmpty)
+            if (provider.examInfos.isEmpty)
               SliverFillRemaining(
                 child: _buildEmptyState(context, provider, l10n, colorScheme),
               )
@@ -95,7 +90,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 child: _buildSearchAndFilterBar(context, provider, l10n, colorScheme),
               ),
 
-              // Deck grid
+              // Exam grid
               SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverGrid(
@@ -109,17 +104,17 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final deckInfo = provider.filteredDeckInfos[index];
-                      return _DeckCard(
-                        deckInfo: deckInfo,
-                        onStudy: () => _handleStudy(context, provider, deckInfo),
-                        onEdit: () => _showEditDeckDialog(context, provider, deckInfo),
-                        onDelete: () => _showDeleteConfirmation(context, provider, deckInfo),
-                        onShare: () => _handleShare(context, provider, deckInfo),
-                        onRemoveShared: () => _handleRemoveShared(context, provider, deckInfo),
+                      final examInfo = provider.filteredExamInfos[index];
+                      return _ExamCard(
+                        examInfo: examInfo,
+                        onStudy: () => _handleStudy(context, provider, examInfo),
+                        onEdit: () => _showEditExamDialog(context, provider, examInfo),
+                        onDelete: () => _showDeleteConfirmation(context, provider, examInfo),
+                        onShare: () => _handleShare(context, provider, examInfo),
+                        onRemoveShared: () => _handleRemoveShared(context, provider, examInfo),
                       );
                     },
-                    childCount: provider.filteredDeckInfos.length,
+                    childCount: provider.filteredExamInfos.length,
                   ),
                 ),
               ),
@@ -127,11 +122,11 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           ],
         ),
       ),
-      floatingActionButton: provider.deckInfos.isNotEmpty
+      floatingActionButton: provider.examInfos.isNotEmpty
           ? FloatingActionButton.extended(
-              onPressed: () => _showCreateDeckDialog(context, provider),
+              onPressed: () => _showCreateExamDialog(context, provider),
               icon: const Icon(Icons.add),
-              label: Text(l10n?.createDeck ?? 'Create Deck'),
+              label: Text(l10n?.createExam ?? 'Create Exam'),
             )
           : null,
     );
@@ -142,19 +137,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       child: Column(
         children: [
-          // Title
           Text(
-            l10n?.flashcards ?? 'Flashcards',
+            l10n?.tests ?? 'Tests',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: colorScheme.primary,
             ),
           ),
           const SizedBox(height: 8),
-          // Description
           Text(
-            l10n?.flashcardsDescription ??
-                'Create and study flashcard decks to boost your learning',
+            l10n?.testsDescription ?? 'Create and take practice exams to test your knowledge',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -174,7 +166,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             CircularProgressIndicator(color: colorScheme.primary),
             const SizedBox(height: 16),
             Text(
-              'Loading decks...',
+              'Loading exams...',
               style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ],
@@ -185,7 +177,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Widget _buildErrorState(
     BuildContext context,
-    FlashcardsProvider provider,
+    ExamsProvider provider,
     AppLocalizations? l10n,
     ColorScheme colorScheme,
   ) {
@@ -196,11 +188,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.error_outline,
-                size: 64,
-                color: colorScheme.error,
-              ),
+              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
               const SizedBox(height: 16),
               Text(
                 l10n?.error ?? 'Error',
@@ -218,7 +206,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               FilledButton.icon(
                 onPressed: () {
                   provider.clearError();
-                  provider.fetchDeckInfos();
+                  provider.fetchExamInfos();
                 },
                 icon: const Icon(Icons.refresh),
                 label: Text(l10n?.try_again ?? 'Try Again'),
@@ -232,7 +220,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Widget _buildEmptyState(
     BuildContext context,
-    FlashcardsProvider provider,
+    ExamsProvider provider,
     AppLocalizations? l10n,
     ColorScheme colorScheme,
   ) {
@@ -250,22 +238,21 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.style_outlined,
+                Icons.quiz_outlined,
                 size: 48,
                 color: colorScheme.primary,
               ),
             ),
             const SizedBox(height: 24),
             Text(
-              l10n?.welcome_flashcards ?? 'Welcome to Flashcards',
+              l10n?.welcomeTests ?? 'Welcome to Tests',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              l10n?.get_started_create_deck ??
-                  'Create your first deck or add one using a share code',
+              l10n?.getStartedCreateTest ?? 'Create your first exam or add one using a share code',
               textAlign: TextAlign.center,
               style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
@@ -274,9 +261,9 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 FilledButton.icon(
-                  onPressed: () => _showCreateDeckDialog(context, provider),
+                  onPressed: () => _showCreateExamDialog(context, provider),
                   icon: const Icon(Icons.add),
-                  label: Text(l10n?.create_your_first_deck ?? 'Create Deck'),
+                  label: Text(l10n?.createExam ?? 'Create Exam'),
                 ),
                 const SizedBox(width: 16),
                 OutlinedButton.icon(
@@ -294,7 +281,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Widget _buildSearchAndFilterBar(
     BuildContext context,
-    FlashcardsProvider provider,
+    ExamsProvider provider,
     AppLocalizations? l10n,
     ColorScheme colorScheme,
   ) {
@@ -307,7 +294,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             controller: _searchController,
             focusNode: _searchFocusNode,
             decoration: InputDecoration(
-              hintText: l10n?.searchDecks ?? 'Search decks...',
+              hintText: l10n?.searchExams ?? 'Search exams...',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
@@ -334,14 +321,11 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                // Sort dropdown
                 _SortDropdown(
                   sortBy: provider.sortBy,
                   onChanged: provider.setSortBy,
                 ),
                 const SizedBox(width: 8),
-
-                // Sort direction
                 IconButton.outlined(
                   onPressed: provider.toggleSortDirection,
                   icon: Icon(
@@ -349,21 +333,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                         ? Icons.arrow_upward
                         : Icons.arrow_downward,
                   ),
-                  tooltip: provider.sortDirection == SortDirection.asc
-                      ? l10n?.ascending ?? 'Ascending'
-                      : l10n?.descending ?? 'Descending',
                 ),
                 const SizedBox(width: 8),
-
-                // Add by code
                 OutlinedButton.icon(
                   onPressed: () => _showAddByCodeDialog(context, provider),
                   icon: const Icon(Icons.download, size: 18),
                   label: Text(l10n?.addByCode ?? 'Add by Code'),
                 ),
                 const SizedBox(width: 8),
-
-                // Manage shares
                 OutlinedButton.icon(
                   onPressed: () => _showManageSharesDialog(context, provider),
                   icon: const Icon(Icons.people, size: 18),
@@ -383,14 +360,14 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Future<void> _handleStudy(
     BuildContext context,
-    FlashcardsProvider provider,
-    DeckInfo deckInfo,
+    ExamsProvider provider,
+    ExamInfo examInfo,
   ) async {
-    final success = await provider.startStudy(deckInfo);
+    final success = await provider.startStudy(examInfo);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(provider.error ?? 'Failed to start study session'),
+          content: Text(provider.error ?? 'Failed to start exam'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -399,10 +376,10 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Future<void> _handleShare(
     BuildContext context,
-    FlashcardsProvider provider,
-    DeckInfo deckInfo,
+    ExamsProvider provider,
+    ExamInfo examInfo,
   ) async {
-    final shareCode = await provider.shareDeck(deckInfo.id);
+    final shareCode = await provider.shareExam(examInfo.id);
     if (shareCode != null && mounted) {
       await Clipboard.setData(ClipboardData(text: shareCode));
       ScaffoldMessenger.of(context).showSnackBar(
@@ -421,17 +398,17 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Future<void> _handleRemoveShared(
     BuildContext context,
-    FlashcardsProvider provider,
-    DeckInfo deckInfo,
+    ExamsProvider provider,
+    ExamInfo examInfo,
   ) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n?.removeSharedDeck ?? 'Remove Shared Deck'),
+        title: Text(l10n?.removeSharedExam ?? 'Remove Shared Exam'),
         content: Text(
-          l10n?.removeSharedDeckConfirm ??
-              'Are you sure you want to remove this shared deck from your library?',
+          l10n?.removeSharedExamConfirm ??
+              'Are you sure you want to remove this shared exam from your library?',
         ),
         actions: [
           TextButton(
@@ -447,19 +424,19 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     );
 
     if (confirmed == true) {
-      await provider.removeSharedDeck(deckInfo.id);
+      await provider.removeSharedExam(examInfo.id);
     }
   }
 
-  void _showCreateDeckDialog(BuildContext context, FlashcardsProvider provider) {
+  void _showCreateExamDialog(BuildContext context, ExamsProvider provider) {
     showDialog(
       context: context,
-      builder: (context) => _EditDeckDialog(
-        onSave: (name, description, flashcards) async {
-          final success = await provider.createDeck(
+      builder: (context) => _EditExamDialog(
+        onSave: (name, description, questions) async {
+          final success = await provider.createExam(
             name: name,
             description: description,
-            flashcards: flashcards,
+            questions: questions,
           );
           if (success && mounted) {
             Navigator.pop(context);
@@ -470,40 +447,34 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     );
   }
 
-  void _showEditDeckDialog(
+  void _showEditExamDialog(
     BuildContext context,
-    FlashcardsProvider provider,
-    DeckInfo deckInfo,
+    ExamsProvider provider,
+    ExamInfo examInfo,
   ) async {
-    // Track if loading dialog is still showing
     bool isLoadingDialogOpen = true;
 
-    // Show loading indicator
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (loadingContext) => PopScope(
         canPop: false,
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        child: const Center(child: CircularProgressIndicator()),
       ),
     ).then((_) {
       isLoadingDialogOpen = false;
     });
 
-    Deck? deck;
+    Exam? exam;
     String? errorMessage;
 
     try {
-      // Fetch full deck with flashcards
-      final deckService = DeckService();
-      deck = await deckService.fetchDeck(deckInfo.id);
+      final examService = ExamService();
+      exam = await examService.fetchExam(examInfo.id);
     } catch (e) {
       errorMessage = e.toString();
     }
 
-    // Close loading indicator only if it's still open and widget is mounted
     if (isLoadingDialogOpen && mounted) {
       Navigator.of(context, rootNavigator: true).pop();
     }
@@ -512,29 +483,28 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
     if (errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading deck: $errorMessage')),
+        SnackBar(content: Text('Error loading exam: $errorMessage')),
       );
       return;
     }
 
-    if (deck == null) {
+    if (exam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load deck')),
+        const SnackBar(content: Text('Failed to load exam')),
       );
       return;
     }
 
-    // Show edit dialog with full deck
     showDialog(
       context: context,
-      builder: (editDialogContext) => _EditDeckDialog(
-        deck: deck,
-        onSave: (name, description, flashcards) async {
-          final success = await provider.updateDeck(
-            deckId: deck!.id,
+      builder: (editDialogContext) => _EditExamDialog(
+        exam: exam,
+        onSave: (name, description, questions) async {
+          final success = await provider.updateExam(
+            examId: exam!.id,
             name: name,
             description: description,
-            flashcards: flashcards,
+            questions: questions,
           );
           if (success) {
             Navigator.of(editDialogContext).pop();
@@ -547,17 +517,16 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   void _showDeleteConfirmation(
     BuildContext context,
-    FlashcardsProvider provider,
-    DeckInfo deckInfo,
+    ExamsProvider provider,
+    ExamInfo examInfo,
   ) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n?.deleteDeck ?? 'Delete Deck'),
+        title: Text(l10n?.deleteExam ?? 'Delete Exam'),
         content: Text(
-          l10n?.deleteDeckConfirm(deckInfo.name) ??
-              'Are you sure you want to delete "${deckInfo.name}"? This cannot be undone.',
+          'Are you sure you want to delete "${examInfo.name}"? This cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -576,25 +545,23 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     );
 
     if (confirmed == true) {
-      final success = await provider.deleteDeck(deckInfo.id);
+      final success = await provider.deleteExam(examInfo.id);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n?.deckDeleted ?? 'Deck deleted'),
-          ),
+          SnackBar(content: Text(l10n?.examDeleted ?? 'Exam deleted')),
         );
       }
     }
   }
 
-  void _showAddByCodeDialog(BuildContext context, FlashcardsProvider provider) {
+  void _showAddByCodeDialog(BuildContext context, ExamsProvider provider) {
     showDialog(
       context: context,
       builder: (context) => _AddByCodeDialog(provider: provider),
     );
   }
 
-  void _showManageSharesDialog(BuildContext context, FlashcardsProvider provider) {
+  void _showManageSharesDialog(BuildContext context, ExamsProvider provider) {
     provider.fetchMySharedCodes();
     showDialog(
       context: context,
@@ -604,19 +571,19 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 }
 
 // ============================================================================
-// DECK CARD WIDGET
+// EXAM CARD WIDGET
 // ============================================================================
 
-class _DeckCard extends StatelessWidget {
-  final DeckInfo deckInfo;
+class _ExamCard extends StatelessWidget {
+  final ExamInfo examInfo;
   final VoidCallback onStudy;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onShare;
   final VoidCallback onRemoveShared;
 
-  const _DeckCard({
-    required this.deckInfo,
+  const _ExamCard({
+    required this.examInfo,
     required this.onStudy,
     required this.onEdit,
     required this.onDelete,
@@ -629,7 +596,7 @@ class _DeckCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final isShared = deckInfo.accessType == 'shared' || deckInfo.isOwn == false;
+    final isShared = examInfo.accessType == 'shared' || examInfo.isOwn == false;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -647,9 +614,8 @@ class _DeckCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Title
                         Text(
-                          deckInfo.name,
+                          examInfo.name,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -657,17 +623,16 @@ class _DeckCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        // Card count
                         Row(
                           children: [
                             Icon(
-                              Icons.style,
+                              Icons.quiz,
                               size: 14,
                               color: colorScheme.primary,
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${deckInfo.flashcardCount} ${l10n?.cards ?? 'cards'}',
+                              '${examInfo.questionCount} ${l10n?.questions ?? 'questions'}',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colorScheme.primary,
                               ),
@@ -696,7 +661,6 @@ class _DeckCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Menu
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert),
                     onSelected: (value) {
@@ -770,11 +734,11 @@ class _DeckCard extends StatelessWidget {
               ),
 
               // Description
-              if (deckInfo.description != null && deckInfo.description!.isNotEmpty) ...[
+              if (examInfo.description.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Expanded(
                   child: Text(
-                    deckInfo.description!,
+                    examInfo.description,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -788,34 +752,12 @@ class _DeckCard extends StatelessWidget {
               // Footer
               const SizedBox(height: 8),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  // Last session
-                  if (deckInfo.lastSession != null)
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: colorScheme.outline,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatDate(deckInfo.lastSession!),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.outline,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    const SizedBox.shrink(),
-
-                  // Study button
                   FilledButton.icon(
                     onPressed: onStudy,
                     icon: const Icon(Icons.play_arrow, size: 18),
-                    label: Text(l10n?.study ?? 'Study'),
+                    label: Text(l10n?.startExam ?? 'Start'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       minimumSize: const Size(0, 36),
@@ -829,24 +771,6 @@ class _DeckCard extends StatelessWidget {
       ),
     );
   }
-
-  String _formatDate(String dateString) {
-    final date = DateTime.tryParse(dateString);
-    if (date == null) return dateString;
-
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return 'Today';
-    } else if (difference.inDays == 1) {
-      return 'Yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}';
-    }
-  }
 }
 
 // ============================================================================
@@ -854,8 +778,8 @@ class _DeckCard extends StatelessWidget {
 // ============================================================================
 
 class _SortDropdown extends StatelessWidget {
-  final DeckSortOption sortBy;
-  final Function(DeckSortOption) onChanged;
+  final ExamSortOption sortBy;
+  final Function(ExamSortOption) onChanged;
 
   const _SortDropdown({
     required this.sortBy,
@@ -866,7 +790,7 @@ class _SortDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return PopupMenuButton<DeckSortOption>(
+    return PopupMenuButton<ExamSortOption>(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -887,78 +811,75 @@ class _SortDropdown extends StatelessWidget {
       onSelected: onChanged,
       itemBuilder: (context) => [
         PopupMenuItem(
-          value: DeckSortOption.name,
+          value: ExamSortOption.name,
           child: Text(l10n?.name ?? 'Name'),
         ),
         PopupMenuItem(
-          value: DeckSortOption.cards,
-          child: Text(l10n?.cardCount ?? 'Card Count'),
+          value: ExamSortOption.questions,
+          child: Text(l10n?.questions ?? 'Questions'),
         ),
         PopupMenuItem(
-          value: DeckSortOption.recent,
+          value: ExamSortOption.recent,
           child: Text(l10n?.recent ?? 'Recent'),
-        ),
-        PopupMenuItem(
-          value: DeckSortOption.lastSession,
-          child: Text(l10n?.lastSession ?? 'Last Session'),
         ),
       ],
     );
   }
 
-  String _getSortLabel(DeckSortOption option, AppLocalizations? l10n) {
+  String _getSortLabel(ExamSortOption option, AppLocalizations? l10n) {
     switch (option) {
-      case DeckSortOption.name:
+      case ExamSortOption.name:
         return l10n?.name ?? 'Name';
-      case DeckSortOption.cards:
-        return l10n?.cardCount ?? 'Cards';
-      case DeckSortOption.recent:
+      case ExamSortOption.questions:
+        return l10n?.questions ?? 'Questions';
+      case ExamSortOption.recent:
         return l10n?.recent ?? 'Recent';
-      case DeckSortOption.lastSession:
-        return l10n?.lastSession ?? 'Last Session';
     }
   }
 }
 
 // ============================================================================
-// EDIT DECK DIALOG
+// EDIT EXAM DIALOG
 // ============================================================================
 
-class _EditDeckDialog extends StatefulWidget {
-  final Future<bool> Function(String name, String? description, List<Flashcard> flashcards) onSave;
-  final Deck? deck;
+class _EditExamDialog extends StatefulWidget {
+  final Future<bool> Function(String name, String description, List<ExamQuestion> questions) onSave;
+  final Exam? exam;
 
-  const _EditDeckDialog({
+  const _EditExamDialog({
     required this.onSave,
-    this.deck,
+    this.exam,
   });
 
   @override
-  State<_EditDeckDialog> createState() => _EditDeckDialogState();
+  State<_EditExamDialog> createState() => _EditExamDialogState();
 }
 
-class _EditDeckDialogState extends State<_EditDeckDialog> {
+class _EditExamDialogState extends State<_EditExamDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
-  List<_FlashcardInput> _flashcards = [];
+  List<_QuestionInput> _questions = [];
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.deck != null) {
-      _nameController.text = widget.deck!.name;
-      _descriptionController.text = widget.deck!.description ?? '';
-      _flashcards = widget.deck!.flashcards
-          .map((f) => _FlashcardInput(
-                question: f.question,
-                answer: f.answer,
-              ))
-          .toList();
+    if (widget.exam != null) {
+      _nameController.text = widget.exam!.name;
+      _descriptionController.text = widget.exam!.description;
+      _questions = widget.exam!.questions.map((q) => _QuestionInput(
+        id: q.id,
+        text: q.text,
+        answers: q.answers.map((a) => _AnswerInput(
+          id: a.id,
+          text: a.text,
+          isCorrect: a.isCorrect,
+        )).toList(),
+      )).toList();
     }
-    if (_flashcards.isEmpty) {
-      _flashcards.add(_FlashcardInput());
+    if (_questions.isEmpty) {
+      _questions.add(_QuestionInput.empty());
     }
   }
 
@@ -969,16 +890,16 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
     super.dispose();
   }
 
-  void _addFlashcard() {
+  void _addQuestion() {
     setState(() {
-      _flashcards.add(_FlashcardInput());
+      _questions.add(_QuestionInput.empty());
     });
   }
 
-  void _removeFlashcard(int index) {
-    if (_flashcards.length > 1) {
+  void _removeQuestion(int index) {
+    if (_questions.length > 1) {
       setState(() {
-        _flashcards.removeAt(index);
+        _questions.removeAt(index);
       });
     }
   }
@@ -988,17 +909,25 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
 
     setState(() => _isSaving = true);
 
-    final flashcards = _flashcards
-        .where((f) => f.question.isNotEmpty && f.answer.isNotEmpty)
-        .map((f) => Flashcard(
-              question: f.question,
-              answer: f.answer,
+    final questions = _questions
+        .where((q) => q.text.isNotEmpty && q.answers.any((a) => a.text.isNotEmpty))
+        .map((q) => ExamQuestion(
+              id: q.id,
+              text: q.text,
+              answers: q.answers
+                  .where((a) => a.text.isNotEmpty)
+                  .map((a) => ExamAnswer(
+                        id: a.id,
+                        text: a.text,
+                        isCorrect: a.isCorrect,
+                      ))
+                  .toList(),
             ))
         .toList();
 
-    if (flashcards.isEmpty) {
+    if (questions.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one flashcard')),
+        const SnackBar(content: Text('Add at least one question with answers')),
       );
       setState(() => _isSaving = false);
       return;
@@ -1006,10 +935,8 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
 
     await widget.onSave(
       _nameController.text.trim(),
-      _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      flashcards,
+      _descriptionController.text.trim(),
+      questions,
     );
 
     setState(() => _isSaving = false);
@@ -1021,7 +948,7 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
 
     return Dialog(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 700, maxHeight: 800),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1031,9 +958,9 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
               child: Row(
                 children: [
                   Text(
-                    widget.deck != null
-                        ? l10n?.editDeck ?? 'Edit Deck'
-                        : l10n?.createDeck ?? 'Create Deck',
+                    widget.exam != null
+                        ? l10n?.editExam ?? 'Edit Exam'
+                        : l10n?.createExam ?? 'Create Exam',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const Spacer(),
@@ -1055,11 +982,10 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Name
                       TextFormField(
                         controller: _nameController,
                         decoration: InputDecoration(
-                          labelText: l10n?.deckName ?? 'Deck Name',
+                          labelText: l10n?.examName ?? 'Exam Name',
                           border: const OutlineInputBorder(),
                         ),
                         validator: (value) {
@@ -1071,7 +997,6 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Description
                       TextFormField(
                         controller: _descriptionController,
                         decoration: InputDecoration(
@@ -1082,31 +1007,29 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Flashcards
                       Row(
                         children: [
                           Text(
-                            l10n?.flashcards ?? 'Flashcards',
+                            l10n?.questions ?? 'Questions',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const Spacer(),
                           TextButton.icon(
-                            onPressed: _addFlashcard,
+                            onPressed: _addQuestion,
                             icon: const Icon(Icons.add),
-                            label: Text(l10n?.addCard ?? 'Add Card'),
+                            label: Text(l10n?.addQuestion ?? 'Add Question'),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
 
-                      // Flashcard list
-                      ...List.generate(_flashcards.length, (index) {
-                        return _FlashcardInputWidget(
+                      ...List.generate(_questions.length, (index) {
+                        return _QuestionInputWidget(
                           key: ValueKey(index),
-                          input: _flashcards[index],
+                          input: _questions[index],
                           index: index + 1,
-                          canDelete: _flashcards.length > 1,
-                          onDelete: () => _removeFlashcard(index),
+                          canDelete: _questions.length > 1,
+                          onDelete: () => _removeQuestion(index),
                         );
                       }),
                     ],
@@ -1147,20 +1070,41 @@ class _EditDeckDialogState extends State<_EditDeckDialog> {
   }
 }
 
-class _FlashcardInput {
-  String question;
-  String answer;
+class _QuestionInput {
+  int? id;
+  String text;
+  List<_AnswerInput> answers;
 
-  _FlashcardInput({this.question = '', this.answer = ''});
+  _QuestionInput({this.id, this.text = '', List<_AnswerInput>? answers})
+      : answers = answers ?? [];
+
+  factory _QuestionInput.empty() {
+    return _QuestionInput(
+      answers: [
+        _AnswerInput(isCorrect: true),
+        _AnswerInput(),
+        _AnswerInput(),
+        _AnswerInput(),
+      ],
+    );
+  }
 }
 
-class _FlashcardInputWidget extends StatelessWidget {
-  final _FlashcardInput input;
+class _AnswerInput {
+  int? id;
+  String text;
+  bool isCorrect;
+
+  _AnswerInput({this.id, this.text = '', this.isCorrect = false});
+}
+
+class _QuestionInputWidget extends StatefulWidget {
+  final _QuestionInput input;
   final int index;
   final bool canDelete;
   final VoidCallback onDelete;
 
-  const _FlashcardInputWidget({
+  const _QuestionInputWidget({
     super.key,
     required this.input,
     required this.index,
@@ -1169,50 +1113,92 @@ class _FlashcardInputWidget extends StatelessWidget {
   });
 
   @override
+  State<_QuestionInputWidget> createState() => _QuestionInputWidgetState();
+}
+
+class _QuestionInputWidgetState extends State<_QuestionInputWidget> {
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Text(
-                  '${l10n?.card ?? 'Card'} $index',
-                  style: Theme.of(context).textTheme.labelLarge,
+                  '${l10n?.question ?? 'Question'} ${widget.index}',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const Spacer(),
-                if (canDelete)
+                if (widget.canDelete)
                   IconButton(
                     icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: onDelete,
-                    color: Theme.of(context).colorScheme.error,
+                    onPressed: widget.onDelete,
+                    color: colorScheme.error,
                   ),
               ],
             ),
             const SizedBox(height: 8),
             TextFormField(
-              initialValue: input.question,
+              initialValue: widget.input.text,
               decoration: InputDecoration(
-                labelText: l10n?.question ?? 'Question',
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (value) => input.question = value,
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              initialValue: input.answer,
-              decoration: InputDecoration(
-                labelText: l10n?.answer ?? 'Answer',
+                labelText: l10n?.questionText ?? 'Question text',
                 border: const OutlineInputBorder(),
               ),
               maxLines: 2,
-              onChanged: (value) => input.answer = value,
+              onChanged: (value) => widget.input.text = value,
             ),
+            const SizedBox(height: 16),
+            Text(
+              l10n?.answers ?? 'Answers',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            ...widget.input.answers.asMap().entries.map((entry) {
+              final answerIndex = entry.key;
+              final answer = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Radio<int>(
+                      value: answerIndex,
+                      groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
+                      onChanged: (value) {
+                        setState(() {
+                          for (var a in widget.input.answers) {
+                            a.isCorrect = false;
+                          }
+                          if (value != null) {
+                            widget.input.answers[value].isCorrect = true;
+                          }
+                        });
+                      },
+                    ),
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: answer.text,
+                        decoration: InputDecoration(
+                          hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        onChanged: (value) => answer.text = value,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -1225,7 +1211,7 @@ class _FlashcardInputWidget extends StatelessWidget {
 // ============================================================================
 
 class _AddByCodeDialog extends StatefulWidget {
-  final FlashcardsProvider provider;
+  final ExamsProvider provider;
 
   const _AddByCodeDialog({required this.provider});
 
@@ -1250,7 +1236,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return AlertDialog(
-      title: Text(l10n?.addDeckByCode ?? 'Add Deck by Code'),
+      title: Text(l10n?.addExamByCode ?? 'Add Exam by Code'),
       content: SizedBox(
         width: 400,
         child: Column(
@@ -1276,7 +1262,6 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
             ),
             const SizedBox(height: 16),
 
-            // Share code info
             ListenableBuilder(
               listenable: provider,
               builder: (context, _) {
@@ -1299,7 +1284,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${info.itemCount} cards • by ${info.creatorName}',
+                          '${info.itemCount} questions • by ${info.creatorName}',
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
                         if (info.description.isNotEmpty) ...[
@@ -1345,7 +1330,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
               ? null
               : () async {
                   setState(() => _isAdding = true);
-                  final success = await provider.addDeckByCode(
+                  final success = await provider.addExamByCode(
                     _codeController.text.trim(),
                   );
                   setState(() => _isAdding = false);
@@ -1353,8 +1338,8 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(l10n?.deckAddedSuccessfully ??
-                            'Deck added successfully'),
+                        content: Text(l10n?.examAddedSuccessfully ??
+                            'Exam added successfully'),
                       ),
                     );
                   }
@@ -1377,7 +1362,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
 // ============================================================================
 
 class _ManageSharesDialog extends StatelessWidget {
-  final FlashcardsProvider provider;
+  final ExamsProvider provider;
 
   const _ManageSharesDialog({required this.provider});
 
@@ -1386,7 +1371,7 @@ class _ManageSharesDialog extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
 
     return AlertDialog(
-      title: Text(l10n?.manageShares ?? 'Manage Shared Decks'),
+      title: Text(l10n?.manageShares ?? 'Manage Shared Exams'),
       content: SizedBox(
         width: 500,
         height: 400,
@@ -1396,7 +1381,7 @@ class _ManageSharesDialog extends StatelessWidget {
             if (provider.mySharedCodes.isEmpty) {
               return Center(
                 child: Text(
-                  l10n?.noSharedDecks ?? 'No shared decks yet',
+                  l10n?.noSharedExams ?? 'No shared exams yet',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -1410,7 +1395,7 @@ class _ManageSharesDialog extends StatelessWidget {
                 final code = provider.mySharedCodes[index];
                 return ListTile(
                   title: Text(code.contentName),
-                  subtitle: Text('${code.itemCount} cards • ${code.accessCount} uses'),
+                  subtitle: Text('${code.itemCount} questions • ${code.accessCount} uses'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

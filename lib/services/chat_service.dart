@@ -1,0 +1,297 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import '../models/models.dart';
+import 'api_service.dart';
+import 'storage_service.dart';
+
+/// Service for chat-related API operations
+class ChatService {
+  final ApiService _api = ApiService();
+
+  // ============================================================================
+  // CONVERSATION CRUD OPERATIONS
+  // ============================================================================
+
+  /// Fetch all conversations for the current user
+  Future<List<Conversation>> fetchConversations() async {
+    try {
+      final response = await _api.ragGet<List<dynamic>>('/chats/');
+
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data!.map((json) {
+          final map = json as Map<String, dynamic>;
+          return Conversation(
+            id: map['id'] as int,
+            title: map['title'] as String? ?? 'New Conversation',
+            createdAt: map['created_at'] as String? ?? '',
+            updatedAt: map['updated_at'] as String? ?? '',
+            messages: null,
+          );
+        }).toList();
+      }
+      return [];
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Create a new conversation
+  Future<Conversation?> createConversation() async {
+    try {
+      final response = await _api.ragPost<Map<String, dynamic>>('/chats/');
+
+      if (response.statusCode == 200 && response.data != null) {
+        return Conversation.fromJson(response.data!);
+      }
+      return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Update conversation title
+  Future<bool> updateConversationTitle(int conversationId, String title) async {
+    try {
+      final response = await _api.ragPatch<Map<String, dynamic>>(
+        '/chats/$conversationId',
+        data: {'title': title},
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Delete a conversation
+  Future<bool> deleteConversation(int conversationId) async {
+    try {
+      final response = await _api.ragDelete<Map<String, dynamic>>(
+        '/chats/$conversationId',
+      );
+
+      return response.statusCode == 200 || response.statusCode == 204;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ============================================================================
+  // MESSAGE OPERATIONS
+  // ============================================================================
+
+  /// Fetch messages for a conversation
+  Future<List<Message>> fetchMessages(int conversationId) async {
+    try {
+      final response = await _api.ragGet<List<dynamic>>(
+        '/chats/$conversationId/messages/',
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data!.map((json) {
+          final map = json as Map<String, dynamic>;
+          return Message(
+            role: map['sender'] as String? ?? 'user',
+            content: map['text'] as String? ?? '',
+            timestamp: map['created_at'] as String?,
+          );
+        }).toList();
+      }
+      return [];
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Save a message to the conversation
+  Future<bool> saveMessage({
+    required int conversationId,
+    required String sender,
+    required String text,
+  }) async {
+    try {
+      final response = await _api.ragPost<Map<String, dynamic>>(
+        '/chats/$conversationId/messages/',
+        data: {
+          'sender': sender,
+          'text': text,
+        },
+      );
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ============================================================================
+  // STREAMING QUERY
+  // ============================================================================
+
+  /// Send a query and get streaming response
+  /// Returns a Stream of response chunks
+  Stream<ChatStreamEvent> streamQuery({
+    required int conversationId,
+    required String query,
+    List<String> selectedTools = const [],
+  }) async* {
+    final storageService = StorageService();
+    final token = await storageService.getToken();
+
+    final uri = Uri.parse('${_api.ragBaseUrl}/query/');
+
+    final request = http.Request('POST', uri);
+    request.headers['Content-Type'] = 'application/json';
+    request.headers['Accept'] = 'text/event-stream';
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    request.body = jsonEncode({
+      'conversation_id': conversationId,
+      'query': query,
+      'selected_tools': selectedTools,
+    });
+
+    try {
+      final client = http.Client();
+      final streamedResponse = await client.send(request);
+
+      if (streamedResponse.statusCode != 200) {
+        yield ChatStreamEvent.error('HTTP error: ${streamedResponse.statusCode}');
+        client.close();
+        return;
+      }
+
+      String buffer = '';
+
+      await for (final chunk in streamedResponse.stream.transform(utf8.decoder)) {
+        buffer += chunk;
+
+        // Parse SSE format (data: {...}\n\n)
+        while (buffer.contains('\n')) {
+          final lineEnd = buffer.indexOf('\n');
+          final line = buffer.substring(0, lineEnd).trim();
+          buffer = buffer.substring(lineEnd + 1);
+
+          if (line.isEmpty) continue;
+
+          if (line.startsWith('data: ')) {
+            try {
+              final jsonStr = line.substring(6);
+              if (jsonStr.isEmpty) continue;
+
+              final jsonData = jsonDecode(jsonStr) as Map<String, dynamic>;
+              final eventType = jsonData['type'] as String?;
+
+              // Handle different event types from backend
+              switch (eventType) {
+                case 'step':
+                  yield ChatStreamEvent.step(
+                    jsonData['content'] as String? ?? '',
+                    jsonData['status'] as String? ?? 'loading',
+                  );
+                  break;
+
+                case 'chunk':
+                  final chunkContent = jsonData['content'] as String? ?? '';
+                  yield ChatStreamEvent.chunk(chunkContent, false);
+                  break;
+
+                case 'done':
+                  yield ChatStreamEvent.done();
+                  client.close();
+                  return;
+
+                case 'error':
+                  yield ChatStreamEvent.error(jsonData['content'] as String? ?? 'Unknown error');
+                  client.close();
+                  return;
+
+                default:
+                  // Fallback: handle old format with 'chunk' key
+                  if (jsonData.containsKey('chunk')) {
+                    final chunkText = jsonData['chunk'] as String? ?? '';
+                    final isDone = jsonData['done'] as bool? ?? false;
+                    yield ChatStreamEvent.chunk(chunkText, isDone);
+                    if (isDone) {
+                      yield ChatStreamEvent.done();
+                      client.close();
+                      return;
+                    }
+                  } else if (jsonData.containsKey('error')) {
+                    yield ChatStreamEvent.error(jsonData['error'] as String);
+                    client.close();
+                    return;
+                  }
+              }
+            } catch (e) {
+              // Skip malformed JSON, continue parsing
+              debugPrint('SSE parse error: $e');
+            }
+          }
+        }
+      }
+
+      // Stream ended naturally
+      yield ChatStreamEvent.done();
+      client.close();
+    } catch (e) {
+      yield ChatStreamEvent.error(e.toString());
+    }
+  }
+}
+
+/// Event types for chat streaming
+enum ChatStreamEventType { chunk, step, error, done }
+
+class ChatStreamEvent {
+  final ChatStreamEventType type;
+  final String? chunk;
+  final String? content;
+  final String? status;
+  final String? error;
+  final bool isDone;
+
+  ChatStreamEvent._({
+    required this.type,
+    this.chunk,
+    this.content,
+    this.status,
+    this.error,
+    this.isDone = false,
+  });
+
+  factory ChatStreamEvent.chunk(String chunk, bool isDone) {
+    return ChatStreamEvent._(
+      type: ChatStreamEventType.chunk,
+      chunk: chunk,
+      isDone: isDone,
+    );
+  }
+
+  factory ChatStreamEvent.step(String content, String status) {
+    return ChatStreamEvent._(
+      type: ChatStreamEventType.step,
+      content: content,
+      status: status,
+    );
+  }
+
+  factory ChatStreamEvent.error(String error) {
+    return ChatStreamEvent._(
+      type: ChatStreamEventType.error,
+      error: error,
+    );
+  }
+
+  factory ChatStreamEvent.done() {
+    return ChatStreamEvent._(
+      type: ChatStreamEventType.done,
+      isDone: true,
+    );
+  }
+}
+

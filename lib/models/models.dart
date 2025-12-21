@@ -40,11 +40,11 @@ class Exam with _$Exam {
   const factory Exam({
     required int id,
     required String name,
-    required String description,
-    @JsonKey(name: 'created_at') required String createdAt,
-    @JsonKey(name: 'user_id') required int userId,
+    @Default('') String description,
+    @JsonKey(name: 'created_at') @Default('') String createdAt,
+    @JsonKey(name: 'user_id') int? userId,
     @JsonKey(name: 'conversation_id') int? conversationId,
-    required List<ExamQuestion> questions,
+    @Default([]) List<ExamQuestion> questions,
     // Sharing related fields
     @JsonKey(name: 'is_template') bool? isTemplate,
     @JsonKey(name: 'template_id') int? templateId,
@@ -64,11 +64,11 @@ class ExamInfo with _$ExamInfo {
   const factory ExamInfo({
     required int id,
     required String name,
-    required String description,
-    @JsonKey(name: 'created_at') required String createdAt,
-    @JsonKey(name: 'user_id') required int userId,
+    @Default('') String description,
+    @JsonKey(name: 'created_at') @Default('') String createdAt,
+    @JsonKey(name: 'user_id') int? userId,
     @JsonKey(name: 'conversation_id') int? conversationId,
-    @JsonKey(name: 'question_count') required int questionCount,
+    @JsonKey(name: 'question_count') @Default(0) int questionCount,
     // Sharing related fields
     @JsonKey(name: 'is_template') bool? isTemplate,
     @JsonKey(name: 'template_id') int? templateId,
@@ -91,7 +91,7 @@ class ExamInfo with _$ExamInfo {
 @freezed
 class Flashcard with _$Flashcard {
   const factory Flashcard({
-    required int id,
+    int? id,
     required String question,
     required String answer,
     @JsonKey(name: 'media_url') String? mediaUrl,
@@ -106,12 +106,12 @@ class Flashcard with _$Flashcard {
 @freezed
 class DeckInfo with _$DeckInfo {
   const factory DeckInfo({
-    @JsonKey(name: 'access_type') required String accessType,
+    @JsonKey(name: 'access_type') String? accessType,
     required int id,
-    @JsonKey(name: 'user_id') required int userId,
+    @JsonKey(name: 'user_id') int? userId,
     required String name,
     String? description,
-    @JsonKey(name: 'conversation_id') required int conversationId,
+    @JsonKey(name: 'conversation_id') int? conversationId,
     @JsonKey(name: 'flashcard_count') required int flashcardCount,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'last_session') String? lastSession,
@@ -132,10 +132,10 @@ class DeckInfo with _$DeckInfo {
 class Deck with _$Deck {
   const factory Deck({
     required int id,
-    @JsonKey(name: 'user_id') required int userId,
+    @JsonKey(name: 'user_id') int? userId,
     required String name,
     String? description,
-    required List<Flashcard> flashcards,
+    @Default([]) List<Flashcard> flashcards,
     @JsonKey(name: 'conversation_id') int? conversationId,
     // Sharing related fields
     @JsonKey(name: 'is_template') bool? isTemplate,

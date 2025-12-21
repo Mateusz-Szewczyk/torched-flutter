@@ -1,266 +1,391 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../models/models.dart';
-import '../services/api_service.dart';
-import '../config/constants.dart';
+import '../services/chat_service.dart';
+import '../data/repositories/conversation_repository.dart';
 
-// Conversation Provider - equivalent to ConversationContext.tsx
-// Uses RAG API (localhost:8043) for chat functionality
+class ChatStep {
+  final String content;
+  final String status;
+  ChatStep({required this.content, required this.status});
+}
 
-class ConversationProvider with ChangeNotifier {
-  final _api = ApiService();
+/// Provider for managing conversations and chat state
+/// Uses Repository pattern with local cache for optimistic UI
+class ConversationProvider extends ChangeNotifier {
+  final ChatService _chatService = ChatService();
+  final ConversationRepository _repository = ConversationRepository();
+
+  StreamSubscription<List<Conversation>>? _conversationsSubscription;
+  StreamSubscription<List<Message>>? _messagesSubscription;
+
+  // ============================================================================
+  // STATE
+  // ============================================================================
 
   List<Conversation> _conversations = [];
-  Conversation? _currentConversation;
-  int? _currentConversationId;
-  List<Message> _messages = [];
-  bool _isLoading = false;
-  bool _isSending = false;
-  String? _errorMessage;
-
   List<Conversation> get conversations => _conversations;
-  Conversation? get currentConversation => _currentConversation;
+
+  int? _currentConversationId;
   int? get currentConversationId => _currentConversationId;
+
+  List<Message> _messages = [];
   List<Message> get messages => _messages;
-  bool get isLoading => _isLoading;
+
+  List<ChatStep> _currentSteps = [];
+  List<ChatStep> get currentSteps => _currentSteps;
+
+  bool _isLoadingConversations = false;
+  bool get isLoadingConversations => _isLoadingConversations;
+
+  bool _isLoadingMessages = false;
+  bool get isLoadingMessages => _isLoadingMessages;
+
+  bool _isSending = false;
   bool get isSending => _isSending;
-  String? get errorMessage => _errorMessage;
+
+  String? _error;
+  String? get error => _error;
+
+  // Streaming state
+  String _streamingText = '';
+  String get streamingText => _streamingText;
+
+  bool _isStreaming = false;
+  bool get isStreaming => _isStreaming;
+
+  StreamSubscription? _streamSubscription;
+
+  // Selected tools
+  List<String> _selectedTools = [];
+  List<String> get selectedTools => _selectedTools;
 
   // ============================================================================
-  // CONVERSATION MANAGEMENT (RAG API: /chats/)
+  // INITIALIZATION
   // ============================================================================
 
-  // Load all conversations
-  Future<void> loadConversations() async {
-    _isLoading = true;
-    _errorMessage = null;
+  ConversationProvider() {
+    // Subscribe to repository streams for reactive updates
+    _conversationsSubscription = _repository.conversationsStream.listen((convs) {
+      _conversations = convs..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      notifyListeners();
+    });
+  }
+
+  // ============================================================================
+  // COMPUTED PROPERTIES
+  // ============================================================================
+
+  Conversation? get currentConversation {
+    if (_currentConversationId == null) return null;
+    try {
+      return _conversations.firstWhere((c) => c.id == _currentConversationId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ============================================================================
+  // CONVERSATION OPERATIONS (with Optimistic UI)
+  // ============================================================================
+
+  /// Fetch all conversations - uses cache-first strategy
+  Future<void> fetchConversations({bool forceRefresh = false}) async {
+    _isLoadingConversations = true;
+    _error = null;
     notifyListeners();
 
     try {
-      // RAG API endpoint: GET /chats/
-      final response = await _api.ragGet<List<dynamic>>(
-        '${AppConfig.chatsEndpoint}/',
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        _conversations = response.data!
-            .map((json) => Conversation.fromJson(json as Map<String, dynamic>))
-            .toList();
-        _errorMessage = null;
-      }
+      _conversations = await _repository.getConversations(forceRefresh: forceRefresh);
+      _conversations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
-      _errorMessage = _api.getErrorMessage(e);
+      _error = e.toString();
     } finally {
-      _isLoading = false;
+      _isLoadingConversations = false;
       notifyListeners();
     }
   }
 
-  // Create new conversation
-  Future<Conversation?> createConversation({String? title}) async {
-    try {
-      // RAG API endpoint: POST /chats/
-      final response = await _api.ragPost<Map<String, dynamic>>(
-        '${AppConfig.chatsEndpoint}/',
-        data: title != null ? {'title': title} : null,
-      );
+  /// Create a new conversation with optimistic UI
+  Future<Conversation?> createConversation() async {
+    // Haptic feedback for action
+    HapticFeedback.lightImpact();
 
-      if (response.statusCode == 200 && response.data != null) {
-        final conversation = Conversation.fromJson(response.data!);
-        _conversations.insert(0, conversation);
-        _currentConversation = conversation;
+    try {
+      final conversation = await _repository.createConversation();
+
+      if (conversation != null) {
         _currentConversationId = conversation.id;
         _messages = [];
         notifyListeners();
-        return conversation;
       }
+
+      return conversation;
     } catch (e) {
-      _errorMessage = _api.getErrorMessage(e);
+      _error = e.toString();
       notifyListeners();
+      return null;
     }
-    return null;
   }
 
-  // Set current conversation ID
-  void setCurrentConversationId(int? id) {
-    _currentConversationId = id;
-    if (id != null) {
-      loadConversation(id);
-    } else {
-      _currentConversation = null;
-      _messages = [];
-    }
-    notifyListeners();
-  }
-
-  // Load specific conversation with messages
-  Future<void> loadConversation(int conversationId) async {
-    _isLoading = true;
-    notifyListeners();
-
+  /// Update conversation title with optimistic UI
+  Future<bool> updateConversationTitle(int conversationId, String title) async {
     try {
-      // RAG API endpoint: GET /chats/{id}/messages/
-      final response = await _api.ragGet<List<dynamic>>(
-        '${AppConfig.chatsEndpoint}/$conversationId/messages/',
-      );
+      final success = await _repository.updateTitle(conversationId, title);
 
-      if (response.statusCode == 200 && response.data != null) {
-        _messages = response.data!
-            .map((json) => Message.fromJson(json as Map<String, dynamic>))
-            .toList();
-        _currentConversationId = conversationId;
-        _currentConversation = _conversations.firstWhere(
-          (c) => c.id == conversationId,
-          orElse: () => Conversation(
-            id: conversationId,
-            title: 'Conversation',
-            createdAt: DateTime.now().toIso8601String(),
-            updatedAt: DateTime.now().toIso8601String(),
-          ),
-        );
-        _errorMessage = null;
-      }
-    } catch (e) {
-      _errorMessage = _api.getErrorMessage(e);
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  // Set current conversation
-  void setCurrentConversation(Conversation? conversation) {
-    _currentConversation = conversation;
-    _currentConversationId = conversation?.id;
-    _messages = conversation?.messages ?? [];
-    notifyListeners();
-  }
-
-  // Update conversation title
-  Future<void> updateConversationTitle(int conversationId, String newTitle) async {
-    try {
-      // RAG API endpoint: PUT /chats/{id}/
-      final response = await _api.ragPut<Map<String, dynamic>>(
-        '${AppConfig.chatsEndpoint}/$conversationId/',
-        data: {'title': newTitle},
-      );
-
-      if (response.statusCode == 200) {
-        // Update in local list
+      if (success) {
+        // Update local state (repository already updated cache)
         final index = _conversations.indexWhere((c) => c.id == conversationId);
         if (index != -1) {
-          _conversations[index] = _conversations[index].copyWith(title: newTitle);
+          _conversations[index] = _conversations[index].copyWith(title: title);
+          notifyListeners();
         }
-
-        // Update current conversation if it's the one being edited
-        if (_currentConversation?.id == conversationId) {
-          _currentConversation = _currentConversation?.copyWith(title: newTitle);
-        }
-
-        notifyListeners();
       }
+
+      return success;
     } catch (e) {
-      _errorMessage = _api.getErrorMessage(e);
+      _error = e.toString();
       notifyListeners();
+      return false;
     }
   }
 
-  // Delete conversation
-  Future<void> deleteConversation(int conversationId) async {
+  /// Delete a conversation with optimistic UI
+  Future<bool> deleteConversation(int conversationId) async {
+    // Haptic feedback for destructive action
+    HapticFeedback.mediumImpact();
+
+    // Store for potential rollback
+    final deletedIndex = _conversations.indexWhere((c) => c.id == conversationId);
+    final deletedConv = deletedIndex != -1 ? _conversations[deletedIndex] : null;
+
+    // Optimistic removal from local state
+    if (deletedIndex != -1) {
+      _conversations.removeAt(deletedIndex);
+      if (_currentConversationId == conversationId) {
+        _currentConversationId = null;
+        _messages = [];
+      }
+      notifyListeners();
+    }
+
     try {
-      // RAG API endpoint: DELETE /chats/{id}/
-      final response = await _api.ragDelete(
-        '${AppConfig.chatsEndpoint}/$conversationId/',
-      );
+      final success = await _repository.deleteConversation(conversationId);
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        // Remove from local list
-        _conversations.removeWhere((c) => c.id == conversationId);
-
-        // Clear current conversation if it's the one being deleted
-        if (_currentConversation?.id == conversationId) {
-          _currentConversation = null;
-          _currentConversationId = null;
-          _messages = [];
-        }
-
+      if (!success && deletedConv != null) {
+        // Rollback
+        _conversations.insert(deletedIndex, deletedConv);
         notifyListeners();
       }
+
+      return success;
     } catch (e) {
-      _errorMessage = _api.getErrorMessage(e);
+      // Rollback on error
+      if (deletedConv != null) {
+        _conversations.insert(deletedIndex, deletedConv);
+        notifyListeners();
+      }
+      _error = e.toString();
       notifyListeners();
+      return false;
+    }
+  }
+
+  /// Set current conversation
+  void setCurrentConversation(int? conversationId) {
+    if (_currentConversationId != conversationId) {
+      _currentConversationId = conversationId;
+      _messages = [];
+      _streamingText = '';
+      _isStreaming = false;
+      _currentSteps = [];
+      notifyListeners();
+
+      if (conversationId != null) {
+        fetchMessages(conversationId);
+      }
     }
   }
 
   // ============================================================================
-  // MESSAGE MANAGEMENT (RAG API: /chats/{id}/messages/)
+  // MESSAGE OPERATIONS
   // ============================================================================
 
-  // Send message
-  Future<void> sendMessage(String content, {int? conversationId, List<String>? tools}) async {
-    final convId = conversationId ?? _currentConversationId;
-
-    if (convId == null) {
-      // Create new conversation first
-      final newConv = await createConversation();
-      if (newConv == null) {
-        _errorMessage = 'Failed to create conversation';
-        notifyListeners();
-        return;
-      }
-      return sendMessage(content, conversationId: newConv.id, tools: tools);
-    }
-
-    _isSending = true;
-    _errorMessage = null;
-
-    // Add user message optimistically
-    final userMessage = Message(
-      role: 'user',
-      content: content,
-      timestamp: DateTime.now().toIso8601String(),
-    );
-    _messages.add(userMessage);
+  /// Fetch messages for the current conversation - uses cache
+  Future<void> fetchMessages(int conversationId) async {
+    _isLoadingMessages = true;
+    _error = null;
     notifyListeners();
 
     try {
-      // RAG API endpoint: POST /chats/{id}/messages/
-      final response = await _api.ragPost<Map<String, dynamic>>(
-        '${AppConfig.chatsEndpoint}/$convId/messages/',
-        data: {
-          'content': content,
-          if (tools != null && tools.isNotEmpty) 'tools': tools,
-        },
-      );
-
-      if (response.statusCode == 200 && response.data != null) {
-        final assistantMessage = Message.fromJson(response.data!);
-        _messages.add(assistantMessage);
-        _errorMessage = null;
-      }
+      _messages = await _repository.getMessages(conversationId);
     } catch (e) {
-      _errorMessage = _api.getErrorMessage(e);
-      // Remove optimistic user message on error
-      if (_messages.isNotEmpty) {
-        _messages.removeLast();
-      }
+      _error = e.toString();
     } finally {
-      _isSending = false;
+      _isLoadingMessages = false;
       notifyListeners();
     }
   }
 
-  // Clear messages
-  void clearMessages() {
-    _messages = [];
-    _currentConversation = null;
-    _currentConversationId = null;
+  /// Send a message and get streaming response
+Future<void> sendMessage(String text) async {
+  if (_currentConversationId == null || text
+      .trim()
+      .isEmpty) return;
+  if (_isSending || _isStreaming) return;
+
+  final userText = text.trim();
+  _isSending = true;
+  _error = null;
+
+  // 1. Natychmiastowe dodanie wiadomości użytkownika do UI
+  final userMessage = Message(
+    role: 'user',
+    content: userText,
+    timestamp: DateTime.now().toIso8601String(),
+  );
+  _messages = [..._messages, userMessage];
+  notifyListeners();
+
+  // 2. Zapisanie wiadomości użytkownika na serwerze (asynchronicznie w tle)
+  try {
+    _chatService.saveMessage(
+      conversationId: _currentConversationId!,
+      sender: 'user',
+      text: userText,
+    );
+  } catch (e) {
+    debugPrint('Failed to save user message: $e');
+  }
+
+  // 3. Przygotowanie stanu do streamingu
+  _isStreaming = true;
+  _streamingText = '';
+  _currentSteps = [];
+  notifyListeners();
+
+  try {
+    final stream = _chatService.streamQuery(
+      conversationId: _currentConversationId!,
+      query: userText,
+      selectedTools: _selectedTools,
+    );
+
+    await for (final event in stream) {
+      switch (event.type) {
+        case ChatStreamEventType.step:
+          if (event.content != null && event.status != null) {
+            final index = _currentSteps.indexWhere((s) => s.content == event.content);
+
+            if (index != -1) {
+              _currentSteps[index] = ChatStep(
+                content: event.content!,
+                status: event.status!
+              );
+            } else {
+              _currentSteps.add(ChatStep(
+                content: event.content!,
+                status: event.status!
+              ));
+            }
+            notifyListeners();
+          }
+          break;
+
+        case ChatStreamEventType.chunk:
+          _streamingText += event.chunk ?? '';
+          break;
+
+        case ChatStreamEventType.done:
+          if (_streamingText.isNotEmpty) {
+            final botMessage = Message(
+              role: 'bot',
+              content: _streamingText,
+              timestamp: DateTime.now().toIso8601String(),
+            );
+            _messages = [..._messages, botMessage];
+
+            // Trwały zapis odpowiedzi bota na serwerze
+            await _chatService.saveMessage(
+              conversationId: _currentConversationId!,
+              sender: 'bot',
+              text: _streamingText,
+            );
+          }
+
+          _isStreaming = false;
+          _streamingText = '';
+          _selectedTools = []; // Czyścimy narzędzia po udanym zapytaniu
+          break;
+
+        case ChatStreamEventType.error:
+          _error = event.error ?? 'Unknown error occurred';
+          _isStreaming = false;
+          _streamingText = '';
+          break;
+      }
+      notifyListeners();
+    }
+  } catch (e) {
+    _error = e.toString();
+    _isStreaming = false;
+    _streamingText = '';
+    notifyListeners();
+  } finally {
+    _isSending = false;
+    notifyListeners();
+  }
+}
+
+  /// Cancel current streaming
+  void cancelStreaming() {
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _isStreaming = false;
+    _streamingText = '';
+    _isSending = false;
     notifyListeners();
   }
 
-  // Clear error
-  void clearError() {
-    _errorMessage = null;
+  // ============================================================================
+  // TOOL SELECTION
+  // ============================================================================
+
+  void setSelectedTools(List<String> tools) {
+    _selectedTools = tools;
     notifyListeners();
+  }
+
+  void toggleTool(String tool) {
+    if (_selectedTools.contains(tool)) {
+      _selectedTools = _selectedTools.where((t) => t != tool).toList();
+    } else {
+      _selectedTools = [..._selectedTools, tool];
+    }
+    notifyListeners();
+  }
+
+  void clearTools() {
+    _selectedTools = [];
+    notifyListeners();
+  }
+
+  // ============================================================================
+  // CLEANUP
+  // ============================================================================
+
+  void clearError() {
+    _error = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _streamSubscription?.cancel();
+    _conversationsSubscription?.cancel();
+    _messagesSubscription?.cancel();
+    super.dispose();
   }
 }
 

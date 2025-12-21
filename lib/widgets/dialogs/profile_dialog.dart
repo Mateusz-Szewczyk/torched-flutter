@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/models.dart';
+import '../profile/memories_section.dart';
 
 /// Profile dialog - equivalent to profile-dialog.tsx
 /// Shows user profile information with tabs for profile, password change, and account deletion
@@ -18,7 +19,7 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -34,7 +35,7 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
 
     return Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 700),
+        constraints: const BoxConstraints(maxWidth: 650, maxHeight: 750),
         child: Column(
           children: [
             // Header
@@ -63,6 +64,7 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
               controller: _tabController,
               tabs: const [
                 Tab(text: 'Profile', icon: Icon(Icons.person_outline)),
+                Tab(text: 'Memories', icon: Icon(Icons.psychology_outlined)),
                 Tab(text: 'Password', icon: Icon(Icons.lock_outline)),
                 Tab(text: 'Account', icon: Icon(Icons.manage_accounts_outlined)),
               ],
@@ -74,6 +76,10 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
                 controller: _tabController,
                 children: [
                   _ProfileTab(user: user),
+                  const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: MemoriesSection(),
+                  ),
                   const _PasswordTab(),
                   _AccountTab(user: user),
                 ],

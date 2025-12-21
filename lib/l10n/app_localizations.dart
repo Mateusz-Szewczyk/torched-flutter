@@ -116,6 +116,12 @@ abstract class AppLocalizations {
   /// **'Flashcards'**
   String get flashcards;
 
+  /// No description provided for @flashcardsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and study flashcard decks to boost your learning'**
+  String get flashcardsDescription;
+
   /// No description provided for @chat.
   ///
   /// In en, this message translates to:
@@ -314,6 +320,12 @@ abstract class AppLocalizations {
   /// **'Error'**
   String get error;
 
+  /// No description provided for @errorOccurred.
+  ///
+  /// In en, this message translates to:
+  /// **'An error occurred'**
+  String get errorOccurred;
+
   /// No description provided for @try_again.
   ///
   /// In en, this message translates to:
@@ -343,6 +355,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create your first deck'**
   String get create_your_first_deck;
+
+  /// No description provided for @createDeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Deck'**
+  String get createDeck;
 
   /// No description provided for @create_new_deck.
   ///
@@ -506,11 +524,23 @@ abstract class AppLocalizations {
   /// **'Edit deck'**
   String get edit_deck;
 
+  /// No description provided for @editDeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Deck'**
+  String get editDeck;
+
   /// No description provided for @deck_name.
   ///
   /// In en, this message translates to:
   /// **'Deck name'**
   String get deck_name;
+
+  /// No description provided for @deckName.
+  ///
+  /// In en, this message translates to:
+  /// **'Deck Name'**
+  String get deckName;
 
   /// No description provided for @enter_deck_name.
   ///
@@ -631,6 +661,552 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Profile'**
   String get profile;
+
+  /// No description provided for @searchDecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Search decks...'**
+  String get searchDecks;
+
+  /// No description provided for @cards.
+  ///
+  /// In en, this message translates to:
+  /// **'cards'**
+  String get cards;
+
+  /// No description provided for @shared.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared'**
+  String get shared;
+
+  /// No description provided for @share.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get share;
+
+  /// No description provided for @addByCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Add by Code'**
+  String get addByCode;
+
+  /// No description provided for @manageShares.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Shares'**
+  String get manageShares;
+
+  /// No description provided for @name.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get name;
+
+  /// No description provided for @cardCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Card Count'**
+  String get cardCount;
+
+  /// No description provided for @recent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get recent;
+
+  /// No description provided for @lastSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Session'**
+  String get lastSession;
+
+  /// No description provided for @ascending.
+  ///
+  /// In en, this message translates to:
+  /// **'Ascending'**
+  String get ascending;
+
+  /// No description provided for @descending.
+  ///
+  /// In en, this message translates to:
+  /// **'Descending'**
+  String get descending;
+
+  /// No description provided for @deleteDeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Deck'**
+  String get deleteDeck;
+
+  /// No description provided for @deleteDeckConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? This cannot be undone.'**
+  String deleteDeckConfirm(String name);
+
+  /// No description provided for @deckDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deck deleted'**
+  String get deckDeleted;
+
+  /// No description provided for @removeSharedDeck.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Shared Deck'**
+  String get removeSharedDeck;
+
+  /// No description provided for @removeSharedDeckConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to remove this shared deck from your library?'**
+  String get removeSharedDeckConfirm;
+
+  /// No description provided for @remove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get remove;
+
+  /// No description provided for @removeFromLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from library'**
+  String get removeFromLibrary;
+
+  /// No description provided for @showAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Answer'**
+  String get showAnswer;
+
+  /// No description provided for @tapToFlip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to flip'**
+  String get tapToFlip;
+
+  /// No description provided for @hard.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard'**
+  String get hard;
+
+  /// No description provided for @tryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get tryAgain;
+
+  /// No description provided for @good.
+  ///
+  /// In en, this message translates to:
+  /// **'Good'**
+  String get good;
+
+  /// No description provided for @reviewLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Review later'**
+  String get reviewLater;
+
+  /// No description provided for @easy.
+  ///
+  /// In en, this message translates to:
+  /// **'Easy'**
+  String get easy;
+
+  /// No description provided for @gotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it!'**
+  String get gotIt;
+
+  /// No description provided for @exit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit'**
+  String get exit;
+
+  /// No description provided for @sessionComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Session Complete!'**
+  String get sessionComplete;
+
+  /// No description provided for @cardsReviewed.
+  ///
+  /// In en, this message translates to:
+  /// **'You reviewed {count} cards'**
+  String cardsReviewed(String count);
+
+  /// No description provided for @nextSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Next session: {date}'**
+  String nextSession(String date);
+
+  /// No description provided for @retakeHardCards.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake Hard Cards'**
+  String get retakeHardCards;
+
+  /// No description provided for @retakeSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake Session'**
+  String get retakeSession;
+
+  /// No description provided for @saveAndExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Save & Exit'**
+  String get saveAndExit;
+
+  /// No description provided for @backToDecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Decks'**
+  String get backToDecks;
+
+  /// No description provided for @noCardsToRetake.
+  ///
+  /// In en, this message translates to:
+  /// **'No cards to retake'**
+  String get noCardsToRetake;
+
+  /// No description provided for @finish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish'**
+  String get finish;
+
+  /// No description provided for @noHardCardsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No hard cards found'**
+  String get noHardCardsFound;
+
+  /// No description provided for @addDeckByCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Deck by Code'**
+  String get addDeckByCode;
+
+  /// No description provided for @shareCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Share Code'**
+  String get shareCode;
+
+  /// No description provided for @alreadyAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Already in your library'**
+  String get alreadyAdded;
+
+  /// No description provided for @add.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get add;
+
+  /// No description provided for @deckAddedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Deck added successfully'**
+  String get deckAddedSuccessfully;
+
+  /// No description provided for @noSharedDecks.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared decks yet'**
+  String get noSharedDecks;
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @description.
+  ///
+  /// In en, this message translates to:
+  /// **'Description (optional)'**
+  String get description;
+
+  /// No description provided for @nameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Name is required'**
+  String get nameRequired;
+
+  /// No description provided for @addCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Card'**
+  String get addCard;
+
+  /// No description provided for @card.
+  ///
+  /// In en, this message translates to:
+  /// **'Card'**
+  String get card;
+
+  /// No description provided for @testsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and take practice exams to test your knowledge'**
+  String get testsDescription;
+
+  /// No description provided for @searchExams.
+  ///
+  /// In en, this message translates to:
+  /// **'Search exams...'**
+  String get searchExams;
+
+  /// No description provided for @welcomeTests.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Tests'**
+  String get welcomeTests;
+
+  /// No description provided for @getStartedCreateTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your first exam or add one using a share code'**
+  String get getStartedCreateTest;
+
+  /// No description provided for @createExam.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Exam'**
+  String get createExam;
+
+  /// No description provided for @editExam.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Exam'**
+  String get editExam;
+
+  /// No description provided for @deleteExam.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Exam'**
+  String get deleteExam;
+
+  /// No description provided for @examDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Exam deleted'**
+  String get examDeleted;
+
+  /// No description provided for @examName.
+  ///
+  /// In en, this message translates to:
+  /// **'Exam Name'**
+  String get examName;
+
+  /// No description provided for @questions.
+  ///
+  /// In en, this message translates to:
+  /// **'Questions'**
+  String get questions;
+
+  /// No description provided for @addQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Question'**
+  String get addQuestion;
+
+  /// No description provided for @questionText.
+  ///
+  /// In en, this message translates to:
+  /// **'Question text'**
+  String get questionText;
+
+  /// No description provided for @answers.
+  ///
+  /// In en, this message translates to:
+  /// **'Answers'**
+  String get answers;
+
+  /// No description provided for @selectNumberOfQuestions.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Number of Questions'**
+  String get selectNumberOfQuestions;
+
+  /// No description provided for @estimatedTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Est. Time'**
+  String get estimatedTime;
+
+  /// No description provided for @startExam.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Exam'**
+  String get startExam;
+
+  /// No description provided for @examComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Exam Complete!'**
+  String get examComplete;
+
+  /// No description provided for @congratulationsPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations! You passed!'**
+  String get congratulationsPassed;
+
+  /// No description provided for @keepPracticing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep practicing!'**
+  String get keepPracticing;
+
+  /// No description provided for @correct.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct'**
+  String get correct;
+
+  /// No description provided for @correctAnswers.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct'**
+  String get correctAnswers;
+
+  /// No description provided for @incorrectAnswers.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect'**
+  String get incorrectAnswers;
+
+  /// No description provided for @timeTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get timeTaken;
+
+  /// No description provided for @submittingResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting results...'**
+  String get submittingResults;
+
+  /// No description provided for @resultsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Results saved!'**
+  String get resultsSaved;
+
+  /// No description provided for @backToExams.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to Exams'**
+  String get backToExams;
+
+  /// No description provided for @previous.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous'**
+  String get previous;
+
+  /// No description provided for @next.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get next;
+
+  /// No description provided for @addExamByCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Exam by Code'**
+  String get addExamByCode;
+
+  /// No description provided for @examAddedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Exam added successfully'**
+  String get examAddedSuccessfully;
+
+  /// No description provided for @noSharedExams.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared exams yet'**
+  String get noSharedExams;
+
+  /// No description provided for @removeSharedExam.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove Shared Exam'**
+  String get removeSharedExam;
+
+  /// No description provided for @removeSharedExamConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to remove this shared exam from your library?'**
+  String get removeSharedExamConfirm;
+
+  /// Message shown when an exam contains no questions
+  ///
+  /// In en, this message translates to:
+  /// **'This exam has no questions.'**
+  String get examHasNoQuestions;
+
+  /// No description provided for @selectConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a conversation'**
+  String get selectConversation;
+
+  /// No description provided for @orCreateNew.
+  ///
+  /// In en, this message translates to:
+  /// **'or create a new one from the sidebar'**
+  String get orCreateNew;
+
+  /// No description provided for @startChatting.
+  ///
+  /// In en, this message translates to:
+  /// **'Start chatting'**
+  String get startChatting;
+
+  /// No description provided for @askAnything.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask me anything!'**
+  String get askAnything;
+
+  /// No description provided for @tools.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get tools;
+
+  /// No description provided for @selectTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Tools'**
+  String get selectTools;
+
+  /// No description provided for @clearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All'**
+  String get clearAll;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
 }
 
 class _AppLocalizationsDelegate

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/conversation_provider.dart';
 
 /// Conversation list widget - equivalent to conversation-list.tsx
-/// Shows list of conversations with edit/delete options
+/// Shows list of conversations with swipe actions and pull-to-refresh
 class ConversationList extends StatefulWidget {
   final Function(int) onConversationClick;
 
@@ -25,14 +26,17 @@ class _ConversationListState extends State<ConversationList> {
     super.initState();
     // Load conversations when widget is created
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ConversationProvider>().loadConversations();
+      context.read<ConversationProvider>().fetchConversations();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final conversationProvider = context.watch<ConversationProvider>();
     final conversations = conversationProvider.conversations;
+    final currentId = conversationProvider.currentConversationId;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,13 +44,19 @@ class _ConversationListState extends State<ConversationList> {
         // Header with expand/collapse and new conversation button
         InkWell(
           onTap: () => setState(() => _isExpanded = !_isExpanded),
+          borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
               children: [
-                Icon(
-                  _isExpanded ? Icons.expand_more : Icons.chevron_right,
-                  size: 16,
+                AnimatedRotation(
+                  turns: _isExpanded ? 0.25 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 4),
                 Expanded(
@@ -54,72 +64,131 @@ class _ConversationListState extends State<ConversationList> {
                     'Recent',
                     style: TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ),
                 // New conversation button
-                IconButton(
-                  icon: const Icon(Icons.add, size: 16),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 24,
-                    minHeight: 24,
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _createNewConversation(context),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.add,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
+                    ),
                   ),
-                  onPressed: () => _createNewConversation(context),
-                  tooltip: 'New conversation',
                 ),
               ],
             ),
           ),
         ),
 
-        // Conversation list
-        if (_isExpanded)
-          conversationProvider.isLoading
-              ? const Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Center(
-                    child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                )
-              : conversations.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Center(
-                        child: Text(
-                          'No conversations yet',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).textTheme.bodySmall?.color,
-                          ),
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: conversations.length > 10 ? 10 : conversations.length,
-                      itemBuilder: (context, index) {
-                        final conversation = conversations[index];
-                        return _ConversationItem(
-                          conversation: conversation,
-                          onTap: () => widget.onConversationClick(conversation.id),
-                          onEdit: () => _editConversation(context, conversation),
-                          onDelete: () => _deleteConversation(context, conversation),
-                        );
-                      },
-                    ),
+        // Conversation list with animations
+        AnimatedCrossFade(
+          firstChild: _buildConversationList(
+            context,
+            conversationProvider,
+            conversations,
+            currentId,
+            colorScheme,
+          ),
+          secondChild: const SizedBox.shrink(),
+          crossFadeState: _isExpanded
+              ? CrossFadeState.showFirst
+              : CrossFadeState.showSecond,
+          duration: const Duration(milliseconds: 200),
+        ),
       ],
     );
   }
 
+  Widget _buildConversationList(
+    BuildContext context,
+    ConversationProvider provider,
+    List<Conversation> conversations,
+    int? currentId,
+    ColorScheme colorScheme,
+  ) {
+    if (provider.isLoadingConversations && conversations.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    if (conversations.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                size: 32,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No conversations yet',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => _createNewConversation(context),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Start chatting'),
+                style: TextButton.styleFrom(
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: conversations.length > 15 ? 15 : conversations.length,
+      itemBuilder: (context, index) {
+        final conversation = conversations[index];
+        final isSelected = conversation.id == currentId;
+
+        return _SwipeableConversationItem(
+          key: ValueKey(conversation.id),
+          conversation: conversation,
+          isSelected: isSelected,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            widget.onConversationClick(conversation.id);
+          },
+          onEdit: () => _editConversation(context, conversation),
+          onDelete: () => _deleteConversation(context, conversation),
+        );
+      },
+    );
+  }
+
   Future<void> _createNewConversation(BuildContext context) async {
+    HapticFeedback.lightImpact();
     final provider = context.read<ConversationProvider>();
     final newConv = await provider.createConversation();
     if (newConv != null && mounted) {
@@ -128,11 +197,11 @@ class _ConversationListState extends State<ConversationList> {
   }
 
   Future<void> _editConversation(BuildContext context, Conversation conversation) async {
-    final controller = TextEditingController(text: conversation.title ?? '');
+    final controller = TextEditingController(text: conversation.title);
 
     final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Edit Conversation'),
         content: TextField(
           controller: controller,
@@ -141,21 +210,22 @@ class _ConversationListState extends State<ConversationList> {
             hintText: 'Enter conversation title',
           ),
           autofocus: true,
+          onSubmitted: (value) => Navigator.pop(dialogContext, value),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
+            onPressed: () => Navigator.pop(dialogContext, controller.text),
             child: const Text('Save'),
           ),
         ],
       ),
     );
 
-    if (result != null && mounted) {
+    if (result != null && result.isNotEmpty && mounted) {
       await context.read<ConversationProvider>().updateConversationTitle(
         conversation.id,
         result,
@@ -166,44 +236,32 @@ class _ConversationListState extends State<ConversationList> {
   }
 
   Future<void> _deleteConversation(BuildContext context, Conversation conversation) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Conversation'),
-        content: Text(
-          'Are you sure you want to delete "${conversation.title ?? 'Untitled'}"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+    HapticFeedback.mediumImpact();
+    await context.read<ConversationProvider>().deleteConversation(conversation.id);
 
-    if (confirmed == true && mounted) {
-      await context.read<ConversationProvider>().deleteConversation(conversation.id);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Deleted "${conversation.title}"'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 }
 
-/// Individual conversation item with menu
-class _ConversationItem extends StatelessWidget {
+/// Swipeable conversation item using native Dismissible
+class _SwipeableConversationItem extends StatelessWidget {
   final Conversation conversation;
+  final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _ConversationItem({
+  const _SwipeableConversationItem({
+    super.key,
     required this.conversation,
+    required this.isSelected,
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
@@ -211,57 +269,105 @@ class _ConversationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          children: [
-            const Icon(Icons.chat_bubble_outline, size: 16),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                conversation.title ?? 'Untitled',
-                style: const TextStyle(fontSize: 13),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      child: Dismissible(
+        key: ValueKey(conversation.id),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 16),
+          decoration: BoxDecoration(
+            color: colorScheme.error,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            Icons.delete_outline,
+            color: colorScheme.onError,
+            size: 20,
+          ),
+        ),
+        confirmDismiss: (direction) async {
+          HapticFeedback.mediumImpact();
+          return true;
+        },
+        onDismissed: (direction) => onDelete(),
+        child: Material(
+          color: isSelected
+              ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: () => _showContextMenu(context),
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                    size: 16,
+                    color: isSelected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      conversation.title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  // Subtle swipe hint
+                  Icon(
+                    Icons.chevron_left,
+                    size: 14,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  ),
+                ],
               ),
             ),
-            // More menu
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 16),
-              padding: EdgeInsets.zero,
-              iconSize: 16,
-              tooltip: 'More options',
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit_outlined, size: 16),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete_outline, size: 16),
-                      SizedBox(width: 8),
-                      Text('Delete'),
-                    ],
-                  ),
-                ),
-              ],
-              onSelected: (value) {
-                if (value == 'edit') {
-                  onEdit();
-                } else if (value == 'delete') {
-                  onDelete();
-                }
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showContextMenu(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit'),
+              onTap: () {
+                Navigator.pop(context);
+                onEdit();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: colorScheme.error),
+              title: Text('Delete', style: TextStyle(color: colorScheme.error)),
+              onTap: () {
+                Navigator.pop(context);
+                onDelete();
               },
             ),
           ],

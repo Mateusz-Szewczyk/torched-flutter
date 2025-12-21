@@ -50,6 +50,12 @@ class AuthService {
       if (response.statusCode == 200 && response.data != null) {
         await _storage.saveUserEmail(email);
 
+          // Save token from response body (for web clients where cookies don't work cross-origin)
+        final token = response.data!['token'] as String?;
+        if (token != null) {
+          await _storage.saveToken(token);
+        }
+
         // Check if account is confirmed
         final isConfirmed = response.data!['is_confirmed'] as bool? ?? true;
         if (!isConfirmed) {
@@ -139,7 +145,7 @@ class AuthService {
 
   Future<void> logout() async {
     try {
-      await _api.post('${AppConfig.authEndpoint}/logout');
+      await _api.get('${AppConfig.authEndpoint}/logout');
     } finally {
       await _storage.clearUserData();
     }

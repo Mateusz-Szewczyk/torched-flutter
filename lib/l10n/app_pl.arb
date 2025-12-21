@@ -2,6 +2,7 @@
   "@@locale": "pl",
   "menu": "Menu",
   "flashcards": "Fiszki",
+  "flashcardsDescription": "Twórz i ucz się z talii fiszek, aby zwiększyć efektywność nauki",
   "chat": "Czat",
   "login_register": "Zaloguj się / Zarejestruj",
   "settings": "Ustawienia",
@@ -35,11 +36,13 @@
   "error_fetch_files": "Wystąpił błąd podczas pobierania przesłanych plików.",
   "loading_decks": "Ładowanie talii...",
   "error": "Błąd",
+  "errorOccurred": "Wystąpił błąd",
   "try_again": "Spróbuj ponownie",
   "welcome_flashcards": "Witamy w Fiszkach!",
   "get_started_create_deck": "Rozpocznij, tworząc swoją pierwszą talię.",
   "no_flashcard_decks": "Nie masz jeszcze żadnych talii fiszek. Utwórz nową talię, aby rozpocząć naukę!",
   "create_your_first_deck": "Utwórz swoją pierwszą talię",
+  "createDeck": "Utwórz Talię",
   "create_new_deck": "Utwórz nową talię",
   "edit": "Edytuj",
   "delete": "Usuń",
@@ -67,7 +70,9 @@
   "save": "Zapisz",
   "add_flashcard": "Dodaj fiszkę",
   "edit_deck": "Edytuj talię",
+  "editDeck": "Edytuj Talię",
   "deck_name": "Nazwa talii",
+  "deckName": "Nazwa Talii",
   "enter_deck_name": "Wprowadź nazwę talii",
   "deck_description": "Opis talii",
   "enter_deck_description": "Wprowadź opis talii",
@@ -87,6 +92,70 @@
   "logout": "Wyloguj",
   "tests": "Testy",
   "dashboard": "Panel",
-  "profile": "Profil"
+  "profile": "Profil",
+  "searchDecks": "Szukaj talii...",
+  "cards": "fiszek",
+  "shared": "Udostępniona",
+  "share": "Udostępnij",
+  "addByCode": "Dodaj Kodem",
+  "manageShares": "Zarządzaj Udostępnieniami",
+  "name": "Nazwa",
+  "cardCount": "Liczba Fiszek",
+  "recent": "Ostatnie",
+  "lastSession": "Ostatnia Sesja",
+  "ascending": "Rosnąco",
+  "descending": "Malejąco",
+  "deleteDeck": "Usuń Talię",
+  "deleteDeckConfirm": "Czy na pewno chcesz usunąć \"{name}\"? Tej operacji nie można cofnąć.",
+  "@deleteDeckConfirm": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "deckDeleted": "Talia usunięta",
+  "removeSharedDeck": "Usuń Udostępnioną Talię",
+  "removeSharedDeckConfirm": "Czy na pewno chcesz usunąć tę udostępnioną talię z biblioteki?",
+  "remove": "Usuń",
+  "removeFromLibrary": "Usuń z biblioteki",
+  "showAnswer": "Pokaż Odpowiedź",
+  "tapToFlip": "Dotknij, aby odwrócić",
+  "hard": "Trudne",
+  "tryAgain": "Spróbuj ponownie",
+  "good": "Dobrze",
+  "reviewLater": "Powtórz później",
+  "easy": "Łatwe",
+  "gotIt": "Znam!",
+  "exit": "Wyjdź",
+  "sessionComplete": "Sesja Zakończona!",
+  "cardsReviewed": "Przejrzałeś {count} fiszek",
+  "@cardsReviewed": {
+    "placeholders": {
+      "count": {"type": "String"}
+    }
+  },
+  "nextSession": "Następna sesja: {date}",
+  "@nextSession": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "retakeHardCards": "Powtórz Trudne",
+  "retakeSession": "Powtórz Sesję",
+  "saveAndExit": "Zapisz i Wyjdź",
+  "backToDecks": "Powrót do Talii",
+  "noCardsToRetake": "Brak fiszek do powtórzenia",
+  "finish": "Zakończ",
+  "noHardCardsFound": "Nie znaleziono trudnych fiszek",
+  "addDeckByCode": "Dodaj Talię Kodem",
+  "shareCode": "Kod Udostępniania",
+  "alreadyAdded": "Już w Twojej bibliotece",
+  "add": "Dodaj",
+  "deckAddedSuccessfully": "Talia dodana pomyślnie",
+  "noSharedDecks": "Brak udostępnionych talii",
+  "close": "Zamknij",
+  "description": "Opis (opcjonalny)",
+  "nameRequired": "Nazwa jest wymagana",
+  "addCard": "Dodaj Fiszkę",
+  "card": "Fiszka"
 }
 

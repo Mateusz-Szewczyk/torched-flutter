@@ -6,6 +6,7 @@ import '../../providers/conversation_provider.dart';
 import '../dialogs/login_register_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/profile_dialog.dart';
+import '../dialogs/manage_files_dialog.dart';
 import 'conversation_list.dart';
 
 /// Left navigation panel - equivalent to left-panel/index.tsx
@@ -194,8 +195,10 @@ class _LeftPanelState extends State<LeftPanel> {
             _NavItem(
               icon: Icons.folder_outlined,
               label: 'My Files',
-              route: '/files',
               isPanelVisible: widget.isPanelVisible,
+              onTap: () {
+                ManageFilesDialog.show(context);
+              },
             ),
           ],
         ],
@@ -223,8 +226,14 @@ class _LeftPanelState extends State<LeftPanel> {
             ),
             ConversationList(
               onConversationClick: (id) {
-                context.read<ConversationProvider>().setCurrentConversationId(id);
-                context.go('/chat');
+                // Use deep linking for better UX and URL sharing
+                context.read<ConversationProvider>().setCurrentConversation(id);
+                context.go('/chat/$id');
+
+                // Close panel on mobile after selection
+                if (widget.isMobile) {
+                  widget.togglePanel();
+                }
               },
             ),
           ] else

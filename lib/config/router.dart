@@ -61,11 +61,24 @@ class AppRouter {
             builder: (context, state) => const HomeScreen(),
           ),
 
-          // Chat
+          // Chat - both with and without conversation ID
           GoRoute(
             path: Routes.chat,
             name: 'chat',
             builder: (context, state) => const ChatScreen(),
+            routes: [
+              // Chat with specific conversation ID (deep link support)
+              GoRoute(
+                path: ':conversationId',
+                name: 'chat-conversation',
+                builder: (context, state) {
+                  final conversationId = state.pathParameters['conversationId'];
+                  return ChatScreen(
+                    initialConversationId: int.tryParse(conversationId ?? ''),
+                  );
+                },
+              ),
+            ],
           ),
 
           // Flashcards
@@ -100,13 +113,6 @@ class AppRouter {
                 },
               ),
             ],
-          ),
-
-          // My Files
-          GoRoute(
-            path: '/files',
-            name: 'files',
-            builder: (context, state) => const MyFilesScreen(),
           ),
         ],
       ),
@@ -187,16 +193,5 @@ class StudyExamScreen extends StatelessWidget {
   }
 }
 
-class MyFilesScreen extends StatelessWidget {
-  const MyFilesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('My Files')),
-      body: const Center(child: Text('My Files screen - TODO')),
-    );
-  }
-}
 
 

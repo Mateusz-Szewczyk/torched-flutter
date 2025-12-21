@@ -15,6 +15,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get flashcards => 'Tarjetas';
 
   @override
+  String get flashcardsDescription =>
+      'Create and study flashcard decks to boost your learning';
+
+  @override
   String get chat => 'Chat';
 
   @override
@@ -116,6 +120,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get error => 'Error';
 
   @override
+  String get errorOccurred => 'An error occurred';
+
+  @override
   String get try_again => 'Intentar de nuevo';
 
   @override
@@ -131,6 +138,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get create_your_first_deck => 'Create your first deck';
+
+  @override
+  String get createDeck => 'Create Deck';
 
   @override
   String get create_new_deck => 'Crear nuevo mazo';
@@ -220,7 +230,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get edit_deck => 'Edit deck';
 
   @override
+  String get editDeck => 'Edit Deck';
+
+  @override
   String get deck_name => 'Deck name';
+
+  @override
+  String get deckName => 'Deck Name';
 
   @override
   String get enter_deck_name => 'Enter deck name';
@@ -284,4 +300,287 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profile => 'Perfil';
+
+  @override
+  String get searchDecks => 'Search decks...';
+
+  @override
+  String get cards => 'cards';
+
+  @override
+  String get shared => 'Shared';
+
+  @override
+  String get share => 'Share';
+
+  @override
+  String get addByCode => 'Add by Code';
+
+  @override
+  String get manageShares => 'Manage Shares';
+
+  @override
+  String get name => 'Name';
+
+  @override
+  String get cardCount => 'Card Count';
+
+  @override
+  String get recent => 'Recent';
+
+  @override
+  String get lastSession => 'Last Session';
+
+  @override
+  String get ascending => 'Ascending';
+
+  @override
+  String get descending => 'Descending';
+
+  @override
+  String get deleteDeck => 'Delete Deck';
+
+  @override
+  String deleteDeckConfirm(String name) {
+    return 'Are you sure you want to delete \"$name\"? This cannot be undone.';
+  }
+
+  @override
+  String get deckDeleted => 'Deck deleted';
+
+  @override
+  String get removeSharedDeck => 'Remove Shared Deck';
+
+  @override
+  String get removeSharedDeckConfirm =>
+      'Are you sure you want to remove this shared deck from your library?';
+
+  @override
+  String get remove => 'Remove';
+
+  @override
+  String get removeFromLibrary => 'Remove from library';
+
+  @override
+  String get showAnswer => 'Show Answer';
+
+  @override
+  String get tapToFlip => 'Tap to flip';
+
+  @override
+  String get hard => 'Hard';
+
+  @override
+  String get tryAgain => 'Try again';
+
+  @override
+  String get good => 'Good';
+
+  @override
+  String get reviewLater => 'Review later';
+
+  @override
+  String get easy => 'Easy';
+
+  @override
+  String get gotIt => 'Got it!';
+
+  @override
+  String get exit => 'Exit';
+
+  @override
+  String get sessionComplete => 'Session Complete!';
+
+  @override
+  String cardsReviewed(String count) {
+    return 'You reviewed $count cards';
+  }
+
+  @override
+  String nextSession(String date) {
+    return 'Next session: $date';
+  }
+
+  @override
+  String get retakeHardCards => 'Retake Hard Cards';
+
+  @override
+  String get retakeSession => 'Retake Session';
+
+  @override
+  String get saveAndExit => 'Save & Exit';
+
+  @override
+  String get backToDecks => 'Back to Decks';
+
+  @override
+  String get noCardsToRetake => 'No cards to retake';
+
+  @override
+  String get finish => 'Finish';
+
+  @override
+  String get noHardCardsFound => 'No hard cards found';
+
+  @override
+  String get addDeckByCode => 'Add Deck by Code';
+
+  @override
+  String get shareCode => 'Share Code';
+
+  @override
+  String get alreadyAdded => 'Already in your library';
+
+  @override
+  String get add => 'Add';
+
+  @override
+  String get deckAddedSuccessfully => 'Deck added successfully';
+
+  @override
+  String get noSharedDecks => 'No shared decks yet';
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get description => 'Description (optional)';
+
+  @override
+  String get nameRequired => 'Name is required';
+
+  @override
+  String get addCard => 'Add Card';
+
+  @override
+  String get card => 'Card';
+
+  @override
+  String get testsDescription =>
+      'Create and take practice exams to test your knowledge';
+
+  @override
+  String get searchExams => 'Search exams...';
+
+  @override
+  String get welcomeTests => 'Welcome to Tests';
+
+  @override
+  String get getStartedCreateTest =>
+      'Create your first exam or add one using a share code';
+
+  @override
+  String get createExam => 'Create Exam';
+
+  @override
+  String get editExam => 'Edit Exam';
+
+  @override
+  String get deleteExam => 'Delete Exam';
+
+  @override
+  String get examDeleted => 'Exam deleted';
+
+  @override
+  String get examName => 'Exam Name';
+
+  @override
+  String get questions => 'Questions';
+
+  @override
+  String get addQuestion => 'Add Question';
+
+  @override
+  String get questionText => 'Question text';
+
+  @override
+  String get answers => 'Answers';
+
+  @override
+  String get selectNumberOfQuestions => 'Select Number of Questions';
+
+  @override
+  String get estimatedTime => 'Est. Time';
+
+  @override
+  String get startExam => 'Start Exam';
+
+  @override
+  String get examComplete => 'Exam Complete!';
+
+  @override
+  String get congratulationsPassed => 'Congratulations! You passed!';
+
+  @override
+  String get keepPracticing => 'Keep practicing!';
+
+  @override
+  String get correct => 'Correct';
+
+  @override
+  String get correctAnswers => 'Correct';
+
+  @override
+  String get incorrectAnswers => 'Incorrect';
+
+  @override
+  String get timeTaken => 'Time';
+
+  @override
+  String get submittingResults => 'Submitting results...';
+
+  @override
+  String get resultsSaved => 'Results saved!';
+
+  @override
+  String get backToExams => 'Back to Exams';
+
+  @override
+  String get previous => 'Previous';
+
+  @override
+  String get next => 'Next';
+
+  @override
+  String get addExamByCode => 'Add Exam by Code';
+
+  @override
+  String get examAddedSuccessfully => 'Exam added successfully';
+
+  @override
+  String get noSharedExams => 'No shared exams yet';
+
+  @override
+  String get removeSharedExam => 'Remove Shared Exam';
+
+  @override
+  String get removeSharedExamConfirm =>
+      'Are you sure you want to remove this shared exam from your library?';
+
+  @override
+  String get examHasNoQuestions => 'This exam has no questions.';
+
+  @override
+  String get selectConversation => 'Select a conversation';
+
+  @override
+  String get orCreateNew => 'or create a new one from the sidebar';
+
+  @override
+  String get startChatting => 'Start chatting';
+
+  @override
+  String get askAnything => 'Ask me anything!';
+
+  @override
+  String get tools => 'Tools';
+
+  @override
+  String get selectTools => 'Select Tools';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get done => 'Done';
 }

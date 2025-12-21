@@ -22,6 +22,9 @@ class ApiService {
   final _cookieJar = CookieJar();
   final _storage = StorageService();
 
+  /// Get the RAG API base URL for streaming requests
+  String get ragBaseUrl => AppConfig.ragApiUrl;
+
   void init() {
     // Initialize Flask API client (auth, user management)
     _flaskDio = _createDio(AppConfig.flaskApiUrl);
@@ -41,10 +44,15 @@ class ApiService {
           'Accept': 'application/json',
         },
         validateStatus: (status) => status != null && status < 500,
+        // Enable credentials for cross-origin requests (cookies)
+        extra: {'withCredentials': true},
       ),
     );
 
-    if (!kIsWeb) {
+    // Configure for web platform to send credentials
+    if (kIsWeb) {
+      dio.options.extra['withCredentials'] = true;
+    } else {
       dio.interceptors.add(CookieManager(_cookieJar));
     }
 
@@ -52,11 +60,11 @@ class ApiService {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Add JWT token from storage if available
+          // For web, use Authorization header with Bearer token
+          // (Cookie header is forbidden in browsers for CORS requests)
           final token = await _storage.getToken();
           if (token != null) {
-            options.headers['Cookie'] = 'TorchED_auth=$token';
-            options.headers['Authorization'] = 'TorchED_AUTH';
+            options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
         },
@@ -198,6 +206,10 @@ class ApiService {
 
   Future<Response<T>> ragPut<T>(String path, {dynamic data}) async {
     return await _ragDio.put<T>(path, data: data);
+  }
+
+  Future<Response<T>> ragPatch<T>(String path, {dynamic data}) async {
+    return await _ragDio.patch<T>(path, data: data);
   }
 
   Future<Response<T>> ragDelete<T>(String path, {dynamic data}) async {
