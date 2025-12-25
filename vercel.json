@@ -1,7 +1,7 @@
 {
   "version": 2,
   "installCommand": "[ -d flutter ] || git clone -b stable --depth 1 https://github.com/flutter/flutter.git; ./flutter/bin/flutter config --enable-web; ./flutter/bin/flutter pub get; ./flutter/bin/flutter pub run build_runner build -d",
-  "buildCommand": "./flutter/bin/flutter build web --release",
+  "buildCommand": "./flutter/bin/flutter build web --release --dart-define=FLASK_API_URL=$FLASK_API_URL --dart-define=RAG_API_URL=$RAG_API_URL",
   "outputDirectory": "build/web",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
