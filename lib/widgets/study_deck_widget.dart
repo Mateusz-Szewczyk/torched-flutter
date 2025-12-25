@@ -25,7 +25,7 @@ class FlashcardRating {
 }
 
 /// Study deck widget - Mobile-first flashcard study experience
-/// Redesigned for focus, clarity, and ease of use.
+/// Features: swipe gestures, 3D flip cards, clean focus-oriented UI
 class StudyDeckWidget extends StatefulWidget {
   final Deck deck;
   final int? studySessionId;
@@ -341,68 +341,95 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
       builder: (context, child) {
         final angle = _flipAnimation.value * pi;
         final isFront = angle < pi / 2;
+
         return Transform(
           alignment: Alignment.center,
-          transform: Matrix4.identity()..setEntry(3, 2, 0.001)..rotateY(angle),
-          child: Container(
-            width: double.infinity,
-            constraints: BoxConstraints(minHeight: isMobile ? 320 : 400),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: cs.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        isFront ? 'QUESTION' : 'ANSWER',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: cs.primary, fontWeight: FontWeight.bold, letterSpacing: 1.2
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Center(
-                        child: SingleChildScrollView(
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: isFront ? Matrix4.identity() : Matrix4.identity()..rotateY(pi),
-                            child: Text(
-                              isFront ? card.question : card.answer,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: cs.onSurface, fontWeight: FontWeight.w500, height: 1.4
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (isFront)
-                      Text('Tap to reveal', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant))
-                    else
-                      Transform(
-                        alignment: Alignment.center,
-                        transform: Matrix4.identity()..rotateY(pi),
-                        child: Text('Rate your answer', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant))
-                      ),
-                  ],
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateY(angle),
+          child: isFront
+              ? _buildCardFace(
+                  content: card.question,
+                  label: 'QUESTION',
+                  cs: cs,
+                  theme: theme,
+                  isMobile: isMobile,
+                )
+              : Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()..rotateY(pi), // Naprawa lustrzanego odbicia
+                  child: _buildCardFace(
+                    content: card.answer,
+                    label: 'ANSWER',
+                    cs: cs,
+                    theme: theme,
+                    isMobile: isMobile,
+                  ),
                 ),
-              ),
-            ),
-          ),
         );
       },
+    );
+  }
+
+  Widget _buildCardFace({
+    required String content,
+    required String label,
+    required ColorScheme cs,
+    required ThemeData theme,
+    required bool isMobile,
+  }) {
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(minHeight: isMobile ? 320 : 400),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  label,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Center(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      content,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.w500,
+                        height: 1.4
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Text(
+                label == 'QUESTION' ? 'Tap to reveal' : 'Rate your answer',
+                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
