@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "outputDirectory": "build/web",
+  "installCommand": "echo 'Skipping npm install'",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
