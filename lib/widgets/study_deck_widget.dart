@@ -244,6 +244,41 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     }
   }
 
+  Future<void> _handleSave() async {
+    if (_localRatings.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No progress to save yet'), duration: Duration(seconds: 2)),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final ratingsJson = _localRatings.map((r) => r.toJson()).toList();
+      await widget.provider.submitRatings(ratingsJson);
+      _localRatings.clear(); // Clear after successful save
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Progress saved! ✓'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
   void _showStatsBottomSheet() {
     final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
@@ -299,6 +334,8 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
               total: _initialTotalCards,
               onClose: widget.onExit,
               onShowStats: _showStatsBottomSheet,
+              onSave: _handleSave,
+              isSaving: _isSubmitting,
             ),
             Expanded(
               child: Padding(
@@ -485,6 +522,8 @@ class _MinimalStudyAppBar extends StatelessWidget {
   final int total;
   final VoidCallback onClose;
   final VoidCallback onShowStats;
+  final VoidCallback onSave;
+  final bool isSaving;
 
   const _MinimalStudyAppBar({
     required this.deckName,
@@ -493,6 +532,8 @@ class _MinimalStudyAppBar extends StatelessWidget {
     required this.total,
     required this.onClose,
     required this.onShowStats,
+    required this.onSave,
+    this.isSaving = false,
   });
 
   @override
@@ -504,17 +545,41 @@ class _MinimalStudyAppBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
+              // Left side: Deck name and progress counter
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(deckName, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('$currentIndex / $total cards', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(deckName, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text('$currentIndex / $total cards', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
                 ),
               ),
-              IconButton(onPressed: onShowStats, icon: const Icon(Icons.bar_chart_rounded)),
+              // Right side: Stats, Save, Close buttons
+              IconButton(
+                onPressed: onShowStats,
+                icon: const Icon(Icons.bar_chart_rounded),
+                tooltip: 'View Stats',
+              ),
+              IconButton(
+                onPressed: isSaving ? null : onSave,
+                icon: isSaving
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                      )
+                    : const Icon(Icons.save_outlined),
+                tooltip: 'Save Progress',
+              ),
+              IconButton(
+                onPressed: onClose,
+                icon: const Icon(Icons.close),
+                tooltip: 'Exit',
+              ),
             ],
           ),
           Padding(

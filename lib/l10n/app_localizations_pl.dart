@@ -582,4 +582,78 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get done => 'Done';
+
+  @override
+  String get dashboardTitle => 'Twój Panel Nauki';
+
+  @override
+  String get dashboardSubtitle => 'Śledź swoje postępy i osiągnięcia';
+
+  @override
+  String get studyStreak => 'Seria Nauki';
+
+  @override
+  String get totalStudyTime => 'Czas Nauki';
+
+  @override
+  String get averageExamScore => 'Średni Wynik';
+
+  @override
+  String get flashcardsStudied => 'Fiszki';
+
+  @override
+  String get totalCards => 'łącznie';
+
+  @override
+  String get thisMonth => 'ten miesiąc';
+
+  @override
+  String get allExams => 'wszystkie egz.';
+
+  @override
+  String get keepItUp => 'Tak trzymaj!';
+
+  @override
+  String get quickActions => 'Szybkie Akcje';
+
+  @override
+  String get recentActivity => 'Ostatnia Aktywność';
+
+  @override
+  String get viewAll => 'Zobacz Wszystko';
+
+  @override
+  String get noRecentActivity => 'Brak ostatniej aktywności';
+
+  @override
+  String get flashcardDifficultyDistribution => 'Wyniki Fiszek';
+
+  @override
+  String get welcomeTitle => 'Tutaj zaczyna i kończy się Twoja nauka';
+
+  @override
+  String get welcomeSubtitle =>
+      'Połącz świat egzaminów, fiszek i inteligentnego chatu w jednym miejscu.';
+
+  @override
+  String get chatTabTitle => 'AI Chat';
+
+  @override
+  String get chatDescription => 'Rozmawiaj z asystentem AI';
+
+  @override
+  String get flashcardsTabTitle => 'Fiszki';
+
+  @override
+  String get testsTabTitle => 'Egzaminy';
+
+  @override
+  String get loginToAccess => 'Zaloguj się, aby uzyskać dostęp do panelu';
+
+  @override
+  String get loginToAccessDescription =>
+      'Śledź swoje postępy, serię nauki i więcej';
+
+  @override
+  String get retry => 'Ponów';
 }

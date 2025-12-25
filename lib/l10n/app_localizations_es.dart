@@ -583,4 +583,78 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get done => 'Done';
+
+  @override
+  String get dashboardTitle => 'Your Learning Dashboard';
+
+  @override
+  String get dashboardSubtitle => 'Track your progress and achievements';
+
+  @override
+  String get studyStreak => 'Study Streak';
+
+  @override
+  String get totalStudyTime => 'Study Time';
+
+  @override
+  String get averageExamScore => 'Avg Score';
+
+  @override
+  String get flashcardsStudied => 'Cards Studied';
+
+  @override
+  String get totalCards => 'total';
+
+  @override
+  String get thisMonth => 'this month';
+
+  @override
+  String get allExams => 'all exams';
+
+  @override
+  String get keepItUp => 'Keep it up!';
+
+  @override
+  String get quickActions => 'Quick Actions';
+
+  @override
+  String get recentActivity => 'Recent Activity';
+
+  @override
+  String get viewAll => 'View All';
+
+  @override
+  String get noRecentActivity => 'No recent activity yet';
+
+  @override
+  String get flashcardDifficultyDistribution => 'Flashcard Performance';
+
+  @override
+  String get welcomeTitle => 'Your learning starts and ends here';
+
+  @override
+  String get welcomeSubtitle =>
+      'Combine exams, flashcards, and intelligent chat in one place.';
+
+  @override
+  String get chatTabTitle => 'AI Chat';
+
+  @override
+  String get chatDescription => 'Talk to your AI assistant';
+
+  @override
+  String get flashcardsTabTitle => 'Flashcards';
+
+  @override
+  String get testsTabTitle => 'Tests';
+
+  @override
+  String get loginToAccess => 'Log in to access your dashboard';
+
+  @override
+  String get loginToAccessDescription =>
+      'Track your progress, study streak, and more';
+
+  @override
+  String get retry => 'Retry';
 }

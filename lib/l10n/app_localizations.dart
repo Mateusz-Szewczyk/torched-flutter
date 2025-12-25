@@ -1207,6 +1207,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Done'**
   String get done;
+
+  /// No description provided for @dashboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Learning Dashboard'**
+  String get dashboardTitle;
+
+  /// No description provided for @dashboardSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Track your progress and achievements'**
+  String get dashboardSubtitle;
+
+  /// No description provided for @studyStreak.
+  ///
+  /// In en, this message translates to:
+  /// **'Study Streak'**
+  String get studyStreak;
+
+  /// No description provided for @totalStudyTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Study Time'**
+  String get totalStudyTime;
+
+  /// No description provided for @averageExamScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Avg Score'**
+  String get averageExamScore;
+
+  /// No description provided for @flashcardsStudied.
+  ///
+  /// In en, this message translates to:
+  /// **'Cards Studied'**
+  String get flashcardsStudied;
+
+  /// No description provided for @totalCards.
+  ///
+  /// In en, this message translates to:
+  /// **'total'**
+  String get totalCards;
+
+  /// No description provided for @thisMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'this month'**
+  String get thisMonth;
+
+  /// No description provided for @allExams.
+  ///
+  /// In en, this message translates to:
+  /// **'all exams'**
+  String get allExams;
+
+  /// No description provided for @keepItUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep it up!'**
+  String get keepItUp;
+
+  /// No description provided for @quickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick Actions'**
+  String get quickActions;
+
+  /// No description provided for @recentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Activity'**
+  String get recentActivity;
+
+  /// No description provided for @viewAll.
+  ///
+  /// In en, this message translates to:
+  /// **'View All'**
+  String get viewAll;
+
+  /// No description provided for @noRecentActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent activity yet'**
+  String get noRecentActivity;
+
+  /// No description provided for @flashcardDifficultyDistribution.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashcard Performance'**
+  String get flashcardDifficultyDistribution;
+
+  /// No description provided for @welcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your learning starts and ends here'**
+  String get welcomeTitle;
+
+  /// No description provided for @welcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Combine exams, flashcards, and intelligent chat in one place.'**
+  String get welcomeSubtitle;
+
+  /// No description provided for @chatTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Chat'**
+  String get chatTabTitle;
+
+  /// No description provided for @chatDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk to your AI assistant'**
+  String get chatDescription;
+
+  /// No description provided for @flashcardsTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashcards'**
+  String get flashcardsTabTitle;
+
+  /// No description provided for @testsTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tests'**
+  String get testsTabTitle;
+
+  /// No description provided for @loginToAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Log in to access your dashboard'**
+  String get loginToAccess;
+
+  /// No description provided for @loginToAccessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Track your progress, study streak, and more'**
+  String get loginToAccessDescription;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
 }
 
 class _AppLocalizationsDelegate

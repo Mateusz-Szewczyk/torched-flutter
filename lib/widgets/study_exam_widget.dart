@@ -216,11 +216,15 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     if (totalQuestions == 0) {
       return Scaffold(
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: widget.onExit,
-          ),
-          title: Text(widget.exam.name),
+          automaticallyImplyLeading: false,
+          title: Text(widget.exam.name, overflow: TextOverflow.ellipsis),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: widget.onExit,
+              tooltip: 'Exit',
+            ),
+          ],
         ),
         body: Center(
           child: Padding(
@@ -260,11 +264,15 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: widget.onExit,
-        ),
-        title: Text(widget.exam.name),
+        automaticallyImplyLeading: false,
+        title: Text(widget.exam.name, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: widget.onExit,
+            tooltip: 'Exit',
+          ),
+        ],
       ),
       body: Center(
         child: Card(
@@ -406,11 +414,8 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: widget.onExit,
-        ),
-        title: Text(widget.exam.name),
+        automaticallyImplyLeading: false,
+        title: Text(widget.exam.name, overflow: TextOverflow.ellipsis),
         actions: [
           // Timer
           Container(
@@ -435,13 +440,19 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
           ),
           // Progress
           Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: Text(
                 total > 0 ? '${_currentQuestionIndex + 1}/$total' : '0/0',
                 style: theme.textTheme.bodyLarge,
               ),
             ),
+          ),
+          // Close button (moved to right)
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: widget.onExit,
+            tooltip: 'Exit Exam',
           ),
         ],
       ),
@@ -670,11 +681,15 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: widget.onExit,
-        ),
-        title: Text(widget.exam.name),
+        automaticallyImplyLeading: false,
+        title: Text(widget.exam.name, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: widget.onExit,
+            tooltip: 'Exit',
+          ),
+        ],
       ),
       body: Center(
         child: SingleChildScrollView(
