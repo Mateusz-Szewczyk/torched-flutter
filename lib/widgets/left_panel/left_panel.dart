@@ -285,10 +285,7 @@ class _LeftPanelState extends State<LeftPanel> {
             label: 'Settings',
             isPanelVisible: widget.isPanelVisible,
             onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => const SettingsDialog(),
-              );
+              showSettingsDialog(context);
             },
           ),
 
@@ -301,10 +298,7 @@ class _LeftPanelState extends State<LeftPanel> {
               label: 'My Profile',
               isPanelVisible: widget.isPanelVisible,
               onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const ProfileDialog(),
-                );
+                showProfileDialog(context);
               },
             )
           else

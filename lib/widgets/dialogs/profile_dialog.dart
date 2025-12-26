@@ -4,8 +4,232 @@ import '../../providers/auth_provider.dart';
 import '../../models/models.dart';
 import '../profile/memories_section.dart';
 
-/// Profile dialog - equivalent to profile-dialog.tsx
-/// Shows user profile information with tabs for profile, password change, and account deletion
+/// Shows the profile dialog as a full-screen modal
+void showProfileDialog(BuildContext context) {
+  final isMobile = MediaQuery.of(context).size.width < 768;
+
+  if (isMobile) {
+    // Full screen modal for mobile
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierDismissible: true,
+        barrierColor: Colors.black54,
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return const ProfileScreen();
+        },
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          );
+        },
+      ),
+    );
+  } else {
+    // Regular dialog for desktop
+    showDialog(
+      context: context,
+      builder: (context) => const ProfileDialog(),
+    );
+  }
+}
+
+/// Full-screen profile for mobile with swipe-to-close
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  double _dragOffset = 0;
+  bool _isDragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _handleDragStart(DragStartDetails details) {
+    _isDragging = true;
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging) return;
+    setState(() {
+      _dragOffset = (_dragOffset + details.delta.dy).clamp(0, double.infinity);
+    });
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    _isDragging = false;
+    final velocity = details.velocity.pixelsPerSecond.dy;
+
+    if (velocity > 500 || _dragOffset > 150) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() {
+        _dragOffset = 0;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final user = authProvider.currentUser;
+    final cs = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      onVerticalDragStart: _handleDragStart,
+      onVerticalDragUpdate: _handleDragUpdate,
+      onVerticalDragEnd: _handleDragEnd,
+      child: AnimatedContainer(
+        duration: _isDragging ? Duration.zero : const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        transform: Matrix4.translationValues(0, _dragOffset, 0),
+        child: Scaffold(
+          backgroundColor: cs.surface,
+          body: SafeArea(
+            child: Column(
+              children: [
+                // Drag handle indicator
+                _buildDragHandle(cs),
+
+                // Header with close button
+                _buildHeader(context, cs),
+
+                // Tab bar
+                _buildTabBar(cs),
+
+                // Content
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _ProfileContent(user: user),
+                      const Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: MemoriesSection(),
+                      ),
+                      const _PasswordContent(),
+                      _AccountContent(user: user),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDragHandle(ColorScheme cs) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragStart: _handleDragStart,
+      onVerticalDragUpdate: _handleDragUpdate,
+      onVerticalDragEnd: _handleDragEnd,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: cs.onSurfaceVariant.withAlpha(80),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'My Profile',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Manage your account settings',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close),
+            style: IconButton.styleFrom(
+              backgroundColor: cs.surfaceContainerHighest,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBar(ColorScheme cs) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withAlpha(100),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          color: cs.primaryContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        labelColor: cs.onPrimaryContainer,
+        unselectedLabelColor: cs.onSurfaceVariant,
+        dividerColor: Colors.transparent,
+        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        tabs: const [
+          Tab(icon: Icon(Icons.person_outline, size: 20), text: 'Profile'),
+          Tab(icon: Icon(Icons.psychology_outlined, size: 20), text: 'Memory'),
+          Tab(icon: Icon(Icons.lock_outline, size: 20), text: 'Password'),
+          Tab(icon: Icon(Icons.settings_outlined, size: 20), text: 'Account'),
+        ],
+      ),
+    );
+  }
+}
+
+/// Desktop dialog version
 class ProfileDialog extends StatefulWidget {
   const ProfileDialog({super.key});
 
@@ -34,6 +258,7 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
     final user = authProvider.currentUser;
 
     return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 650, maxHeight: 750),
         child: Column(
@@ -75,13 +300,13 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _ProfileTab(user: user),
+                  _ProfileContent(user: user),
                   const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: MemoriesSection(),
                   ),
-                  const _PasswordTab(),
-                  _AccountTab(user: user),
+                  const _PasswordContent(),
+                  _AccountContent(user: user),
                 ],
               ),
             ),
@@ -92,73 +317,102 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
   }
 }
 
-/// Profile information tab
-class _ProfileTab extends StatelessWidget {
+class _ProfileContent extends StatelessWidget {
   final User? user;
 
-  const _ProfileTab({required this.user});
+  const _ProfileContent({required this.user});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // User avatar
-          Center(
-            child: CircleAvatar(
-              radius: 50,
-              backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-              child: Icon(
-                Icons.person,
-                size: 50,
-                color: Theme.of(context).primaryColor,
+          // User avatar card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [cs.primaryContainer, cs.primaryContainer.withAlpha(150)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: cs.primary.withAlpha(30),
+                  child: Icon(
+                    Icons.person,
+                    size: 40,
+                    color: cs.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  user?.name ?? user?.email ?? 'User',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.onPrimaryContainer,
+                  ),
+                ),
+                if (user?.email != null)
+                  Text(
+                    user!.email,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onPrimaryContainer.withAlpha(180),
+                    ),
+                  ),
+              ],
             ),
           ),
 
           const SizedBox(height: 24),
 
-          // Email
-          _buildInfoRow(
+          // Info cards
+          _buildInfoCard(
             context,
             icon: Icons.email_outlined,
             label: 'Email',
             value: user?.email ?? 'Not available',
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Name
-          _buildInfoRow(
+          _buildInfoCard(
             context,
             icon: Icons.person_outline,
-            label: 'Name',
+            label: 'Display Name',
             value: user?.name ?? 'Not set',
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Created at
-          _buildInfoRow(
+          _buildInfoCard(
             context,
             icon: Icons.calendar_today_outlined,
-            label: 'Member since',
+            label: 'Member Since',
             value: user?.createdAt ?? 'Unknown',
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
           // Logout button
           SizedBox(
             width: double.infinity,
+            height: 56,
             child: FilledButton.icon(
               onPressed: () => _handleLogout(context),
               icon: const Icon(Icons.logout),
-              label: const Text('Logout'),
+              label: const Text('Logout', style: TextStyle(fontSize: 16)),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
           ),
@@ -167,39 +421,53 @@ class _ProfileTab extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, {
+  Widget _buildInfoCard(BuildContext context, {
     required IconData icon,
     required String label,
     required String value,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withAlpha(100),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withAlpha(50)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cs.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 20, color: cs.primary),
           ),
-        ),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -225,21 +493,21 @@ class _ProfileTab extends StatelessWidget {
     if (confirmed == true && context.mounted) {
       await context.read<AuthProvider>().logout();
       if (context.mounted) {
-        Navigator.pop(context); // Close profile dialog
+        Navigator.pop(context);
       }
     }
   }
 }
 
-/// Password change tab
-class _PasswordTab extends StatefulWidget {
-  const _PasswordTab();
+/// Password change content
+class _PasswordContent extends StatefulWidget {
+  const _PasswordContent();
 
   @override
-  State<_PasswordTab> createState() => _PasswordTabState();
+  State<_PasswordContent> createState() => _PasswordContentState();
 }
 
-class _PasswordTabState extends State<_PasswordTab> {
+class _PasswordContentState extends State<_PasswordContent> {
   final _formKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
@@ -259,6 +527,8 @@ class _PasswordTabState extends State<_PasswordTab> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Form(
@@ -266,85 +536,54 @@ class _PasswordTabState extends State<_PasswordTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Change Password',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer.withAlpha(50),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.security, color: cs.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Change your password regularly to keep your account secure.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
             const SizedBox(height: 24),
 
-            // Current password
-            TextFormField(
+            _buildPasswordField(
               controller: _currentPasswordController,
-              decoration: InputDecoration(
-                labelText: 'Current Password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureCurrentPassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
-                ),
-              ),
-              obscureText: _obscureCurrentPassword,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Current password is required';
-                }
-                return null;
-              },
+              label: 'Current Password',
+              obscure: _obscureCurrentPassword,
+              onToggle: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
             ),
 
             const SizedBox(height: 16),
 
-            // New password
-            TextFormField(
+            _buildPasswordField(
               controller: _newPasswordController,
-              decoration: InputDecoration(
-                labelText: 'New Password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureNewPassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
-                ),
-              ),
-              obscureText: _obscureNewPassword,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'New password is required';
-                }
-                if (value.length < 8) {
-                  return 'Password must be at least 8 characters';
-                }
-                return null;
-              },
+              label: 'New Password',
+              obscure: _obscureNewPassword,
+              onToggle: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
             ),
 
             const SizedBox(height: 16),
 
-            // Confirm password
-            TextFormField(
+            _buildPasswordField(
               controller: _confirmPasswordController,
-              decoration: InputDecoration(
-                labelText: 'Confirm New Password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
-                ),
-              ),
-              obscureText: _obscureConfirmPassword,
+              label: 'Confirm New Password',
+              obscure: _obscureConfirmPassword,
+              onToggle: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
               validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please confirm your password';
-                }
                 if (value != _newPasswordController.text) {
                   return 'Passwords do not match';
                 }
@@ -352,14 +591,17 @@ class _PasswordTabState extends State<_PasswordTab> {
               },
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
 
-            // Submit button
             SizedBox(
               width: double.infinity,
+              height: 56,
               child: FilledButton(
-                onPressed: _handlePasswordChange,
-                child: const Text('Change Password'),
+                onPressed: _handleChangePassword,
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('Update Password', style: TextStyle(fontSize: 16)),
               ),
             ),
           ],
@@ -368,86 +610,103 @@ class _PasswordTabState extends State<_PasswordTab> {
     );
   }
 
-  Future<void> _handlePasswordChange() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // TODO: Implement password change API call
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password change - TODO: implement API call'),
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String label,
+    required bool obscure,
+    required VoidCallback onToggle,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscure,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        prefixIcon: const Icon(Icons.lock_outline),
+        suffixIcon: IconButton(
+          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+          onPressed: onToggle,
+        ),
       ),
+      validator: validator ?? (value) {
+        if (value == null || value.isEmpty) {
+          return '$label is required';
+        }
+        return null;
+      },
+    );
+  }
+
+  Future<void> _handleChangePassword() async {
+    if (_formKey.currentState?.validate() != true) return;
+
+    // TODO: Implement password change
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Password change not yet implemented')),
     );
   }
 }
 
-/// Account management tab (delete account)
-class _AccountTab extends StatelessWidget {
+/// Account management content
+class _AccountContent extends StatelessWidget {
   final User? user;
 
-  const _AccountTab({required this.user});
+  const _AccountContent({required this.user});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Account Management',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
           // Danger zone
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.3),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.error,
-              ),
-              borderRadius: BorderRadius.circular(8),
+              color: cs.errorContainer.withAlpha(50),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cs.error.withAlpha(50)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
+                    Icon(Icons.warning_amber_rounded, color: cs.error),
                     const SizedBox(width: 8),
                     Text(
                       'Danger Zone',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.error,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: cs.error,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                const Text(
-                  'Deleting your account is permanent and cannot be undone. All your data will be permanently deleted.',
+                Text(
+                  'Deleting your account is permanent. All your data including flashcards, exams, and study progress will be permanently removed.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurface,
+                  ),
                 ),
-
-                const SizedBox(height: 16),
-
-                FilledButton.icon(
-                  onPressed: () => _handleDeleteAccount(context),
-                  icon: const Icon(Icons.delete_forever),
-                  label: const Text('Delete Account'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _handleDeleteAccount(context),
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('Delete Account'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: cs.error,
+                      side: BorderSide(color: cs.error),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
               ],
@@ -464,7 +723,8 @@ class _AccountTab extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Text('Delete Account'),
         content: const Text(
-          'Are you absolutely sure? This action cannot be undone. All your data will be permanently deleted.',
+          'Are you absolutely sure? This action cannot be undone. '
+          'All your data will be permanently deleted.',
         ),
         actions: [
           TextButton(
@@ -476,20 +736,19 @@ class _AccountTab extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('Yes, Delete My Account'),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
 
     if (confirmed == true && context.mounted) {
-      // TODO: Implement account deletion API call
+      // TODO: Implement account deletion
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account deletion - TODO: implement API call'),
-        ),
+        const SnackBar(content: Text('Account deletion not yet implemented')),
       );
     }
   }
 }
+
 
