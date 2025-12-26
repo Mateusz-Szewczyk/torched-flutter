@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../models/models.dart';
@@ -9,6 +10,30 @@ class ChatStep {
   final String content;
   final String status;
   ChatStep({required this.content, required this.status});
+}
+
+/// Model for a generated action (flashcards/exam)
+class GeneratedAction {
+  final String type;  // "flashcards" or "exam"
+  final int id;
+  final String name;
+  final int count;
+
+  GeneratedAction({
+    required this.type,
+    required this.id,
+    required this.name,
+    required this.count,
+  });
+
+  String get itemLabel => type == 'flashcards' ? 'fiszek' : 'pytań';
+  String get routePath => type == 'flashcards' ? '/flashcards' : '/tests';
+
+  /// Label to display on the navigation button
+  String get label {
+    final icon = type == 'flashcards' ? '📚' : '📝';
+    return '$icon $name ($count $itemLabel)';
+  }
 }
 
 /// Provider for managing conversations and chat state
@@ -35,6 +60,10 @@ class ConversationProvider extends ChangeNotifier {
 
   List<ChatStep> _currentSteps = [];
   List<ChatStep> get currentSteps => _currentSteps;
+
+  // Generated actions for navigation buttons
+  List<GeneratedAction> _generatedActions = [];
+  List<GeneratedAction> get generatedActions => _generatedActions;
 
   bool _isLoadingConversations = false;
   bool get isLoadingConversations => _isLoadingConversations;
@@ -229,122 +258,174 @@ class ConversationProvider extends ChangeNotifier {
   }
 
   /// Send a message and get streaming response
-Future<void> sendMessage(String text) async {
-  if (_currentConversationId == null || text
-      .trim()
-      .isEmpty) return;
-  if (_isSending || _isStreaming) return;
+  Future<void> sendMessage(String text) async {
+    if (_currentConversationId == null || text.trim().isEmpty) return;
+    if (_isSending || _isStreaming) return;
 
-  final userText = text.trim();
-  _isSending = true;
-  _error = null;
+    final userText = text.trim();
+    _isSending = true;
+    _error = null;
+    _generatedActions = []; // Clear previous actions
 
-  // 1. Natychmiastowe dodanie wiadomości użytkownika do UI
-  final userMessage = Message(
-    role: 'user',
-    content: userText,
-    timestamp: DateTime.now().toIso8601String(),
-  );
-  _messages = [..._messages, userMessage];
-  notifyListeners();
-
-  // 2. Zapisanie wiadomości użytkownika na serwerze (asynchronicznie w tle)
-  try {
-    _chatService.saveMessage(
-      conversationId: _currentConversationId!,
-      sender: 'user',
-      text: userText,
+    // 1. Natychmiastowe dodanie wiadomości użytkownika do UI
+    final userMessage = Message(
+      role: 'user',
+      content: userText,
+      timestamp: DateTime.now().toIso8601String(),
     );
-  } catch (e) {
-    debugPrint('Failed to save user message: $e');
-  }
+    _messages = [..._messages, userMessage];
+    notifyListeners();
 
-  // 3. Przygotowanie stanu do streamingu
-  _isStreaming = true;
-  _streamingText = '';
-  _currentSteps = [];
-  notifyListeners();
+    // 2. Zapisanie wiadomości użytkownika na serwerze (asynchronicznie w tle)
+    try {
+      _chatService.saveMessage(
+        conversationId: _currentConversationId!,
+        sender: 'user',
+        text: userText,
+      );
+    } catch (e) {
+      debugPrint('Failed to save user message: $e');
+    }
 
-  try {
-    final stream = _chatService.streamQuery(
-      conversationId: _currentConversationId!,
-      query: userText,
-      selectedTools: _selectedTools,
-    );
+    // 3. Przygotowanie stanu do streamingu
+    _isStreaming = true;
+    _streamingText = '';
+    _currentSteps = [];
 
-    await for (final event in stream) {
-      switch (event.type) {
-        case ChatStreamEventType.step:
-          if (event.content != null && event.status != null) {
-            final index = _currentSteps.indexWhere((s) => s.content == event.content);
+    // Collect steps and actions during streaming for persistence
+    final List<Map<String, String>> collectedSteps = [];
+    final List<Map<String, dynamic>> collectedActions = [];
 
-            if (index != -1) {
-              _currentSteps[index] = ChatStep(
-                content: event.content!,
-                status: event.status!
-              );
-            } else {
-              _currentSteps.add(ChatStep(
-                content: event.content!,
-                status: event.status!
-              ));
+    notifyListeners();
+
+    try {
+      final stream = _chatService.streamQuery(
+        conversationId: _currentConversationId!,
+        query: userText,
+        selectedTools: _selectedTools,
+      );
+
+      await for (final event in stream) {
+        switch (event.type) {
+          case ChatStreamEventType.step:
+            if (event.content != null && event.status != null) {
+              final index = _currentSteps.indexWhere((s) => s.content == event.content);
+
+              if (index != -1) {
+                _currentSteps[index] = ChatStep(
+                  content: event.content!,
+                  status: event.status!
+                );
+                // Update collected steps
+                final stepIndex = collectedSteps.indexWhere((s) => s['content'] == event.content);
+                if (stepIndex != -1) {
+                  collectedSteps[stepIndex] = {
+                    'content': event.content!,
+                    'status': event.status!,
+                  };
+                }
+              } else {
+                _currentSteps.add(ChatStep(
+                  content: event.content!,
+                  status: event.status!
+                ));
+                // Add to collected steps
+                collectedSteps.add({
+                  'content': event.content!,
+                  'status': event.status!,
+                });
+              }
+              notifyListeners();
             }
+            break;
+
+          case ChatStreamEventType.chunk:
+            _streamingText += event.chunk ?? '';
             notifyListeners();
-          }
-          break;
+            break;
 
-        case ChatStreamEventType.chunk:
-          _streamingText += event.chunk ?? '';
-          break;
+          case ChatStreamEventType.action:
+            // Dodaj akcję nawigacji do listy
+            if (event.actionType != null && event.actionId != null) {
+              final action = GeneratedAction(
+                type: event.actionType!,
+                id: event.actionId!,
+                name: event.actionName ?? 'Nowy zestaw',
+                count: event.actionCount ?? 0,
+              );
+              _generatedActions.add(action);
 
-        case ChatStreamEventType.done:
-          if (_streamingText.isNotEmpty) {
-            final botMessage = Message(
-              role: 'bot',
-              content: _streamingText,
-              timestamp: DateTime.now().toIso8601String(),
-            );
-            _messages = [..._messages, botMessage];
+              // Add to collected actions for persistence
+              collectedActions.add({
+                'type': event.actionType!,
+                'id': event.actionId!,
+                'name': event.actionName ?? 'Nowy zestaw',
+                'count': event.actionCount ?? 0,
+              });
+              notifyListeners();
+            }
+            break;
 
-            // Trwały zapis odpowiedzi bota na serwerze
-            await _chatService.saveMessage(
-              conversationId: _currentConversationId!,
-              sender: 'bot',
-              text: _streamingText,
-            );
-          }
+          case ChatStreamEventType.done:
+            if (_streamingText.isNotEmpty) {
+              // Build metadata JSON for persistence
+              String? metadataJson;
+              if (collectedSteps.isNotEmpty || collectedActions.isNotEmpty) {
+                final metadata = <String, dynamic>{};
+                if (collectedSteps.isNotEmpty) {
+                  metadata['steps'] = collectedSteps;
+                }
+                if (collectedActions.isNotEmpty) {
+                  metadata['actions'] = collectedActions;
+                }
+                metadataJson = jsonEncode(metadata);
+              }
 
-          _isStreaming = false;
-          _streamingText = '';
-          _selectedTools = []; // Czyścimy narzędzia po udanym zapytaniu
-          break;
+              // Create bot message with metadata
+              final botMessage = Message(
+                role: 'bot',
+                content: _streamingText,
+                timestamp: DateTime.now().toIso8601String(),
+                metadata: metadataJson,
+              );
+              _messages = [..._messages, botMessage];
 
-        case ChatStreamEventType.error:
-          _error = event.error ?? 'Unknown error occurred';
-          _isStreaming = false;
-          _streamingText = '';
-          break;
+              // Trwały zapis odpowiedzi bota na serwerze z metadata
+              await _chatService.saveMessage(
+                conversationId: _currentConversationId!,
+                sender: 'bot',
+                text: _streamingText,
+                metadata: metadataJson,
+              );
+            }
+
+            _isStreaming = false;
+            _streamingText = '';
+            _selectedTools = []; // Czyścimy narzędzia po udanym zapytaniu
+            break;
+
+          case ChatStreamEventType.error:
+            _error = event.error ?? 'Unknown error occurred';
+            _isStreaming = false;
+            _streamingText = '';
+            break;
+        }
+        notifyListeners();
       }
+    } catch (e) {
+      _error = e.toString();
+      _isStreaming = false;
+      _streamingText = '';
+      notifyListeners();
+    } finally {
+      _isSending = false;
       notifyListeners();
     }
-  } catch (e) {
-    _error = e.toString();
-    _isStreaming = false;
-    _streamingText = '';
-    notifyListeners();
-  } finally {
-    _isSending = false;
-    notifyListeners();
   }
-}
 
-  /// Cancel current streaming
-  void cancelStreaming() {
-    _streamSubscription?.cancel();
-    _streamSubscription = null;
-    _isStreaming = false;
-    _streamingText = '';
-    _isSending = false;
+  /// Clear generated actions (call after navigation)
+  void clearGeneratedActions() {
+    _generatedActions = [];
     notifyListeners();
   }
 
@@ -388,4 +469,3 @@ Future<void> sendMessage(String text) async {
     super.dispose();
   }
 }
-

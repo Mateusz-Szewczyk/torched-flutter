@@ -92,10 +92,18 @@ class ChatService {
       if (response.statusCode == 200 && response.data != null) {
         return response.data!.map((json) {
           final map = json as Map<String, dynamic>;
+          final metadata = map['metadata'] as String?;
+
+          // Debug log to verify metadata is received
+          if (metadata != null && metadata.isNotEmpty) {
+            debugPrint('[ChatService] Message has metadata: ${metadata.substring(0, metadata.length.clamp(0, 100))}...');
+          }
+
           return Message(
             role: map['sender'] as String? ?? 'user',
             content: map['text'] as String? ?? '',
             timestamp: map['created_at'] as String?,
+            metadata: metadata, // Include metadata from backend
           );
         }).toList();
       }
@@ -106,18 +114,27 @@ class ChatService {
   }
 
   /// Save a message to the conversation
+  /// Optionally include metadata with steps and actions
   Future<bool> saveMessage({
     required int conversationId,
     required String sender,
     required String text,
+    String? metadata,
   }) async {
     try {
+      final Map<String, dynamic> data = {
+        'sender': sender,
+        'text': text,
+      };
+
+      // Include metadata if provided
+      if (metadata != null && metadata.isNotEmpty) {
+        data['metadata'] = metadata;
+      }
+
       final response = await _api.ragPost<Map<String, dynamic>>(
         '/chats/$conversationId/messages/',
-        data: {
-          'sender': sender,
-          'text': text,
-        },
+        data: data,
       );
 
       return response.statusCode == 200 || response.statusCode == 201;
@@ -233,6 +250,15 @@ class ChatService {
                   yield ChatStreamEvent.chunk(chunkContent, false);
                   break;
 
+                case 'action':
+                  yield ChatStreamEvent.action(
+                    actionType: jsonData['action_type'] as String? ?? '',
+                    actionId: jsonData['id'] as int? ?? 0,
+                    actionName: jsonData['name'] as String? ?? '',
+                    actionCount: jsonData['count'] as int? ?? 0,
+                  );
+                  break;
+
                 case 'done':
                   yield ChatStreamEvent.done();
                   client.close();
@@ -278,7 +304,7 @@ class ChatService {
 }
 
 /// Event types for chat streaming
-enum ChatStreamEventType { chunk, step, error, done }
+enum ChatStreamEventType { chunk, step, action, error, done }
 
 class ChatStreamEvent {
   final ChatStreamEventType type;
@@ -288,6 +314,12 @@ class ChatStreamEvent {
   final String? error;
   final bool isDone;
 
+  // Action-specific fields
+  final String? actionType;  // "flashcards" or "exam"
+  final int? actionId;       // deck_id or exam_id
+  final String? actionName;  // Name of the created set
+  final int? actionCount;    // Number of items (flashcards/questions)
+
   ChatStreamEvent._({
     required this.type,
     this.chunk,
@@ -295,6 +327,10 @@ class ChatStreamEvent {
     this.status,
     this.error,
     this.isDone = false,
+    this.actionType,
+    this.actionId,
+    this.actionName,
+    this.actionCount,
   });
 
   factory ChatStreamEvent.chunk(String chunk, bool isDone) {
@@ -313,6 +349,21 @@ class ChatStreamEvent {
     );
   }
 
+  factory ChatStreamEvent.action({
+    required String actionType,
+    required int actionId,
+    required String actionName,
+    required int actionCount,
+  }) {
+    return ChatStreamEvent._(
+      type: ChatStreamEventType.action,
+      actionType: actionType,
+      actionId: actionId,
+      actionName: actionName,
+      actionCount: actionCount,
+    );
+  }
+
   factory ChatStreamEvent.error(String error) {
     return ChatStreamEvent._(
       type: ChatStreamEventType.error,
@@ -327,4 +378,3 @@ class ChatStreamEvent {
     );
   }
 }
-

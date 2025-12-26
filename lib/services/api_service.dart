@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../config/constants.dart';
 import 'storage_service.dart';
 
@@ -60,11 +60,20 @@ class ApiService {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // For web, use Authorization header with Bearer token
-          // (Cookie header is forbidden in browsers for CORS requests)
-          final token = await _storage.getToken();
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
+          // Skip auth header for login/register endpoints (to avoid sending old revoked tokens)
+          final path = options.path.toLowerCase();
+          final skipAuth = path.contains('/login') ||
+                          path.contains('/register') ||
+                          path.contains('/logout') ||
+                          options.extra['skipAuth'] == true;
+
+          if (!skipAuth) {
+            // For web, use Authorization header with Bearer token
+            // (Cookie header is forbidden in browsers for CORS requests)
+            final token = await _storage.getToken();
+            if (token != null && token.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
           }
           return handler.next(options);
         },
@@ -75,17 +84,22 @@ class ApiService {
             final cookie = setCookie.first;
             if (cookie.contains('TorchED_auth=')) {
               final token = _extractToken(cookie);
-              if (token != null) {
+              if (token != null && token.isNotEmpty) {
                 _storage.saveToken(token);
               }
             }
           }
           return handler.next(response);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           // Handle auth errors
           if (error.response?.statusCode == 401) {
-            _storage.clearUserData();
+            // Check if it's a token revoked error
+            final data = error.response?.data;
+            if (data is Map && data['error'] == 'Token revoked') {
+              // Token was revoked, clear user data
+            }
+            await _storage.clearUserData();
           }
           return handler.next(error);
         },

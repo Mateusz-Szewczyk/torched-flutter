@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/conversation_provider.dart';
@@ -22,6 +23,46 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
+// Widget to display generated actions after the last bot message
+class _GeneratedActionsWidget extends StatelessWidget {
+  final List<GeneratedAction> actions;
+  final void Function(GeneratedAction action) onNavigate;
+
+  const _GeneratedActionsWidget({
+    required this.actions,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0, left: 40, right: 40, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: actions.map((action) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: ElevatedButton.icon(
+              icon: Icon(Icons.arrow_forward, color: colorScheme.onPrimary),
+              label: Text(action.label),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              ),
+              onPressed: () => onNavigate(action),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -29,13 +70,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
   bool _areStepsExpanded = false;
   bool _hasInitialized = false;
+  int _lastMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeConversation();
-      _scrollToBottom();
+      // Use delayed scroll for initial load to ensure content is rendered
+      _scrollToBottom(animated: false, delayed: true);
     });
   }
 
@@ -58,9 +101,12 @@ class _ChatScreenState extends State<ChatScreen> {
     // Handle navigation to different conversation
     if (widget.initialConversationId != oldWidget.initialConversationId &&
         widget.initialConversationId != null) {
+      _lastMessageCount = 0; // Reset to trigger scroll on new conversation
       context.read<ConversationProvider>().setCurrentConversation(
         widget.initialConversationId,
       );
+      // Scroll to bottom after conversation change
+      _scrollToBottom(animated: false, delayed: true);
     }
   }
 
@@ -72,13 +118,28 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+  void _scrollToBottom({bool animated = true, bool delayed = false}) {
+    void doScroll() {
+      if (_scrollController.hasClients) {
+        final maxExtent = _scrollController.position.maxScrollExtent;
+        if (animated && maxExtent > 0) {
+          _scrollController.animateTo(
+            maxExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        } else if (maxExtent > 0) {
+          _scrollController.jumpTo(maxExtent);
+        }
+      }
+    }
+
+    if (delayed) {
+      // Use multiple delays to ensure content is fully rendered
+      Future.delayed(const Duration(milliseconds: 100), doScroll);
+      Future.delayed(const Duration(milliseconds: 300), doScroll);
+    } else {
+      doScroll();
     }
   }
 
@@ -90,8 +151,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
     provider.sendMessage(text);
 
-    // Scroll to bottom after sending
-    Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+    // Scroll to bottom after sending with delay
+    _scrollToBottom(delayed: true);
   }
 
   @override
@@ -103,15 +164,24 @@ class _ChatScreenState extends State<ChatScreen> {
     return Consumer<ConversationProvider>(
       builder: (context, provider, child) {
         final hasConversation = provider.currentConversationId != null;
+        final currentMessageCount = provider.messages.length;
 
-        // Scroll to bottom when messages change
+        // Scroll to bottom when messages change or during streaming
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (provider.messages.isNotEmpty || provider.isStreaming) {
+          // Scroll when new messages arrive or during streaming
+          if (currentMessageCount > _lastMessageCount || provider.isStreaming) {
             _scrollToBottom();
+            _lastMessageCount = currentMessageCount;
+          }
+          // Also scroll on initial load when messages are present
+          else if (currentMessageCount > 0 && _lastMessageCount == 0) {
+            _scrollToBottom(animated: false, delayed: true);
+            _lastMessageCount = currentMessageCount;
           }
         });
 
         if (!hasConversation) {
+          _lastMessageCount = 0; // Reset when no conversation
           return _buildNoConversationState(context, l10n, colorScheme, provider);
         }
 
@@ -208,16 +278,42 @@ Widget _buildMessagesList(BuildContext context, ConversationProvider provider, C
       final isLastMessage = index == allMessages.length - 1;
       final isBot = message.role == 'bot';
 
+      // Parse metadata from the message (for persisted messages)
+      final parsedMetadata = message.parsedMetadata;
+      final hasPersistedSteps = parsedMetadata?.steps?.isNotEmpty ?? false;
+      final hasPersistedActions = parsedMetadata?.actions?.isNotEmpty ?? false;
+
+      // For the last message during streaming, use live steps/actions
+      // For other messages (or after refresh when live data is empty), use persisted metadata
+      final bool hasLiveSteps = provider.currentSteps.isNotEmpty;
+      final bool hasLiveActions = provider.generatedActions.isNotEmpty;
+
+      // Show live steps only if we have them (during current session)
+      final bool showLiveSteps = isBot && isLastMessage && hasLiveSteps;
+      // Show persisted steps for non-last messages, OR for last message when there are no live steps
+      final bool showPersistedSteps = isBot && hasPersistedSteps &&
+          (!isLastMessage || !hasLiveSteps);
+
+      // Show live actions only if we have them and not streaming
+      final bool showLiveActions = isBot && isLastMessage && !provider.isStreaming && hasLiveActions;
+      // Show persisted actions for non-last messages, OR for last message when there are no live actions
+      final bool showPersistedActions = isBot && hasPersistedActions &&
+          (!isLastMessage || !hasLiveActions);
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // JEŚLI to jest ostatnia wiadomość bota i są kroki, wyświetl panel kroków NAD nią
-          if (isBot && isLastMessage && provider.currentSteps.isNotEmpty)
+          // Wyświetl panel kroków dla bieżącej wiadomości (live lub z metadata)
+          if (showLiveSteps)
             _StepsPanel(
-              steps: List.from(provider.currentSteps), // Kopia listy dla bezpieczeństwa
+              steps: List.from(provider.currentSteps),
               isExpanded: _areStepsExpanded,
               completedCount: provider.currentSteps.where((s) => s.status == 'complete').length,
               onToggle: () => setState(() => _areStepsExpanded = !_areStepsExpanded),
+            )
+          else if (showPersistedSteps)
+            _PersistedStepsPanel(
+              steps: parsedMetadata!.steps!,
             ),
 
           // Nie wyświetlaj pustej bańki wiadomości podczas streamingu
@@ -227,6 +323,23 @@ Widget _buildMessagesList(BuildContext context, ConversationProvider provider, C
               isUser: message.role == 'user',
               isStreaming: provider.isStreaming && isLastMessage && isBot,
               colorScheme: colorScheme,
+            ),
+
+          // Wyświetl akcje nawigacji (live lub z metadata)
+          if (showLiveActions)
+            _GeneratedActionsWidget(
+              actions: provider.generatedActions,
+              onNavigate: (action) {
+                provider.clearGeneratedActions();
+                context.go(action.routePath);
+              },
+            )
+          else if (showPersistedActions)
+            _PersistedActionsWidget(
+              actions: parsedMetadata!.actions!,
+              onNavigate: (action) {
+                context.go(action.type == 'flashcards' ? '/flashcards' : '/tests');
+              },
             ),
         ],
       );
@@ -766,6 +879,201 @@ class _StepsPanel extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Widget to display persisted steps from message metadata (collapsed by default)
+class _PersistedStepsPanel extends StatefulWidget {
+  final List<MessageStep> steps;
+
+  const _PersistedStepsPanel({required this.steps});
+
+  @override
+  State<_PersistedStepsPanel> createState() => _PersistedStepsPanelState();
+}
+
+class _PersistedStepsPanelState extends State<_PersistedStepsPanel> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final completedCount = widget.steps.where((s) => s.status == 'complete').length;
+
+    return Container(
+      margin: const EdgeInsets.only(left: 40, right: 40, bottom: 12, top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    size: 16,
+                    color: Colors.green.withOpacity(0.8),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$completedCount kroków wykonanych',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: widget.steps.map((step) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          size: 14,
+                          color: Colors.green,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            step.content,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            crossFadeState: _isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Widget to display persisted actions from message metadata
+class _PersistedActionsWidget extends StatelessWidget {
+  final List<MessageAction> actions;
+  final Function(MessageAction) onNavigate;
+
+  const _PersistedActionsWidget({
+    required this.actions,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 40, right: 40, bottom: 16, top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: actions.map((action) {
+          final icon = action.type == 'flashcards' ? '📚' : '📝';
+          final itemLabel = action.type == 'flashcards' ? 'fiszek' : 'pytań';
+
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => onNavigate(action),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primaryContainer,
+                      colorScheme.primaryContainer.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: colorScheme.primary.withOpacity(0.3),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(icon, style: const TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          action.name,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        Text(
+                          '${action.count} $itemLabel',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }

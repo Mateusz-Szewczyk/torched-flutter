@@ -25,11 +25,24 @@ class AuthService {
       );
 
       if (response.statusCode == 200 && response.data != null) {
+        // Check for token revoked error
+        final error = response.data!['error'] as String?;
+        if (error == 'Token revoked') {
+          debugPrint('[AuthService] Token was revoked, clearing local token');
+          await _storage.deleteToken();
+          return const AuthResponse(authenticated: false, message: 'Session expired');
+        }
         return AuthResponse.fromJson(response.data!);
+      }
+
+      // If not authenticated, clear local token
+      if (response.statusCode == 401) {
+        await _storage.deleteToken();
       }
 
       return const AuthResponse(authenticated: false);
     } catch (e) {
+      debugPrint('[AuthService] Session check error: $e');
       return const AuthResponse(authenticated: false);
     }
   }
@@ -40,6 +53,11 @@ class AuthService {
 
   Future<AuthResponse> login(String email, String password) async {
     try {
+      // IMPORTANT: Clear any old token before attempting login
+      // This prevents "Token revoked" errors when old cookies exist
+      debugPrint('[AuthService] Clearing old token before login');
+      await _storage.deleteToken();
+
       final response = await _api.post<Map<String, dynamic>>(
         '${AppConfig.authEndpoint}/login',
         data: {
@@ -47,6 +65,20 @@ class AuthService {
           'password': password,
         },
       );
+
+      // Check for token revoked error in response
+      final error = response.data?['error'] as String?;
+      if (error == 'Token revoked') {
+        debugPrint('[AuthService] Token revoked error during login');
+        // Try to logout on backend to clear cookie
+        try {
+          await _api.get<Map<String, dynamic>>('${AppConfig.authEndpoint}/logout');
+        } catch (_) {}
+        return const AuthResponse(
+          authenticated: false,
+          message: 'Previous session was revoked. Please try logging in again.',
+        );
+      }
 
       if (response.statusCode == 200 && response.data != null) {
         await _storage.saveUserEmail(email);

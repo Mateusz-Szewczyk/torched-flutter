@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/models.dart';
 import '../services/auth_service.dart';
+import '../services/storage_service.dart';
+import '../utils/web_utils.dart';
 
 // Auth Provider - equivalent to AuthContext.tsx
 
 class AuthProvider with ChangeNotifier {
   final _authService = AuthService();
+  final _storage = StorageService();
 
   bool _isAuthenticated = false;
   bool _isLoading = true;
@@ -23,7 +27,71 @@ class AuthProvider with ChangeNotifier {
 
   // Initialize - check session on app start
   Future<void> init() async {
+    // First, check for OAuth callback token in URL (for web)
+    await _handleOAuthCallback();
+
+    // Then check session
     await checkSession();
+  }
+
+  /// Handle OAuth callback - extract token from URL parameters
+  /// This is needed because OAuth redirects back to the app with token in URL
+  Future<void> _handleOAuthCallback() async {
+    if (!kIsWeb) return;
+
+    try {
+      // Get current URL on web
+      final uri = Uri.base;
+      debugPrint('[AuthProvider] Current URL: $uri');
+
+      // Check for OAuth success with token
+      final loginStatus = uri.queryParameters['login'];
+      final token = uri.queryParameters['token'];
+      final error = uri.queryParameters['error'];
+
+      if (error != null) {
+        debugPrint('[AuthProvider] OAuth error: $error');
+        _errorMessage = 'OAuth login failed. Please try again.';
+        // Clean up URL
+        _cleanupOAuthUrl();
+        return;
+      }
+
+      if (loginStatus == 'success' && token != null && token.isNotEmpty) {
+        debugPrint('[AuthProvider] OAuth success! Token received (${token.length} chars)');
+
+        // Save the token
+        await _storage.saveToken(token);
+        debugPrint('[AuthProvider] OAuth token saved successfully');
+
+        // Clean up URL to remove token (security)
+        _cleanupOAuthUrl();
+      }
+    } catch (e) {
+      debugPrint('[AuthProvider] Error handling OAuth callback: $e');
+    }
+  }
+
+  /// Remove OAuth parameters from URL for security
+  void _cleanupOAuthUrl() {
+    if (!kIsWeb) return;
+
+    try {
+      // Build clean URL without query parameters
+      final currentUri = Uri.base;
+      final cleanUri = Uri(
+        scheme: currentUri.scheme,
+        host: currentUri.host,
+        port: currentUri.port,
+        path: currentUri.path,
+      );
+
+      // Use history.replaceState to update URL without reload
+      replaceUrlState(cleanUri.toString());
+      debugPrint('[AuthProvider] Cleaned OAuth URL');
+    } catch (e) {
+      debugPrint('[AuthProvider] Error cleaning OAuth URL: $e');
+    }
   }
 
   // Check if user has valid session

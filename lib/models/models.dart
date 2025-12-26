@@ -1,5 +1,6 @@
 // Data models - equivalent to types.tsx
 // REGENERATE: Force build_runner to regenerate this file
+import 'dart:convert';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'models.freezed.dart';
@@ -206,16 +207,88 @@ class MySharedCode with _$MySharedCode {
 // CONVERSATION MODELS
 // ============================================================================
 
+/// Represents a step in the agent's processing pipeline
+@freezed
+class MessageStep with _$MessageStep {
+  const factory MessageStep({
+    required String content,
+    required String status, // "loading" or "complete"
+  }) = _MessageStep;
+
+  factory MessageStep.fromJson(Map<String, dynamic> json) =>
+      _$MessageStepFromJson(json);
+}
+
+/// Represents a navigation action (created flashcards/exam)
+@freezed
+class MessageAction with _$MessageAction {
+  const factory MessageAction({
+    required String type, // "flashcards" or "exam"
+    required int id,
+    required String name,
+    required int count,
+  }) = _MessageAction;
+
+  factory MessageAction.fromJson(Map<String, dynamic> json) =>
+      _$MessageActionFromJson(json);
+}
+
+/// Metadata attached to bot messages
+@freezed
+class MessageMetadata with _$MessageMetadata {
+  const factory MessageMetadata({
+    List<MessageStep>? steps,
+    List<MessageAction>? actions,
+  }) = _MessageMetadata;
+
+  factory MessageMetadata.fromJson(Map<String, dynamic> json) =>
+      _$MessageMetadataFromJson(json);
+}
+
 @freezed
 class Message with _$Message {
+  // Wymagane dla extension methods
+  const Message._();
+
   const factory Message({
     required String role,
     required String content,
     String? timestamp,
+    // JSON string that will be parsed to MessageMetadata
+    String? metadata,
   }) = _Message;
 
   factory Message.fromJson(Map<String, dynamic> json) =>
       _$MessageFromJson(json);
+}
+
+// Extension to parse metadata
+extension MessageExtension on Message {
+  /// Parse the metadata JSON string into MessageMetadata object
+  MessageMetadata? get parsedMetadata {
+    if (metadata == null || metadata!.isEmpty) return null;
+    try {
+      final dynamic decoded = jsonDecode(metadata!);
+      if (decoded is Map<String, dynamic>) {
+        return MessageMetadata.fromJson(decoded);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Check if this message has any actions (generated flashcards/exams)
+  bool get hasActions {
+    final meta = parsedMetadata;
+    return meta?.actions != null && meta!.actions!.isNotEmpty;
+  }
+
+  /// Check if this message has any steps
+  bool get hasSteps {
+    final meta = parsedMetadata;
+    return meta?.steps != null && meta!.steps!.isNotEmpty;
+  }
 }
 
 @freezed
