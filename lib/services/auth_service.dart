@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../config/constants.dart';
 import 'api_service.dart';
@@ -50,10 +51,14 @@ class AuthService {
       if (response.statusCode == 200 && response.data != null) {
         await _storage.saveUserEmail(email);
 
-          // Save token from response body (for web clients where cookies don't work cross-origin)
+        // Save token from response body (for web clients where cookies don't work cross-origin)
         final token = response.data!['token'] as String?;
-        if (token != null) {
+        debugPrint('[AuthService] Login response token: ${token != null ? "present (${token.length} chars)" : "null"}');
+        if (token != null && token.isNotEmpty) {
           await _storage.saveToken(token);
+          debugPrint('[AuthService] Token saved successfully');
+        } else {
+          debugPrint('[AuthService] WARNING: No token in login response!');
         }
 
         // Check if account is confirmed

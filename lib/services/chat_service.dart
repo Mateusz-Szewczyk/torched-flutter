@@ -140,14 +140,28 @@ class ChatService {
     final storageService = StorageService();
     final token = await storageService.getToken();
 
+    // Debug: Log token status
+    if (kDebugMode) {
+      debugPrint('[ChatService] Token available: ${token != null}');
+      if (token != null) {
+        debugPrint('[ChatService] Token length: ${token.length}');
+        debugPrint('[ChatService] Token prefix: ${token.length > 20 ? token.substring(0, 20) : token}...');
+      }
+    }
+
+    // Check if token is available before making request
+    if (token == null || token.isEmpty) {
+      debugPrint('[ChatService] ERROR: No token available for streaming request');
+      yield ChatStreamEvent.error('Not authenticated. Please log in again.');
+      return;
+    }
+
     final uri = Uri.parse('${_api.ragBaseUrl}/query/');
 
     final request = http.Request('POST', uri);
     request.headers['Content-Type'] = 'application/json';
     request.headers['Accept'] = 'text/event-stream';
-    if (token != null) {
-      request.headers['Authorization'] = 'Bearer $token';
-    }
+    request.headers['Authorization'] = 'Bearer $token';
 
     request.body = jsonEncode({
       'conversation_id': conversationId,
@@ -155,12 +169,31 @@ class ChatService {
       'selected_tools': selectedTools,
     });
 
+    if (kDebugMode) {
+      debugPrint('[ChatService] Sending query to: $uri');
+      debugPrint('[ChatService] Headers: ${request.headers}');
+    }
+
     try {
       final client = http.Client();
       final streamedResponse = await client.send(request);
 
       if (streamedResponse.statusCode != 200) {
-        yield ChatStreamEvent.error('HTTP error: ${streamedResponse.statusCode}');
+        // Read error body for more details
+        final errorBody = await streamedResponse.stream.bytesToString();
+        if (kDebugMode) {
+          debugPrint('[ChatService] Error response: $errorBody');
+        }
+
+        String errorMessage = 'HTTP error: ${streamedResponse.statusCode}';
+        try {
+          final errorJson = jsonDecode(errorBody) as Map<String, dynamic>;
+          errorMessage = errorJson['detail'] as String? ?? errorMessage;
+        } catch (_) {
+          // Use default error message
+        }
+
+        yield ChatStreamEvent.error(errorMessage);
         client.close();
         return;
       }
