@@ -68,84 +68,106 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     }
 
     final summary = _data!.getSummary();
+    final extendedSummary = _data!.getExtendedSummary();
 
-    // Mobile-first: everything in a vertical scroll
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Hero Section: Welcome + Streak + Today's Goal
-            _HeroOverviewSection(
-              summary: summary,
-              userName: 'Learner',
-            ),
+    // Get screen width for responsive adjustments
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
+    final horizontalPadding = isMobile ? 12.0 : 24.0;
 
-            const SizedBox(height: 20),
+    // Mobile-first: everything in a vertical scroll with SafeArea
+    return SafeArea(
+      child: RefreshIndicator(
+        onRefresh: _loadData,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: isMobile ? 16 : 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Hero Section: Welcome + Streak + Today's Goal
+              _HeroOverviewSection(
+                summary: summary,
+                extendedSummary: extendedSummary,
+                userName: 'Learner',
+              ),
 
-            // 2. Today's Goal & Next Action (most important for mobile!)
-            _TodayGoalCard(summary: summary),
+              const SizedBox(height: 20),
 
-            const SizedBox(height: 16),
+              // 2. Today's Goal & Next Action (most important for mobile!)
+              _TodayGoalCard(
+                summary: summary,
+                extendedSummary: extendedSummary,
+              ),
 
-            _NextActionCard(
-              onFlashcardsTap: () => context.go('/flashcards'),
-              onTestsTap: () => context.go('/tests'),
-            ),
+              const SizedBox(height: 16),
 
-            const SizedBox(height: 24),
+              _NextActionCard(
+                cardsDueToday: extendedSummary.cardsDueToday,
+                onFlashcardsTap: () => context.go('/flashcards'),
+                onTestsTap: () => context.go('/tests'),
+              ),
 
-            // 3. Weekly Summary (moved higher for quick overview)
-            _WeeklySummarySection(data: _data!),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+              // 3. Weekly Summary (moved higher for quick overview)
+              _WeeklySummarySection(
+                data: _data!,
+                extendedSummary: extendedSummary,
+              ),
 
-            // 4. Stats Cards (mobile: stack, desktop: 3 column grid)
-            _buildStatCardsSection(context, summary),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+              // 4. Stats Cards (mobile: stack, desktop: 3 column grid)
+              _buildStatCardsSection(context, summary, extendedSummary),
 
-            // 5. Milestones/Achievements Strip (horizontal scroll)
-            _MilestoneStrip(summary: summary),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+              // 5. Milestones/Achievements Strip (horizontal scroll)
+              _MilestoneStrip(
+                summary: summary,
+                extendedSummary: extendedSummary,
+              ),
 
-            // 6. Filter Bar (collapsible)
-            _FilterBar(
-              isExpanded: _showFilters,
-              onToggle: () => setState(() => _showFilters = !_showFilters),
-              startDate: _filterStartDate,
-              endDate: _filterEndDate,
-              onStartDateChanged: (d) => setState(() => _filterStartDate = d),
-              onEndDateChanged: (d) => setState(() => _filterEndDate = d),
-              onClear: () => setState(() {
-                _filterStartDate = null;
-                _filterEndDate = null;
-              }),
-            ),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+              // 6. Filter Bar (collapsible)
+              _FilterBar(
+                isExpanded: _showFilters,
+                onToggle: () => setState(() => _showFilters = !_showFilters),
+                startDate: _filterStartDate,
+                endDate: _filterEndDate,
+                onStartDateChanged: (d) => setState(() => _filterStartDate = d),
+                onEndDateChanged: (d) => setState(() => _filterEndDate = d),
+                onClear: () => setState(() {
+                  _filterStartDate = null;
+                  _filterEndDate = null;
+                }),
+              ),
 
-            // 7. Exam Analysis Section
-            if (_data!.examResults.isNotEmpty)
-              _ExamAnalysisSection(data: _data!),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+              // 7. Exam Analysis Section
+              if (_data!.examResults.isNotEmpty)
+                _ExamAnalysisSection(data: _data!),
 
-            // 8. Flashcard Analysis Section
-            if (_data!.studyRecords.isNotEmpty)
-              _FlashcardAnalysisSection(data: _data!),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 24),
+              // 8. Flashcard Analysis Section
+              if (_data!.studyRecords.isNotEmpty)
+                _FlashcardAnalysisSection(data: _data!),
 
-            // 9. Cookbook/Tips Section
-            const _CookbookSection(),
+              const SizedBox(height: 24),
 
-            const SizedBox(height: 32),
-          ],
+              // 9. Cookbook/Tips Section
+              const _CookbookSection(),
+
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
     );
@@ -255,7 +277,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     );
   }
 
-  Widget _buildStatCardsSection(BuildContext context, DashboardSummary summary) {
+  Widget _buildStatCardsSection(BuildContext context, DashboardSummary summary, ExtendedDashboardSummary extendedSummary) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Mobile-first: stack cards, on wider screens use grid
@@ -265,19 +287,19 @@ class _DashboardWidgetState extends State<DashboardWidget> {
           _MotivationalStatCard(
             icon: Icons.timer_outlined,
             iconColor: Colors.blue,
-            title: 'Total Study Time',
-            value: summary.totalStudyTime.toStringAsFixed(1),
-            unit: 'hours',
-            subtitle: 'Time well invested',
-            progress: (summary.totalStudyTime / 100).clamp(0.0, 1.0),
+            title: '📚 Flashcard Study Time',
+            value: extendedSummary.studyHoursThisMonth.toStringAsFixed(1),
+            unit: 'hours this month',
+            subtitle: _getStudyTimeSubtitle(extendedSummary),
+            progress: (extendedSummary.studyHoursThisMonth / 50).clamp(0.0, 1.0),
             progressColor: Colors.blue,
           ),
           _MotivationalStatCard(
             icon: Icons.emoji_events,
             iconColor: Colors.amber.shade700,
-            title: 'Average Score',
+            title: '📝 Exam Average Score',
             value: '${summary.averageExamScore.toStringAsFixed(0)}',
-            unit: '%',
+            unit: 'out of 100',
             subtitle: summary.averageExamScore >= 80 ? 'Excellent! 🌟' : 'Keep improving!',
             progress: summary.averageExamScore / 100,
             progressColor: Colors.amber.shade700,
@@ -285,11 +307,11 @@ class _DashboardWidgetState extends State<DashboardWidget> {
           _MotivationalStatCard(
             icon: Icons.style,
             iconColor: Colors.green,
-            title: 'Cards Studied',
-            value: '${summary.totalFlashcards}',
-            unit: 'cards',
-            subtitle: 'Knowledge gained',
-            progress: (summary.totalFlashcards / 500).clamp(0.0, 1.0),
+            title: '🃏 Flashcards Reviewed',
+            value: '${extendedSummary.flashcardsThisMonth}',
+            unit: 'this month',
+            subtitle: '${extendedSummary.flashcardsThisYear} total this year',
+            progress: (extendedSummary.flashcardsThisMonth / 500).clamp(0.0, 1.0),
             progressColor: Colors.green,
           ),
         ];
@@ -317,6 +339,13 @@ class _DashboardWidgetState extends State<DashboardWidget> {
       },
     );
   }
+
+  String _getStudyTimeSubtitle(ExtendedDashboardSummary summary) {
+    if (summary.studyHoursThisWeek > 0) {
+      return '${summary.studyHoursThisWeek.toStringAsFixed(1)}h this week';
+    }
+    return 'Start studying!';
+  }
 }
 
 // ============================================================================
@@ -325,10 +354,12 @@ class _DashboardWidgetState extends State<DashboardWidget> {
 
 class _HeroOverviewSection extends StatelessWidget {
   final DashboardSummary summary;
+  final ExtendedDashboardSummary extendedSummary;
   final String userName;
 
   const _HeroOverviewSection({
     required this.summary,
+    required this.extendedSummary,
     required this.userName,
   });
 
@@ -336,12 +367,14 @@ class _HeroOverviewSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     final greeting = _getGreeting();
     final motivationalMessage = _getMotivationalMessage();
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -351,7 +384,7 @@ class _HeroOverviewSection extends StatelessWidget {
             colorScheme.primaryContainer.withAlpha(150),
           ],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(isMobile ? 20 : 24),
         boxShadow: [
           BoxShadow(
             color: colorScheme.primary.withAlpha(20),
@@ -366,34 +399,36 @@ class _HeroOverviewSection extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(isMobile ? 10 : 12),
                 decoration: BoxDecoration(
                   color: colorScheme.primary.withAlpha(30),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
                 ),
                 child: Icon(
                   Icons.wb_sunny_outlined,
                   color: colorScheme.primary,
-                  size: 28,
+                  size: isMobile ? 24 : 28,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isMobile ? 12 : 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       greeting,
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onPrimaryContainer,
+                        fontSize: isMobile ? 18 : 20,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       motivationalMessage,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onPrimaryContainer.withAlpha(180),
+                        fontSize: isMobile ? 12 : 14,
                       ),
                     ),
                   ],
@@ -401,11 +436,14 @@ class _HeroOverviewSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          // Streak highlight
-          if (summary.studyStreak > 0)
+          SizedBox(height: isMobile ? 14 : 20),
+          // Streak highlight - compact for mobile
+          if (extendedSummary.studyStreak > 0)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 12 : 16,
+                vertical: isMobile ? 10 : 12,
+              ),
               decoration: BoxDecoration(
                 color: colorScheme.surface.withAlpha(200),
                 borderRadius: BorderRadius.circular(12),
@@ -413,26 +451,53 @@ class _HeroOverviewSection extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('🔥', style: TextStyle(fontSize: 24)),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${summary.studyStreak} Day Streak!',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
+                  Text('🔥', style: TextStyle(fontSize: isMobile ? 20 : 24)),
+                  SizedBox(width: isMobile ? 8 : 12),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                          Text(
+                          '${extendedSummary.studyStreak} Day Streak!',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                            fontSize: isMobile ? 14 : 16,
+                          ),
                         ),
-                      ),
-                      Text(
-                        "You're on fire! Keep going!",
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withAlpha(150),
+                        Text(
+                          extendedSummary.streakLongest > extendedSummary.studyStreak
+                              ? "Best: ${extendedSummary.streakLongest} days"
+                              : "Keep going! 🔥",
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withAlpha(150),
+                            fontSize: isMobile ? 11 : 12,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
+                  if (!extendedSummary.isActiveToday) ...[
+                    SizedBox(width: isMobile ? 8 : 12),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 6 : 8,
+                        vertical: isMobile ? 3 : 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withAlpha(40),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Study today!',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: Colors.orange.shade700,
+                          fontWeight: FontWeight.bold,
+                          fontSize: isMobile ? 10 : 11,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -449,11 +514,11 @@ class _HeroOverviewSection extends StatelessWidget {
   }
 
   String _getMotivationalMessage() {
-    if (summary.studyStreak >= 7) {
+    if (extendedSummary.studyStreak >= 7) {
       return "Amazing streak! You're building great habits!";
-    } else if (summary.studyStreak >= 3) {
+    } else if (extendedSummary.studyStreak >= 3) {
       return "Great momentum! Keep the streak alive!";
-    } else if (summary.totalFlashcards > 0) {
+    } else if (extendedSummary.flashcardsThisMonth > 0) {
       return "Ready to continue your learning journey?";
     } else {
       return "Let's start your learning journey today!";
@@ -467,24 +532,32 @@ class _HeroOverviewSection extends StatelessWidget {
 
 class _TodayGoalCard extends StatelessWidget {
   final DashboardSummary summary;
+  final ExtendedDashboardSummary extendedSummary;
 
-  const _TodayGoalCard({required this.summary});
+  const _TodayGoalCard({
+    required this.summary,
+    required this.extendedSummary,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
-    // Simple goal: review at least 10 flashcards or complete 1 exam
-    final dailyGoal = 10;
-    final todayProgress = (summary.totalFlashcards % dailyGoal).clamp(0, dailyGoal);
-    final progressPercent = todayProgress / dailyGoal;
+    // Simple goal: study 10 flashcards per day
+    const dailyGoal = 10;
+    final flashcardsToday = extendedSummary.flashcardsToday;
+    final progressValue = (flashcardsToday / dailyGoal).clamp(0.0, 1.0);
+    final isComplete = flashcardsToday >= dailyGoal;
+    final remaining = (dailyGoal - flashcardsToday).clamp(0, dailyGoal);
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
         border: Border.all(
           color: colorScheme.outlineVariant.withAlpha(100),
         ),
@@ -497,58 +570,73 @@ class _TodayGoalCard extends StatelessWidget {
               Icon(
                 Icons.flag_outlined,
                 color: colorScheme.primary,
-                size: 24,
+                size: isMobile ? 20 : 24,
               ),
-              const SizedBox(width: 12),
-              Text(
-                "Today's Goal",
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              SizedBox(width: isMobile ? 8 : 12),
+              Expanded(
+                child: Text(
+                  "🎯 Today's Goal",
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 14 : 16,
+                  ),
                 ),
               ),
-              const Spacer(),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 10 : 12,
+                  vertical: isMobile ? 4 : 6,
+                ),
                 decoration: BoxDecoration(
-                  color: progressPercent >= 1
+                  color: isComplete
                       ? Colors.green.withAlpha(30)
                       : colorScheme.primary.withAlpha(20),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Text(
-                  progressPercent >= 1 ? '✓ Complete!' : '$todayProgress/$dailyGoal',
+                  isComplete ? '✓ Done!' : '$flashcardsToday / $dailyGoal',
                   style: theme.textTheme.labelMedium?.copyWith(
-                    color: progressPercent >= 1 ? Colors.green : colorScheme.primary,
+                    color: isComplete ? Colors.green : colorScheme.primary,
                     fontWeight: FontWeight.bold,
+                    fontSize: isMobile ? 12 : 13,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
-              value: progressPercent,
-              minHeight: 10,
+              value: progressValue,
+              minHeight: isMobile ? 8 : 10,
               backgroundColor: colorScheme.surfaceContainerHigh,
               valueColor: AlwaysStoppedAnimation(
-                progressPercent >= 1 ? Colors.green : colorScheme.primary,
+                isComplete ? Colors.green : colorScheme.primary,
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isMobile ? 8 : 12),
           Text(
-            progressPercent >= 1
-                ? "Great job! You've hit your daily goal! 🎉"
-                : 'Review ${dailyGoal - todayProgress} more flashcards to reach your goal',
-            style: theme.textTheme.bodyMedium?.copyWith(
+            _getGoalMessage(isComplete, flashcardsToday, remaining),
+            style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurface.withAlpha(150),
+              fontSize: isMobile ? 12 : 14,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _getGoalMessage(bool isComplete, int flashcardsStudied, int remaining) {
+    if (isComplete) {
+      return "Great job! You've reached your daily goal of 10 flashcards! 🎉";
+    }
+    if (flashcardsStudied == 0) {
+      return 'Study 10 flashcards to reach today\'s goal';
+    }
+    return 'Study $remaining more flashcard${remaining > 1 ? 's' : ''} to reach your goal';
   }
 }
 
@@ -557,10 +645,12 @@ class _TodayGoalCard extends StatelessWidget {
 // ============================================================================
 
 class _NextActionCard extends StatelessWidget {
+  final int cardsDueToday;
   final VoidCallback onFlashcardsTap;
   final VoidCallback onTestsTap;
 
   const _NextActionCard({
+    required this.cardsDueToday,
     required this.onFlashcardsTap,
     required this.onTestsTap,
   });
@@ -569,9 +659,11 @@ class _NextActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 14 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -579,7 +671,7 @@ class _NextActionCard extends StatelessWidget {
             colorScheme.primary.withAlpha(200),
           ],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
         boxShadow: [
           BoxShadow(
             color: colorScheme.primary.withAlpha(40),
@@ -593,19 +685,21 @@ class _NextActionCard extends StatelessWidget {
         children: [
           Text(
             '🚀 Ready to Learn?',
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: colorScheme.onPrimary,
+              fontSize: isMobile ? 15 : 17,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isMobile ? 4 : 8),
           Text(
-            'Continue where you left off',
-            style: theme.textTheme.bodyMedium?.copyWith(
+            'Continue your learning journey',
+            style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onPrimary.withAlpha(200),
+              fontSize: isMobile ? 12 : 14,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 12 : 16),
           Row(
             children: [
               Expanded(
@@ -614,15 +708,17 @@ class _NextActionCard extends StatelessWidget {
                   label: 'Flashcards',
                   onTap: onFlashcardsTap,
                   isPrimary: true,
+                  isMobile: isMobile,
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: isMobile ? 10 : 16),
               Expanded(
                 child: _ActionButton(
                   icon: Icons.quiz_outlined,
-                  label: 'Tests',
+                  label: 'Exams',
                   onTap: onTestsTap,
                   isPrimary: false,
+                  isMobile: isMobile,
                 ),
               ),
             ],
@@ -638,12 +734,14 @@ class _ActionButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final bool isPrimary;
+  final bool isMobile;
 
   const _ActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
     required this.isPrimary,
+    this.isMobile = false,
   });
 
   @override
@@ -654,25 +752,25 @@ class _ActionButton extends StatelessWidget {
       color: isPrimary
           ? colorScheme.onPrimary
           : colorScheme.onPrimary.withAlpha(30),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(isMobile ? 12 : 14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: EdgeInsets.symmetric(vertical: isMobile ? 10 : 14),
           child: Column(
             children: [
               Icon(
                 icon,
                 color: isPrimary ? colorScheme.primary : colorScheme.onPrimary,
-                size: 24,
+                size: isMobile ? 20 : 24,
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: isMobile ? 4 : 6),
               Text(
                 label,
                 style: TextStyle(
                   color: isPrimary ? colorScheme.primary : colorScheme.onPrimary,
-                  fontSize: 12,
+                  fontSize: isMobile ? 11 : 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -713,12 +811,14 @@ class _MotivationalStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(isMobile ? 16 : 20),
         border: Border.all(
           color: colorScheme.outlineVariant.withAlpha(80),
         ),
@@ -727,14 +827,14 @@ class _MotivationalStatCard extends StatelessWidget {
         children: [
           // Icon
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: EdgeInsets.all(isMobile ? 10 : 14),
             decoration: BoxDecoration(
               color: iconColor.withAlpha(25),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
             ),
-            child: Icon(icon, color: iconColor, size: 28),
+            child: Icon(icon, color: iconColor, size: isMobile ? 22 : 28),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isMobile ? 12 : 16),
           // Content
           Expanded(
             child: Column(
@@ -745,46 +845,53 @@ class _MotivationalStatCard extends StatelessWidget {
                   title,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurface.withAlpha(150),
+                    fontSize: isMobile ? 11 : 12,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: isMobile ? 2 : 4),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
                       value,
-                      style: theme.textTheme.headlineMedium?.copyWith(
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: colorScheme.onSurface,
+                        fontSize: isMobile ? 22 : 28,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      unit,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withAlpha(150),
+                    Flexible(
+                      child: Text(
+                        unit,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withAlpha(150),
+                          fontSize: isMobile ? 11 : 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: isMobile ? 6 : 8),
                 // Progress bar
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: progress,
-                    minHeight: 6,
+                    minHeight: isMobile ? 5 : 6,
                     backgroundColor: progressColor.withAlpha(30),
                     valueColor: AlwaysStoppedAnimation(progressColor),
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: isMobile ? 4 : 6),
                 Text(
                   subtitle,
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: progressColor,
                     fontWeight: FontWeight.w500,
+                    fontSize: isMobile ? 10 : 11,
                   ),
                 ),
               ],
@@ -802,13 +909,19 @@ class _MotivationalStatCard extends StatelessWidget {
 
 class _MilestoneStrip extends StatelessWidget {
   final DashboardSummary summary;
+  final ExtendedDashboardSummary extendedSummary;
 
-  const _MilestoneStrip({required this.summary});
+  const _MilestoneStrip({
+    required this.summary,
+    required this.extendedSummary,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     final milestones = [
       _Milestone('🎯', 'First Card', summary.totalFlashcards >= 1, 'Review 1 flashcard'),
@@ -817,36 +930,39 @@ class _MilestoneStrip extends StatelessWidget {
       _Milestone('⭐', 'Week Warrior', summary.studyStreak >= 7, 'Study 7 days in a row'),
       _Milestone('🏆', 'Exam Ace', summary.averageExamScore >= 80, 'Score 80%+ on exams'),
       _Milestone('💯', 'Perfectionist', summary.averageExamScore >= 95, 'Score 95%+ average'),
+      _Milestone('🌟', '100 Cards', summary.totalFlashcards >= 100, 'Review 100 flashcards'),
+      _Milestone('👑', 'Month Master', summary.studyStreak >= 30, 'Study 30 days in a row'),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          padding: EdgeInsets.only(left: 4, bottom: isMobile ? 8 : 12),
           child: Text(
             '🏅 Achievements',
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleSmall?.copyWith(
               fontWeight: FontWeight.bold,
+              fontSize: isMobile ? 14 : 16,
             ),
           ),
         ),
         SizedBox(
-          height: 100,
+          height: isMobile ? 85 : 100,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: milestones.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            separatorBuilder: (_, __) => SizedBox(width: isMobile ? 8 : 12),
             itemBuilder: (context, index) {
               final m = milestones[index];
               return Container(
-                width: 90,
-                padding: const EdgeInsets.all(12),
+                width: isMobile ? 75 : 90,
+                padding: EdgeInsets.all(isMobile ? 8 : 12),
                 decoration: BoxDecoration(
                   color: m.achieved
                       ? colorScheme.primaryContainer
                       : colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
                   border: Border.all(
                     color: m.achieved
                         ? colorScheme.primary.withAlpha(80)
@@ -859,11 +975,11 @@ class _MilestoneStrip extends StatelessWidget {
                     Text(
                       m.emoji,
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: isMobile ? 22 : 28,
                         color: m.achieved ? null : Colors.grey,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: isMobile ? 4 : 8),
                     Text(
                       m.title,
                       style: theme.textTheme.labelSmall?.copyWith(
@@ -871,6 +987,7 @@ class _MilestoneStrip extends StatelessWidget {
                             ? colorScheme.onPrimaryContainer
                             : colorScheme.onSurface.withAlpha(100),
                         fontWeight: FontWeight.w600,
+                        fontSize: isMobile ? 9 : 11,
                       ),
                       textAlign: TextAlign.center,
                       maxLines: 2,
@@ -923,13 +1040,15 @@ class _FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     final hasFilters = startDate != null || endDate != null;
 
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
         border: Border.all(
           color: colorScheme.outlineVariant.withAlpha(80),
         ),
@@ -939,26 +1058,31 @@ class _FilterBar extends StatelessWidget {
           // Header
           InkWell(
             onTap: onToggle,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(isMobile ? 12 : 16),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(isMobile ? 12 : 16),
               child: Row(
                 children: [
                   Icon(
                     Icons.filter_list,
                     color: colorScheme.primary,
+                    size: isMobile ? 20 : 24,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: isMobile ? 8 : 12),
                   Text(
                     'Filters',
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
+                      fontSize: isMobile ? 13 : 14,
                     ),
                   ),
                   if (hasFilters) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 6 : 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: colorScheme.primary.withAlpha(30),
                         borderRadius: BorderRadius.circular(10),
@@ -967,6 +1091,7 @@ class _FilterBar extends StatelessWidget {
                         'Active',
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: colorScheme.primary,
+                          fontSize: isMobile ? 10 : 11,
                         ),
                       ),
                     ),
@@ -975,6 +1100,7 @@ class _FilterBar extends StatelessWidget {
                   Icon(
                     isExpanded ? Icons.expand_less : Icons.expand_more,
                     color: colorScheme.onSurface.withAlpha(150),
+                    size: isMobile ? 20 : 24,
                   ),
                 ],
               ),
@@ -983,39 +1109,67 @@ class _FilterBar extends StatelessWidget {
           // Expandable content
           if (isExpanded)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 16,
+                0,
+                isMobile ? 12 : 16,
+                isMobile ? 12 : 16,
+              ),
               child: Column(
                 children: [
                   const Divider(),
-                  const SizedBox(height: 12),
-                  // Date range pickers
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _DatePickerButton(
-                          label: 'From',
-                          date: startDate,
-                          onChanged: onStartDateChanged,
+                  SizedBox(height: isMobile ? 8 : 12),
+                  // Date range pickers - stack on mobile
+                  isMobile
+                      ? Column(
+                          children: [
+                            _DatePickerButton(
+                              label: 'From',
+                              date: startDate,
+                              onChanged: onStartDateChanged,
+                              isMobile: true,
+                            ),
+                            const SizedBox(height: 8),
+                            _DatePickerButton(
+                              label: 'To',
+                              date: endDate,
+                              onChanged: onEndDateChanged,
+                              isMobile: true,
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: _DatePickerButton(
+                                label: 'From',
+                                date: startDate,
+                                onChanged: onStartDateChanged,
+                                isMobile: false,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _DatePickerButton(
+                                label: 'To',
+                                date: endDate,
+                                onChanged: onEndDateChanged,
+                                isMobile: false,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _DatePickerButton(
-                          label: 'To',
-                          date: endDate,
-                          onChanged: onEndDateChanged,
-                        ),
-                      ),
-                    ],
-                  ),
                   if (hasFilters) ...[
-                    const SizedBox(height: 12),
+                    SizedBox(height: isMobile ? 8 : 12),
                     SizedBox(
                       width: double.infinity,
                       child: TextButton.icon(
                         onPressed: onClear,
-                        icon: const Icon(Icons.clear, size: 18),
-                        label: const Text('Clear Filters'),
+                        icon: Icon(Icons.clear, size: isMobile ? 16 : 18),
+                        label: Text(
+                          'Clear Filters',
+                          style: TextStyle(fontSize: isMobile ? 12 : 14),
+                        ),
                       ),
                     ),
                   ],
@@ -1032,11 +1186,13 @@ class _DatePickerButton extends StatelessWidget {
   final String label;
   final DateTime? date;
   final ValueChanged<DateTime?> onChanged;
+  final bool isMobile;
 
   const _DatePickerButton({
     required this.label,
     this.date,
     required this.onChanged,
+    this.isMobile = false,
   });
 
   @override
@@ -1054,32 +1210,36 @@ class _DatePickerButton extends StatelessWidget {
         );
         onChanged(picked);
       },
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? 10 : 12,
+          vertical: isMobile ? 10 : 14,
+        ),
         decoration: BoxDecoration(
           border: Border.all(
             color: colorScheme.outlineVariant,
           ),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(isMobile ? 10 : 12),
         ),
         child: Row(
           children: [
             Icon(
               Icons.calendar_today,
-              size: 18,
+              size: isMobile ? 16 : 18,
               color: colorScheme.onSurface.withAlpha(150),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: isMobile ? 6 : 8),
             Expanded(
               child: Text(
                 date != null
                     ? '${date!.day}/${date!.month}/${date!.year}'
                     : label,
-                style: theme.textTheme.bodyMedium?.copyWith(
+                style: theme.textTheme.bodySmall?.copyWith(
                   color: date != null
                       ? colorScheme.onSurface
                       : colorScheme.onSurface.withAlpha(120),
+                  fontSize: isMobile ? 12 : 14,
                 ),
               ),
             ),
@@ -1328,31 +1488,25 @@ class _FlashcardAnalysisSection extends StatelessWidget {
 
 class _WeeklySummarySection extends StatelessWidget {
   final DashboardData data;
+  final ExtendedDashboardSummary extendedSummary;
 
-  const _WeeklySummarySection({required this.data});
+  const _WeeklySummarySection({
+    required this.data,
+    required this.extendedSummary,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Calculate weekly stats
-    final now = DateTime.now();
-    final weekAgo = now.subtract(const Duration(days: 7));
-
-    final weeklyFlashcards = data.studyRecords.where((r) {
-      try {
-        final date = DateTime.parse(r.reviewedAt);
-        return date.isAfter(weekAgo);
-      } catch (_) {
-        return false;
-      }
-    }).length;
-
+    // Use extended summary data
+    final weeklyFlashcards = extendedSummary.flashcardsThisWeek;
+    final lastWeekFlashcards = extendedSummary.flashcardsLastWeek;
     final weeklyExams = data.examResults.where((e) {
       try {
         final date = DateTime.parse(e.startedAt);
-        return date.isAfter(weekAgo);
+        return date.isAfter(DateTime.now().subtract(const Duration(days: 7)));
       } catch (_) {
         return false;
       }
@@ -1381,10 +1535,12 @@ class _WeeklySummarySection extends StatelessWidget {
                 child: const Icon(Icons.calendar_view_week, color: Colors.purple),
               ),
               const SizedBox(width: 12),
-              Text(
-                'This Week',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+              Expanded(
+                child: Text(
+                  '📊 This Week\'s Progress',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ],
@@ -1397,7 +1553,8 @@ class _WeeklySummarySection extends StatelessWidget {
                   icon: Icons.style,
                   color: Colors.green,
                   value: '$weeklyFlashcards',
-                  label: 'Cards Reviewed',
+                  label: 'Flashcards',
+                  subtitle: lastWeekFlashcards > 0 ? '$lastWeekFlashcards last week' : 'Keep studying!',
                 ),
               ),
               const SizedBox(width: 16),
@@ -1406,10 +1563,51 @@ class _WeeklySummarySection extends StatelessWidget {
                   icon: Icons.quiz_outlined,
                   color: Colors.orange,
                   value: '$weeklyExams',
-                  label: 'Exams Taken',
+                  label: 'Exams',
+                  subtitle: 'Completed',
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          // Monthly comparison - simple stats
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withAlpha(50),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Text('🃏', style: TextStyle(fontSize: 16)),
+                    const SizedBox(width: 10),
+                    Text(
+                      'This month: ${extendedSummary.flashcardsThisMonth} flashcards',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withAlpha(180),
+                      ),
+                    ),
+                  ],
+                ),
+                if (extendedSummary.flashcardsLastMonth > 0) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Text('📅', style: TextStyle(fontSize: 16)),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Last month: ${extendedSummary.flashcardsLastMonth} flashcards',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurface.withAlpha(120),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
           ),
         ],
       ),
@@ -1422,12 +1620,14 @@ class _WeeklyStatItem extends StatelessWidget {
   final Color color;
   final String value;
   final String label;
+  final String subtitle;
 
   const _WeeklyStatItem({
     required this.icon,
     required this.color,
     required this.value,
     required this.label,
+    required this.subtitle,
   });
 
   @override
@@ -1455,8 +1655,18 @@ class _WeeklyStatItem extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurface.withAlpha(180),
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurface.withAlpha(150),
+              color: colorScheme.onSurface.withAlpha(100),
+              fontSize: 10,
             ),
             textAlign: TextAlign.center,
           ),

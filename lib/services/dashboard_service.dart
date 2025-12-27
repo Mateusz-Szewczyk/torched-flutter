@@ -34,6 +34,15 @@ class DashboardData {
   final List<DailyAverage> flashcardDailyAverage;
   final Map<int, String> deckNames;
 
+  // New extended fields
+  final TimePeriodStats? timePeriodStats;
+  final Comparisons? comparisons;
+  final StudyStreak? studyStreak;
+  final FlashcardMastery? flashcardMastery;
+  final QuickStats? quickStats;
+  final MaterialCounts? materialCounts;
+  final String? generatedAt;
+
   DashboardData({
     required this.studyRecords,
     required this.userFlashcards,
@@ -43,6 +52,13 @@ class DashboardData {
     required this.examDailyAverage,
     required this.flashcardDailyAverage,
     required this.deckNames,
+    this.timePeriodStats,
+    this.comparisons,
+    this.studyStreak,
+    this.flashcardMastery,
+    this.quickStats,
+    this.materialCounts,
+    this.generatedAt,
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
@@ -71,33 +87,161 @@ class DashboardData {
       deckNames: (json['deck_names'] as Map<String, dynamic>?)?.map(
         (key, value) => MapEntry(int.tryParse(key) ?? 0, value.toString()),
       ) ?? {},
+      // New fields
+      timePeriodStats: json['time_period_stats'] != null
+          ? TimePeriodStats.fromJson(json['time_period_stats'] as Map<String, dynamic>)
+          : null,
+      comparisons: json['comparisons'] != null
+          ? Comparisons.fromJson(json['comparisons'] as Map<String, dynamic>)
+          : null,
+      studyStreak: json['study_streak'] != null
+          ? StudyStreak.fromJson(json['study_streak'] as Map<String, dynamic>)
+          : null,
+      flashcardMastery: json['flashcard_mastery'] != null
+          ? FlashcardMastery.fromJson(json['flashcard_mastery'] as Map<String, dynamic>)
+          : null,
+      quickStats: json['quick_stats'] != null
+          ? QuickStats.fromJson(json['quick_stats'] as Map<String, dynamic>)
+          : null,
+      materialCounts: json['material_counts'] != null
+          ? MaterialCounts.fromJson(json['material_counts'] as Map<String, dynamic>)
+          : null,
+      generatedAt: json['generated_at'] as String?,
     );
   }
 
-  /// Calculate summary statistics
+  /// Calculate summary statistics - uses new backend data when available
   DashboardSummary getSummary() {
-    // Total study time
+    // If new backend data is available, use it directly
+    if (quickStats != null && studyStreak != null) {
+      return DashboardSummary(
+        totalStudyTime: quickStats!.studyHoursThisMonth,
+        averageExamScore: timePeriodStats?.thisMonth.averageExamScore ?? 0,
+        totalFlashcards: quickStats!.flashcardsThisMonth,
+        studyStreak: studyStreak!.current,
+      );
+    }
+
+    // Fallback to calculating from raw data (backward compatibility)
     final totalStudyTime = sessionDurations.fold<double>(
       0, (sum, session) => sum + session.durationHours,
     );
 
-    // Average exam score
     final validExams = examResults.where((e) => e.score >= 0 && e.score <= 100);
     final averageExamScore = validExams.isEmpty
         ? 0.0
         : validExams.fold<double>(0, (sum, e) => sum + e.score) / validExams.length;
 
-    // Total flashcards studied
     final totalFlashcards = studyRecords.length;
-
-    // Calculate study streak
-    final studyStreak = _calculateStudyStreak();
+    final calculatedStreak = _calculateStudyStreak();
 
     return DashboardSummary(
       totalStudyTime: totalStudyTime,
       averageExamScore: averageExamScore,
       totalFlashcards: totalFlashcards,
-      studyStreak: studyStreak,
+      studyStreak: calculatedStreak,
+    );
+  }
+
+  /// Get extended summary with comparisons
+  ExtendedDashboardSummary getExtendedSummary() {
+    final basic = getSummary();
+
+    // Calculate last week's flashcards from comparison or study records
+    int flashcardsLastWeek = 0;
+    if (comparisons?.weekOverWeek != null) {
+      final current = quickStats?.flashcardsThisWeek ?? 0;
+      final changePercent = comparisons!.weekOverWeek!.flashcards.percentage;
+      if (changePercent != 100 && changePercent != 0) {
+        // Calculate previous value: current = previous * (1 + change/100)
+        // previous = current / (1 + change/100)
+        flashcardsLastWeek = (current / (1 + changePercent / 100)).round();
+      } else if (changePercent == 0) {
+        flashcardsLastWeek = current;
+      }
+    } else {
+      // Calculate from study records
+      final now = DateTime.now();
+      final twoWeeksAgo = now.subtract(const Duration(days: 14));
+      final oneWeekAgo = now.subtract(const Duration(days: 7));
+      flashcardsLastWeek = studyRecords.where((r) {
+        try {
+          final date = DateTime.parse(r.reviewedAt);
+          return date.isAfter(twoWeeksAgo) && date.isBefore(oneWeekAgo);
+        } catch (_) {
+          return false;
+        }
+      }).length;
+    }
+
+    // Calculate last month's flashcards
+    int flashcardsLastMonth = 0;
+    if (comparisons?.monthOverMonth != null) {
+      final current = quickStats?.flashcardsThisMonth ?? 0;
+      final changePercent = comparisons!.monthOverMonth!.flashcards.percentage;
+      if (changePercent != 100 && changePercent != 0) {
+        flashcardsLastMonth = (current / (1 + changePercent / 100)).round();
+      } else if (changePercent == 0) {
+        flashcardsLastMonth = current;
+      }
+    } else {
+      // Calculate from study records
+      final now = DateTime.now();
+      final twoMonthsAgo = DateTime(now.year, now.month - 2, now.day);
+      final oneMonthAgo = DateTime(now.year, now.month - 1, now.day);
+      flashcardsLastMonth = studyRecords.where((r) {
+        try {
+          final date = DateTime.parse(r.reviewedAt);
+          return date.isAfter(twoMonthsAgo) && date.isBefore(oneMonthAgo);
+        } catch (_) {
+          return false;
+        }
+      }).length;
+    }
+
+    return ExtendedDashboardSummary(
+      // Basic stats
+      totalStudyTime: basic.totalStudyTime,
+      averageExamScore: basic.averageExamScore,
+      totalFlashcards: basic.totalFlashcards,
+      studyStreak: basic.studyStreak,
+
+      // Extended from backend
+      streakLongest: studyStreak?.longest ?? 0,
+      isActiveToday: studyStreak?.isActiveToday ?? false,
+
+      // Today stats
+      flashcardsToday: quickStats?.flashcardsToday ?? 0,
+      studyHoursToday: quickStats?.studyHoursToday ?? 0,
+      examsToday: quickStats?.examsToday ?? 0,
+
+      // Week stats
+      flashcardsThisWeek: quickStats?.flashcardsThisWeek ?? 0,
+      flashcardsLastWeek: flashcardsLastWeek,
+      studyHoursThisWeek: quickStats?.studyHoursThisWeek ?? 0,
+      examsThisWeek: quickStats?.examsThisWeek ?? 0,
+
+      // Month stats
+      flashcardsThisMonth: quickStats?.flashcardsThisMonth ?? 0,
+      flashcardsLastMonth: flashcardsLastMonth,
+      studyHoursThisMonth: quickStats?.studyHoursThisMonth ?? 0,
+      examsThisMonth: quickStats?.examsThisMonth ?? 0,
+
+      // Year stats
+      flashcardsThisYear: quickStats?.flashcardsThisYear ?? 0,
+
+      // Cards due
+      cardsDueToday: flashcardMastery?.cardsDueToday ?? quickStats?.cardsDueToday ?? 0,
+
+      // Mastery
+      masteredCards: flashcardMastery?.mastered ?? 0,
+      learningCards: flashcardMastery?.learning ?? 0,
+      difficultCards: flashcardMastery?.difficult ?? 0,
+      masteryPercentage: flashcardMastery?.masteryPercentage ?? 0,
+
+      // Comparisons
+      weekComparison: comparisons?.weekOverWeek,
+      monthComparison: comparisons?.monthOverMonth,
     );
   }
 
@@ -230,6 +374,74 @@ class DashboardSummary {
     required this.averageExamScore,
     required this.totalFlashcards,
     required this.studyStreak,
+  });
+}
+
+/// Extended dashboard summary with all new data
+class ExtendedDashboardSummary extends DashboardSummary {
+  // Extended streak info
+  final int streakLongest;
+  final bool isActiveToday;
+
+  // Today stats
+  final int flashcardsToday;
+  final double studyHoursToday;
+  final int examsToday;
+
+  // Week stats
+  final int flashcardsThisWeek;
+  final int flashcardsLastWeek;
+  final double studyHoursThisWeek;
+  final int examsThisWeek;
+
+  // Month stats
+  final int flashcardsThisMonth;
+  final int flashcardsLastMonth;
+  final double studyHoursThisMonth;
+  final int examsThisMonth;
+
+  // Year stats
+  final int flashcardsThisYear;
+
+  // Cards due
+  final int cardsDueToday;
+
+  // Mastery stats
+  final int masteredCards;
+  final int learningCards;
+  final int difficultCards;
+  final double masteryPercentage;
+
+  // Comparisons
+  final ComparisonSet? weekComparison;
+  final ComparisonSet? monthComparison;
+
+  ExtendedDashboardSummary({
+    required super.totalStudyTime,
+    required super.averageExamScore,
+    required super.totalFlashcards,
+    required super.studyStreak,
+    this.streakLongest = 0,
+    this.isActiveToday = false,
+    this.flashcardsToday = 0,
+    this.studyHoursToday = 0,
+    this.examsToday = 0,
+    this.flashcardsThisWeek = 0,
+    this.flashcardsLastWeek = 0,
+    this.studyHoursThisWeek = 0,
+    this.examsThisWeek = 0,
+    this.flashcardsThisMonth = 0,
+    this.flashcardsLastMonth = 0,
+    this.studyHoursThisMonth = 0,
+    this.examsThisMonth = 0,
+    this.flashcardsThisYear = 0,
+    this.cardsDueToday = 0,
+    this.masteredCards = 0,
+    this.learningCards = 0,
+    this.difficultCards = 0,
+    this.masteryPercentage = 0,
+    this.weekComparison,
+    this.monthComparison,
   });
 }
 
@@ -429,3 +641,301 @@ class HourlyActivity {
   });
 }
 
+
+// =============================================
+// NEW EXTENDED MODELS
+// =============================================
+
+/// Time period statistics
+class TimePeriodStats {
+  final PeriodStats today;
+  final PeriodStats thisWeek;
+  final PeriodStats lastWeek;
+  final PeriodStats thisMonth;
+  final PeriodStats lastMonth;
+  final PeriodStats thisYear;
+
+  TimePeriodStats({
+    required this.today,
+    required this.thisWeek,
+    required this.lastWeek,
+    required this.thisMonth,
+    required this.lastMonth,
+    required this.thisYear,
+  });
+
+  factory TimePeriodStats.fromJson(Map<String, dynamic> json) {
+    return TimePeriodStats(
+      today: PeriodStats.fromJson(json['today'] as Map<String, dynamic>? ?? {}),
+      thisWeek: PeriodStats.fromJson(json['this_week'] as Map<String, dynamic>? ?? {}),
+      lastWeek: PeriodStats.fromJson(json['last_week'] as Map<String, dynamic>? ?? {}),
+      thisMonth: PeriodStats.fromJson(json['this_month'] as Map<String, dynamic>? ?? {}),
+      lastMonth: PeriodStats.fromJson(json['last_month'] as Map<String, dynamic>? ?? {}),
+      thisYear: PeriodStats.fromJson(json['this_year'] as Map<String, dynamic>? ?? {}),
+    );
+  }
+}
+
+/// Statistics for a single time period
+class PeriodStats {
+  final int flashcardsStudied;
+  final int studySessions;
+  final int examsCompleted;
+  final double averageFlashcardRating;
+  final double averageExamScore;
+  final double totalStudyHours;
+  final int activeDays;
+
+  PeriodStats({
+    this.flashcardsStudied = 0,
+    this.studySessions = 0,
+    this.examsCompleted = 0,
+    this.averageFlashcardRating = 0,
+    this.averageExamScore = 0,
+    this.totalStudyHours = 0,
+    this.activeDays = 0,
+  });
+
+  factory PeriodStats.fromJson(Map<String, dynamic> json) {
+    return PeriodStats(
+      flashcardsStudied: json['flashcards_studied'] as int? ?? 0,
+      studySessions: json['study_sessions'] as int? ?? 0,
+      examsCompleted: json['exams_completed'] as int? ?? 0,
+      averageFlashcardRating: (json['average_flashcard_rating'] as num?)?.toDouble() ?? 0,
+      averageExamScore: (json['average_exam_score'] as num?)?.toDouble() ?? 0,
+      totalStudyHours: (json['total_study_hours'] as num?)?.toDouble() ?? 0,
+      activeDays: json['active_days'] as int? ?? 0,
+    );
+  }
+}
+
+/// Comparisons between time periods
+class Comparisons {
+  final ComparisonSet weekOverWeek;
+  final ComparisonSet monthOverMonth;
+
+  Comparisons({
+    required this.weekOverWeek,
+    required this.monthOverMonth,
+  });
+
+  factory Comparisons.fromJson(Map<String, dynamic> json) {
+    return Comparisons(
+      weekOverWeek: ComparisonSet.fromJson(json['week_over_week'] as Map<String, dynamic>? ?? {}),
+      monthOverMonth: ComparisonSet.fromJson(json['month_over_month'] as Map<String, dynamic>? ?? {}),
+    );
+  }
+}
+
+/// Set of comparison changes
+class ComparisonSet {
+  final ComparisonChange flashcards;
+  final ComparisonChange studyHours;
+  final ComparisonChange exams;
+  final ComparisonChange avgRating;
+  final ComparisonChange avgExamScore;
+
+  ComparisonSet({
+    required this.flashcards,
+    required this.studyHours,
+    required this.exams,
+    required this.avgRating,
+    required this.avgExamScore,
+  });
+
+  factory ComparisonSet.fromJson(Map<String, dynamic> json) {
+    return ComparisonSet(
+      flashcards: ComparisonChange.fromJson(json['flashcards'] as Map<String, dynamic>? ?? {}),
+      studyHours: ComparisonChange.fromJson(json['study_hours'] as Map<String, dynamic>? ?? {}),
+      exams: ComparisonChange.fromJson(json['exams'] as Map<String, dynamic>? ?? {}),
+      avgRating: ComparisonChange.fromJson(json['avg_rating'] as Map<String, dynamic>? ?? {}),
+      avgExamScore: ComparisonChange.fromJson(json['avg_exam_score'] as Map<String, dynamic>? ?? {}),
+    );
+  }
+}
+
+/// Single comparison change value
+class ComparisonChange {
+  final double value;
+  final double percentage;
+  final String trend; // 'up', 'down', 'neutral'
+
+  ComparisonChange({
+    this.value = 0,
+    this.percentage = 0,
+    this.trend = 'neutral',
+  });
+
+  factory ComparisonChange.fromJson(Map<String, dynamic> json) {
+    return ComparisonChange(
+      value: (json['value'] as num?)?.toDouble() ?? 0,
+      percentage: (json['percentage'] as num?)?.toDouble() ?? 0,
+      trend: json['trend'] as String? ?? 'neutral',
+    );
+  }
+
+  bool get isPositive => trend == 'up';
+  bool get isNegative => trend == 'down';
+}
+
+/// Study streak information
+class StudyStreak {
+  final int current;
+  final int longest;
+  final bool isActiveToday;
+
+  StudyStreak({
+    this.current = 0,
+    this.longest = 0,
+    this.isActiveToday = false,
+  });
+
+  factory StudyStreak.fromJson(Map<String, dynamic> json) {
+    return StudyStreak(
+      current: json['current'] as int? ?? 0,
+      longest: json['longest'] as int? ?? 0,
+      isActiveToday: json['is_active_today'] as bool? ?? false,
+    );
+  }
+}
+
+/// Flashcard mastery statistics
+class FlashcardMastery {
+  final int total;
+  final int mastered;
+  final int learning;
+  final int difficult;
+  final double masteryPercentage;
+  final int cardsDueToday;
+  final String? nextStudySession;
+
+  FlashcardMastery({
+    this.total = 0,
+    this.mastered = 0,
+    this.learning = 0,
+    this.difficult = 0,
+    this.masteryPercentage = 0,
+    this.cardsDueToday = 0,
+    this.nextStudySession,
+  });
+
+  factory FlashcardMastery.fromJson(Map<String, dynamic> json) {
+    return FlashcardMastery(
+      total: json['total'] as int? ?? 0,
+      mastered: json['mastered'] as int? ?? 0,
+      learning: json['learning'] as int? ?? 0,
+      difficult: json['difficult'] as int? ?? 0,
+      masteryPercentage: (json['mastery_percentage'] as num?)?.toDouble() ?? 0,
+      cardsDueToday: json['cards_due_today'] as int? ?? 0,
+      nextStudySession: json['next_study_session'] as String?,
+    );
+  }
+}
+
+/// Quick stats for fast dashboard display
+class QuickStats {
+  final int flashcardsToday;
+  final int flashcardsThisWeek;
+  final int flashcardsThisMonth;
+  final int flashcardsThisYear;
+  final int examsToday;
+  final int examsThisWeek;
+  final int examsThisMonth;
+  final double studyHoursToday;
+  final double studyHoursThisWeek;
+  final double studyHoursThisMonth;
+  final int cardsDueToday;
+  final int streakDays;
+
+  QuickStats({
+    this.flashcardsToday = 0,
+    this.flashcardsThisWeek = 0,
+    this.flashcardsThisMonth = 0,
+    this.flashcardsThisYear = 0,
+    this.examsToday = 0,
+    this.examsThisWeek = 0,
+    this.examsThisMonth = 0,
+    this.studyHoursToday = 0,
+    this.studyHoursThisWeek = 0,
+    this.studyHoursThisMonth = 0,
+    this.cardsDueToday = 0,
+    this.streakDays = 0,
+  });
+
+  factory QuickStats.fromJson(Map<String, dynamic> json) {
+    return QuickStats(
+      flashcardsToday: json['flashcards_today'] as int? ?? 0,
+      flashcardsThisWeek: json['flashcards_this_week'] as int? ?? 0,
+      flashcardsThisMonth: json['flashcards_this_month'] as int? ?? 0,
+      flashcardsThisYear: json['flashcards_this_year'] as int? ?? 0,
+      examsToday: json['exams_today'] as int? ?? 0,
+      examsThisWeek: json['exams_this_week'] as int? ?? 0,
+      examsThisMonth: json['exams_this_month'] as int? ?? 0,
+      studyHoursToday: (json['study_hours_today'] as num?)?.toDouble() ?? 0,
+      studyHoursThisWeek: (json['study_hours_this_week'] as num?)?.toDouble() ?? 0,
+      studyHoursThisMonth: (json['study_hours_this_month'] as num?)?.toDouble() ?? 0,
+      cardsDueToday: json['cards_due_today'] as int? ?? 0,
+      streakDays: json['streak_days'] as int? ?? 0,
+    );
+  }
+}
+
+/// Material counts (decks, exams, flashcards)
+class MaterialCounts {
+  final MaterialCount decks;
+  final MaterialCount exams;
+  final FlashcardCount flashcards;
+
+  MaterialCounts({
+    required this.decks,
+    required this.exams,
+    required this.flashcards,
+  });
+
+  factory MaterialCounts.fromJson(Map<String, dynamic> json) {
+    return MaterialCounts(
+      decks: MaterialCount.fromJson(json['decks'] as Map<String, dynamic>? ?? {}),
+      exams: MaterialCount.fromJson(json['exams'] as Map<String, dynamic>? ?? {}),
+      flashcards: FlashcardCount.fromJson(json['flashcards'] as Map<String, dynamic>? ?? {}),
+    );
+  }
+}
+
+/// Material count (total, own, shared)
+class MaterialCount {
+  final int total;
+  final int own;
+  final int shared;
+
+  MaterialCount({
+    this.total = 0,
+    this.own = 0,
+    this.shared = 0,
+  });
+
+  factory MaterialCount.fromJson(Map<String, dynamic> json) {
+    return MaterialCount(
+      total: json['total'] as int? ?? 0,
+      own: json['own'] as int? ?? 0,
+      shared: json['shared'] as int? ?? 0,
+    );
+  }
+}
+
+/// Flashcard count
+class FlashcardCount {
+  final int total;
+  final int studied;
+
+  FlashcardCount({
+    this.total = 0,
+    this.studied = 0,
+  });
+
+  factory FlashcardCount.fromJson(Map<String, dynamic> json) {
+    return FlashcardCount(
+      total: json['total'] as int? ?? 0,
+      studied: json['studied'] as int? ?? 0,
+    );
+  }
+}

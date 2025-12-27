@@ -74,7 +74,7 @@ class _LeftPanelState extends State<LeftPanel> {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: Theme.of(context).dividerColor.withOpacity(0.4),
+            color: Theme.of(context).dividerColor.withAlpha(100),
           ),
         ),
       ),
@@ -91,7 +91,7 @@ class _LeftPanelState extends State<LeftPanel> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withOpacity(0.1),
+                          color: Theme.of(context).primaryColor.withAlpha(25),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
@@ -253,68 +253,89 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 
   Widget _buildFooter(BuildContext context, bool isAuthenticated) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).dividerColor.withOpacity(0.4),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Mobile-first: use SafeArea to respect system UI
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: widget.isMobile
+              ? colorScheme.surfaceContainerLow
+              : null,
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).dividerColor.withAlpha(100),
+            ),
           ),
         ),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          // Feedback button
-          _NavItem(
-            icon: Icons.mail_outline,
-            label: 'Send Feedback',
-            isPanelVisible: widget.isPanelVisible,
-            onTap: () {
-              // TODO: Open feedback dialog
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Feedback dialog - TODO')),
-              );
-            },
-          ),
+        // Mobile-first: consistent padding - equal distance from edges
+        padding: EdgeInsets.all(widget.isMobile ? 12 : 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Profile / Login button - FIRST for mobile accessibility
+            // Bigger tap target on mobile
+            if (isAuthenticated)
+              Container(
+                margin: EdgeInsets.only(bottom: widget.isMobile ? 8 : 6),
+                child: _NavItem(
+                  icon: Icons.person_outline,
+                  label: 'My Profile',
+                  isPanelVisible: widget.isPanelVisible,
+                  isMobile: widget.isMobile,
+                  onTap: () {
+                    showProfileDialog(context);
+                  },
+                ),
+              )
+            else
+              Container(
+                margin: EdgeInsets.only(bottom: widget.isMobile ? 8 : 6),
+                child: _NavItem(
+                  icon: Icons.person_outline,
+                  label: 'Login / Register',
+                  isPanelVisible: widget.isPanelVisible,
+                  isMobile: widget.isMobile,
+                  variant: _NavItemVariant.filled,
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => const LoginRegisterDialog(),
+                    );
+                  },
+                ),
+              ),
 
-          const SizedBox(height: 8),
+            // Settings button
+            Container(
+              margin: EdgeInsets.only(bottom: widget.isMobile ? 8 : 6),
+              child: _NavItem(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                isPanelVisible: widget.isPanelVisible,
+                isMobile: widget.isMobile,
+                onTap: () {
+                  showSettingsDialog(context);
+                },
+              ),
+            ),
 
-          // Settings button
-          _NavItem(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-            isPanelVisible: widget.isPanelVisible,
-            onTap: () {
-              showSettingsDialog(context);
-            },
-          ),
-
-          const SizedBox(height: 8),
-
-          // Profile / Login button
-          if (isAuthenticated)
+            // Feedback button
             _NavItem(
-              icon: Icons.person_outline,
-              label: 'My Profile',
+              icon: Icons.mail_outline,
+              label: 'Send Feedback',
               isPanelVisible: widget.isPanelVisible,
+              isMobile: widget.isMobile,
               onTap: () {
-                showProfileDialog(context);
-              },
-            )
-          else
-            _NavItem(
-              icon: Icons.person_outline,
-              label: 'Login / Register',
-              isPanelVisible: widget.isPanelVisible,
-              variant: _NavItemVariant.filled,
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (context) => const LoginRegisterDialog(),
+                // TODO: Open feedback dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Feedback dialog - TODO')),
                 );
               },
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -331,6 +352,7 @@ class _NavItem extends StatelessWidget {
   final bool isActive;
   final _NavItemVariant variant;
   final VoidCallback? onTap;
+  final bool isMobile;
 
   const _NavItem({
     required this.icon,
@@ -340,6 +362,7 @@ class _NavItem extends StatelessWidget {
     this.isActive = false,
     this.variant = _NavItemVariant.ghost,
     this.onTap,
+    this.isMobile = false,
   });
 
   @override
@@ -351,16 +374,17 @@ class _NavItem extends StatelessWidget {
       children: [
         Icon(
           icon,
-          size: 20,
+          size: isMobile ? 22 : 20,
           color: isActive ? Theme.of(context).primaryColor : null,
         ),
         if (isPanelVisible) ...[
-          const SizedBox(width: 12),
+          SizedBox(width: isMobile ? 14 : 12),
           Expanded(
             child: Text(
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w500,
+                fontSize: isMobile ? 15 : 14,
                 color: isActive ? Theme.of(context).primaryColor : null,
               ),
               overflow: TextOverflow.ellipsis,
@@ -372,22 +396,28 @@ class _NavItem extends StatelessWidget {
 
     final button = InkWell(
       onTap: onTap ?? (route != null ? () => context.go(route!) : null),
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
       child: Container(
         padding: isPanelVisible
-            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
-            : const EdgeInsets.all(8),
+            ? EdgeInsets.symmetric(
+                horizontal: isMobile ? 14 : 12,
+                vertical: isMobile ? 14 : 10,
+              )
+            : EdgeInsets.all(isMobile ? 10 : 8),
         decoration: BoxDecoration(
           color: variant == _NavItemVariant.filled
               ? Theme.of(context).primaryColor
               : isActive
-                  ? Theme.of(context).primaryColor.withOpacity(0.1)
+                  ? Theme.of(context).primaryColor.withAlpha(25)
                   : null,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
         ),
         child: variant == _NavItemVariant.filled
             ? DefaultTextStyle(
-                style: TextStyle(color: Theme.of(context).colorScheme.onPrimary),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontSize: isMobile ? 15 : 14,
+                ),
                 child: IconTheme(
                   data: IconThemeData(
                       color: Theme.of(context).colorScheme.onPrimary),
