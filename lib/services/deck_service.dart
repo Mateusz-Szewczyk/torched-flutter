@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../models/models.dart';
 import 'api_service.dart';
 
@@ -161,20 +160,34 @@ class DeckService {
     }
   }
 
-  /// Get hard cards for retake
-  Future<List<Flashcard>> getHardCards(int deckId) async {
+  /// Get hard cards for retake - returns study session response with session ID
+  Future<StudySessionResponse> getHardCards(int deckId) async {
     try {
       final response = await _api.ragGet<List<dynamic>>(
         '/study_sessions/retake_hard_cards',
         queryParameters: {'deck_id': deckId},
       );
 
-      if (response.statusCode == 200 && response.data != null) {
-        return response.data!
+      if (response.statusCode == 200 && response.data != null && response.data!.isNotEmpty) {
+        final cards = response.data!
             .map((json) => Flashcard.fromJson(json as Map<String, dynamic>))
             .toList();
+
+        // Extract study_session_id from first card (backend includes it in each card)
+        final firstCardJson = response.data!.first as Map<String, dynamic>;
+        final sessionId = firstCardJson['study_session_id'] as int?;
+
+        return StudySessionResponse(
+          studySessionId: sessionId,
+          availableCards: cards,
+          nextSessionDate: null,
+        );
       }
-      return [];
+      return StudySessionResponse(
+        studySessionId: null,
+        availableCards: [],
+        nextSessionDate: null,
+      );
     } catch (e) {
       rethrow;
     }

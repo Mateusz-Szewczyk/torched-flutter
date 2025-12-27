@@ -60,6 +60,7 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
   String? _submitError;
   List<FlashcardRating> _localRatings = [];
   Map<int, int> _cardSeenCount = {};
+  bool _isLoadingHardCards = false;
 
   // Animation controllers
   late AnimationController _flipController;
@@ -314,6 +315,11 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     if (_cardsQueue.isEmpty) {
+      // Check if no cards were available from the start (next review scheduled)
+      if (_initialTotalCards == 0) {
+        return _buildNoCardsAvailable(context, l10n, cs, isMobile);
+      }
+      // Otherwise, session is complete (user studied all cards)
       return _buildSessionComplete(context, l10n, cs, isMobile);
     }
 
@@ -512,6 +518,199 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
         ),
       ),
     );
+  }
+
+  Widget _buildNoCardsAvailable(BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
+    // Format next session date nicely
+    String nextSessionText = 'N/A';
+    if (widget.nextSessionDate != null) {
+      try {
+        final nextDate = DateTime.parse(widget.nextSessionDate!);
+        final now = DateTime.now();
+        final difference = nextDate.difference(now);
+
+        if (difference.inDays > 0) {
+          nextSessionText = 'in ${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
+        } else if (difference.inHours > 0) {
+          nextSessionText = 'in ${difference.inHours} hour${difference.inHours > 1 ? 's' : ''}';
+        } else if (difference.inMinutes > 0) {
+          nextSessionText = 'in ${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''}';
+        } else {
+          nextSessionText = 'now';
+        }
+      } catch (_) {
+        nextSessionText = widget.nextSessionDate!;
+      }
+    }
+
+    return Scaffold(
+      backgroundColor: cs.surface,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Success icon
+                Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.calendar_today_rounded, size: 48, color: cs.primary),
+                ),
+                const SizedBox(height: 32),
+
+                // Title
+                Text(
+                  'All Caught Up! 🎉',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+
+                // Description
+                Text(
+                  'You\'ve completed all scheduled reviews for this deck.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+
+                // Next review card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHighest.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.access_time, size: 20, color: cs.onSurfaceVariant),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Next review: $nextSessionText',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 48),
+
+                // Review Hard Cards button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _isLoadingHardCards ? null : _handleReviewHardCards,
+                    icon: _isLoadingHardCards
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                          )
+                        : const Icon(Icons.replay_rounded),
+                    label: Text(_isLoadingHardCards ? 'Loading...' : 'Review Hard Cards'),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      side: BorderSide(color: cs.primary),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Back button
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: widget.onExit,
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('Back to Decks'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleReviewHardCards() async {
+    setState(() => _isLoadingHardCards = true);
+
+    try {
+      final success = await widget.provider.retakeHardCards();
+
+      if (success && mounted) {
+        // Reload with new cards from provider
+        final newCards = widget.provider.availableCards;
+        final newSessionId = widget.provider.studySessionId;
+
+        if (newCards.isNotEmpty) {
+          setState(() {
+            _cardsQueue = _shuffle(List.from(newCards));
+            _initialTotalCards = _cardsQueue.length;
+            _currentIndex = 0;
+            _isFlipped = false;
+            _localRatings.clear();
+            _easyCount = 0;
+            _goodCount = 0;
+            _hardCount = 0;
+            _cardSeenCount.clear();
+            for (var card in newCards) {
+              _cardSeenCount[card.id ?? 0] = 0;
+            }
+          });
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No hard cards found for review'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No hard cards available to review'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading hard cards: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingHardCards = false);
+      }
+    }
   }
 }
 

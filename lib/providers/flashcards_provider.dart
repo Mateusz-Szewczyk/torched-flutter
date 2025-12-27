@@ -120,10 +120,8 @@ class FlashcardsProvider extends ChangeNotifier {
       switch (_sortBy) {
         case DeckSortOption.name:
           comparison = a.name.compareTo(b.name);
-          break;
         case DeckSortOption.cards:
           comparison = a.flashcardCount.compareTo(b.flashcardCount);
-          break;
         case DeckSortOption.lastSession:
           final aDate = a.lastSession != null
               ? DateTime.tryParse(a.lastSession!)?.millisecondsSinceEpoch ?? 0
@@ -132,13 +130,10 @@ class FlashcardsProvider extends ChangeNotifier {
               ? DateTime.tryParse(b.lastSession!)?.millisecondsSinceEpoch ?? 0
               : 0;
           comparison = aDate.compareTo(bDate);
-          break;
         case DeckSortOption.recent:
-        default:
           final aDate = DateTime.tryParse(a.createdAt)?.millisecondsSinceEpoch ?? 0;
           final bDate = DateTime.tryParse(b.createdAt)?.millisecondsSinceEpoch ?? 0;
           comparison = aDate.compareTo(bDate);
-          break;
       }
       return _sortDirection == SortDirection.asc ? comparison : -comparison;
     });
@@ -304,14 +299,16 @@ class FlashcardsProvider extends ChangeNotifier {
     }
   }
 
-  /// Retake hard cards
+  /// Retake hard cards - creates new session and loads hard cards
   Future<bool> retakeHardCards() async {
     if (_studyingDeck == null) return false;
 
     try {
-      final hardCards = await _deckService.getHardCards(_studyingDeck!.id);
-      if (hardCards.isNotEmpty) {
-        _availableCards = hardCards;
+      final sessionResponse = await _deckService.getHardCards(_studyingDeck!.id);
+      if (sessionResponse.availableCards.isNotEmpty) {
+        _studySessionId = sessionResponse.studySessionId;
+        _availableCards = sessionResponse.availableCards;
+        _nextSessionDate = null;
         notifyListeners();
         return true;
       }
