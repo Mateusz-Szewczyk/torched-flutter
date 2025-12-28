@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/conversation_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../dialogs/login_register_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/profile_dialog.dart';
@@ -28,6 +29,29 @@ class LeftPanel extends StatefulWidget {
 }
 
 class _LeftPanelState extends State<LeftPanel> {
+  @override
+  void initState() {
+    super.initState();
+    _fetchSubscriptionIfNeeded();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _fetchSubscriptionIfNeeded();
+  }
+
+  void _fetchSubscriptionIfNeeded() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final authProvider = context.read<AuthProvider>();
+      final subscriptionProvider = context.read<SubscriptionProvider>();
+      if (authProvider.isAuthenticated && subscriptionProvider.stats == null && !subscriptionProvider.isLoading) {
+        subscriptionProvider.fetchStats();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -274,6 +298,13 @@ class _LeftPanelState extends State<LeftPanel> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Subscription Info
+            if (isAuthenticated && widget.isPanelVisible)
+              _SubscriptionInfo(
+                isPanelVisible: widget.isPanelVisible,
+                isMobile: widget.isMobile,
+              ),
+
             // Profile / Login button - FIRST for mobile accessibility
             // Bigger tap target on mobile
             if (isAuthenticated)
@@ -440,3 +471,165 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+class _SubscriptionInfo extends StatelessWidget {
+  final bool isPanelVisible;
+  final bool isMobile;
+
+  const _SubscriptionInfo({
+    required this.isPanelVisible,
+    required this.isMobile,
+  });
+
+  bool _isUnlimited(dynamic value) {
+    if (value == null) return false;
+    if (value == -1) return true;
+    if (value is num && value < 0) return true;
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final subscriptionProvider = context.watch<SubscriptionProvider>();
+    final stats = subscriptionProvider.stats;
+    final theme = Theme.of(context);
+
+    // Show nothing if no stats and not loading
+    if (stats == null && !subscriptionProvider.isLoading && subscriptionProvider.error == null) {
+      return const SizedBox.shrink();
+    }
+    // Show loading state
+    if (subscriptionProvider.isLoading && stats == null) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withAlpha(76),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: theme.dividerColor.withAlpha(128)),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
+    }
+
+    // Show error state
+    if (subscriptionProvider.error != null && stats == null) {
+      return const SizedBox.shrink(); // Silently hide on error
+    }
+
+    if (stats == null) {
+      return const SizedBox.shrink();
+    }
+
+    final role = stats.role.toUpperCase();
+    final isPro = role == 'PRO' || role == 'EXPERT';
+
+    // Calculate usage percentages
+    final questionsUsed = stats.usage['questions_period'] as int? ?? 0;
+    final questionsLimit = stats.limits['max_questions_period'];
+    final questionsLimitVal = questionsLimit is num ? questionsLimit.toInt() : 0;
+    final questionsInfinite = _isUnlimited(questionsLimit);
+
+    final filesUsed = stats.usage['files'] as int? ?? 0;
+    final filesLimit = stats.limits['max_files'];
+    final filesLimitVal = filesLimit is num ? filesLimit.toInt() : 0;
+    final filesInfinite = _isUnlimited(filesLimit);
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(76),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.dividerColor.withAlpha(128)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                role,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isPro ? theme.primaryColor : theme.colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+              if (!isPro)
+                InkWell(
+                  onTap: () {
+                    showProfileDialog(context);
+                    // Note: Tab controller is inside the dialog, so we can't directly switch tabs
+                    // User will need to navigate to the Subscription tab manually
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: theme.primaryColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'UPGRADE',
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (!questionsInfinite) ...[
+            _buildProgressBar(context, 'Questions', questionsUsed, questionsLimitVal),
+            const SizedBox(height: 4),
+          ],
+          if (!filesInfinite)
+            _buildProgressBar(context, 'Files', filesUsed, filesLimitVal),
+          if (questionsInfinite && filesInfinite)
+            Text(
+              'Unlimited resources',
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgressBar(BuildContext context, String label, int used, int limit) {
+    final theme = Theme.of(context);
+    final progress = limit > 0 ? (used / limit).clamp(0.0, 1.0) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
+            Text('$used/$limit', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
+          ],
+        ),
+        const SizedBox(height: 2),
+        LinearProgressIndicator(
+          value: progress,
+          backgroundColor: theme.colorScheme.surfaceContainerHighest,
+          color: progress > 0.9 ? theme.colorScheme.error : theme.primaryColor,
+          minHeight: 4,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ],
+    );
+  }
+}

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../models/models.dart';
+import '../../models/subscription_stats.dart';
 import '../profile/memories_section.dart';
+import '../profile/subscription_section.dart';
 
 /// Shows the profile dialog as a full-screen modal
 void showProfileDialog(BuildContext context) {
@@ -58,6 +61,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    // Fetch subscription stats when profile is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SubscriptionProvider>().fetchStats();
+    });
   }
 
   @override
@@ -94,6 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final user = authProvider.currentUser;
+    final subscriptionProvider = context.watch<SubscriptionProvider>();
     final cs = Theme.of(context).colorScheme;
 
     return GestureDetector(
@@ -123,7 +131,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                   child: TabBarView(
                     controller: _tabController,
                     children: [
-                      _ProfileContent(user: user),
+                      _ProfileContent(
+                        user: user,
+                        subscriptionStats: subscriptionProvider.stats,
+                        onUpgradeTap: () => _showSubscriptionSheet(context),
+                      ),
                       const Padding(
                         padding: EdgeInsets.all(16.0),
                         child: MemoriesSection(),
@@ -135,6 +147,65 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSubscriptionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Text(
+                      'Subscription Plans',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // Plans
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: const SubscriptionSection(),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -244,6 +315,10 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    // Fetch subscription stats when profile is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<SubscriptionProvider>().fetchStats();
+    });
   }
 
   @override
@@ -252,9 +327,45 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
     super.dispose();
   }
 
+  void _showSubscriptionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 550, maxHeight: 700),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Text(
+                      'Subscription Plans',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              const Expanded(child: SubscriptionSection()),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final subscriptionProvider = context.watch<SubscriptionProvider>();
     final user = authProvider.currentUser;
 
     return Dialog(
@@ -300,7 +411,11 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _ProfileContent(user: user),
+                  _ProfileContent(
+                    user: user,
+                    subscriptionStats: subscriptionProvider.stats,
+                    onUpgradeTap: () => _showSubscriptionDialog(context),
+                  ),
                   const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: MemoriesSection(),
@@ -319,12 +434,67 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
 
 class _ProfileContent extends StatelessWidget {
   final User? user;
+  final SubscriptionStats? subscriptionStats;
+  final VoidCallback? onUpgradeTap;
 
-  const _ProfileContent({required this.user});
+  const _ProfileContent({
+    required this.user,
+    this.subscriptionStats,
+    this.onUpgradeTap,
+  });
+
+  String _getDisplayRole() {
+    // Priority: subscriptionStats role > user role > default
+    final statsRole = subscriptionStats?.displayRole;
+    final userRole = user?.role;
+
+    if (statsRole != null && statsRole.isNotEmpty && statsRole != 'Free') {
+      return statsRole;
+    }
+
+    if (userRole != null && userRole.isNotEmpty) {
+      switch (userRole.toLowerCase()) {
+        case 'expert':
+          return 'Expert';
+        case 'pro':
+          return 'Pro';
+        default:
+          return 'Free';
+      }
+    }
+
+    return 'Free';
+  }
+
+  bool _isPremiumRole() {
+    final role = _getDisplayRole().toLowerCase();
+    return role == 'pro' || role == 'expert';
+  }
+
+  String? _getFormattedExpiry() {
+    // Use subscriptionStats expiry as priority
+    if (subscriptionStats?.formattedExpiry != null) {
+      return subscriptionStats!.formattedExpiry;
+    }
+
+    // Try to format user's roleExpiry if available
+    final expiry = user?.roleExpiry;
+    if (expiry == null) return null;
+
+    try {
+      final date = DateTime.parse(expiry);
+      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    } catch (_) {
+      return expiry;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final role = _getDisplayRole();
+    final isPremium = _isPremiumRole();
+    final roleExpiry = _getFormattedExpiry();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -375,20 +545,16 @@ class _ProfileContent extends StatelessWidget {
 
           const SizedBox(height: 24),
 
+          // Subscription Card
+          _buildSubscriptionCard(context, role, isPremium, roleExpiry, cs),
+
+          const SizedBox(height: 16),
+
           // Info cards
           _buildInfoCard(
             context,
-            icon: Icons.email_outlined,
-            label: 'Email',
-            value: user?.email ?? 'Not available',
-          ),
-
-          const SizedBox(height: 12),
-
-          _buildInfoCard(
-            context,
-            icon: Icons.person_outline,
-            label: 'Display Name',
+            icon: Icons.badge_outlined,
+            label: 'Nickname',
             value: user?.name ?? 'Not set',
           ),
 
@@ -396,10 +562,32 @@ class _ProfileContent extends StatelessWidget {
 
           _buildInfoCard(
             context,
-            icon: Icons.calendar_today_outlined,
-            label: 'Member Since',
-            value: user?.createdAt ?? 'Unknown',
+            icon: Icons.workspace_premium_outlined,
+            label: 'Role',
+            value: role,
           ),
+
+          const SizedBox(height: 12),
+
+          _buildInfoCard(
+            context,
+            icon: Icons.email_outlined,
+            label: 'E-mail',
+            value: user?.email ?? 'Not available',
+          ),
+
+          const SizedBox(height: 12),
+
+          // Role Expiry - only show for premium users
+          if (isPremium && roleExpiry != null) ...[
+            _buildInfoCard(
+              context,
+              icon: Icons.event_outlined,
+              label: 'Role Expiry',
+              value: roleExpiry,
+            ),
+            const SizedBox(height: 12),
+          ],
 
           const SizedBox(height: 32),
 
@@ -416,6 +604,181 @@ class _ProfileContent extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  String _formatJoinDate(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    } catch (_) {
+      return dateStr;
+    }
+  }
+
+  Widget _buildSubscriptionCard(
+    BuildContext context,
+    String role,
+    bool isPremium,
+    String? roleExpiry,
+    ColorScheme cs,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: isPremium
+          ? LinearGradient(
+              colors: [
+                Colors.amber.shade700.withAlpha(40),
+                Colors.orange.shade600.withAlpha(30),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            )
+          : null,
+        color: isPremium ? null : cs.surfaceContainerHighest.withAlpha(100),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isPremium ? Colors.amber.shade600.withAlpha(80) : cs.outlineVariant.withAlpha(50),
+          width: isPremium ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row with icon, role and badge
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isPremium
+                    ? Colors.amber.shade600.withAlpha(30)
+                    : cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  isPremium ? Icons.workspace_premium : Icons.person_outline,
+                  color: isPremium ? Colors.amber.shade600 : cs.onSurfaceVariant,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Subscription',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Text(
+                          role,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isPremium ? Colors.amber.shade700 : cs.onSurface,
+                          ),
+                        ),
+                        if (isPremium) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withAlpha(30),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Active',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // Expiry info for premium users
+          if (isPremium && roleExpiry != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: cs.surface.withAlpha(150),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.event_outlined, size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Valid until: $roleExpiry',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Upgrade button for non-premium users
+          if (!isPremium && onUpgradeTap != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                onPressed: onUpgradeTap,
+                icon: const Icon(Icons.upgrade, size: 20),
+                label: const Text('Upgrade Plan'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: cs.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          // Manage subscription for premium users
+          if (isPremium && onUpgradeTap != null) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: onUpgradeTap,
+                icon: const Icon(Icons.settings_outlined, size: 20),
+                label: const Text('Manage Subscription'),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: Colors.amber.shade600.withAlpha(100)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

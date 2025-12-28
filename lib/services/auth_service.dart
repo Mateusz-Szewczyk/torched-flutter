@@ -32,7 +32,31 @@ class AuthService {
           await _storage.deleteToken();
           return const AuthResponse(authenticated: false, message: 'Session expired');
         }
-        return AuthResponse.fromJson(response.data!);
+
+        final data = response.data!;
+        final authenticated = data['authenticated'] as bool? ?? false;
+
+        // Build user from flat response structure
+        User? user;
+        if (authenticated && data['user_id'] != null) {
+          user = User(
+            id: data['user_id'] as int,
+            email: data['email'] as String? ?? '',
+            name: data['username'] as String?,
+            role: data['role'] as String?,
+            roleExpiry: data['role_expiry'] as String?,
+            createdAt: data['created_at'] as String?,
+          );
+        } else if (data.containsKey('user') && data['user'] != null) {
+          // Fallback to nested user object if present
+          user = User.fromJson(data['user'] as Map<String, dynamic>);
+        }
+
+        return AuthResponse(
+          authenticated: authenticated,
+          user: user,
+          message: data['message'] as String?,
+        );
       }
 
       // If not authenticated, clear local token

@@ -8,8 +8,10 @@ import 'providers/theme_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'providers/flashcards_provider.dart';
 import 'providers/exams_provider.dart';
+import 'providers/subscription_provider.dart';
 import 'services/api_service.dart';
 import 'services/storage_service.dart';
+import 'services/subscription_service.dart';
 import 'data/cache/cache_manager.dart';
 import 'l10n/app_localizations.dart';
 
@@ -23,15 +25,19 @@ void main() async {
   final apiService = ApiService();
   apiService.init();
 
+  final subscriptionService = SubscriptionService(apiService);
+
   // Initialize local cache
   final cacheManager = CacheManager();
   await cacheManager.init();
 
-  runApp(const TorchEdApp());
+  runApp(TorchEdApp(subscriptionService: subscriptionService));
 }
 
 class TorchEdApp extends StatelessWidget {
-  const TorchEdApp({super.key});
+  final SubscriptionService subscriptionService;
+
+  const TorchEdApp({super.key, required this.subscriptionService});
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +48,7 @@ class TorchEdApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ConversationProvider()),
         ChangeNotifierProvider(create: (_) => FlashcardsProvider()),
         ChangeNotifierProvider(create: (_) => ExamsProvider()),
+        ChangeNotifierProvider(create: (_) => SubscriptionProvider(subscriptionService)),
       ],
       child: const _AppContent(),
     );
@@ -88,4 +95,3 @@ class _AppContent extends StatelessWidget {
     );
   }
 }
-

@@ -315,6 +315,8 @@ class User with _$User {
     required int id,
     required String email,
     String? name,
+    String? role,
+    @JsonKey(name: 'role_expiry') String? roleExpiry,
     @JsonKey(name: 'created_at') String? createdAt,
   }) = _User;
 
