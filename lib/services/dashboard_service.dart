@@ -21,7 +21,161 @@ class DashboardService {
       return null;
     }
   }
+
+  /// Fetch learning calendar data (GitHub-style contribution graph)
+  Future<CalendarData?> fetchCalendarData({
+    int monthsBack = 3,
+    int monthsForward = 1,
+  }) async {
+    try {
+      final response = await _api.ragGet(
+        '/dashboard/calendar',
+        queryParameters: {
+          'months_back': monthsBack,
+          'months_forward': monthsForward,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return CalendarData.fromJson(response.data as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error fetching calendar data: $e');
+      return null;
+    }
+  }
 }
+
+// =============================================
+// CALENDAR DATA MODELS
+// =============================================
+
+/// Calendar data model for GitHub-style contribution graph
+class CalendarData {
+  final Map<String, CalendarDay> history;
+  final Map<String, CalendarDay> scheduled;
+  final CalendarStats stats;
+  final CalendarRange range;
+  final String? generatedAt;
+
+  CalendarData({
+    required this.history,
+    required this.scheduled,
+    required this.stats,
+    required this.range,
+    this.generatedAt,
+  });
+
+  factory CalendarData.fromJson(Map<String, dynamic> json) {
+    return CalendarData(
+      history: (json['history'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, CalendarDay.fromJson(value as Map<String, dynamic>)),
+      ) ?? {},
+      scheduled: (json['scheduled'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, CalendarDay.fromJson(value as Map<String, dynamic>)),
+      ) ?? {},
+      stats: CalendarStats.fromJson(json['stats'] as Map<String, dynamic>? ?? {}),
+      range: CalendarRange.fromJson(json['range'] as Map<String, dynamic>? ?? {}),
+      generatedAt: json['generated_at'] as String?,
+    );
+  }
+}
+
+/// Single day data in calendar
+class CalendarDay {
+  final int count;
+  final List<DeckCount> decks;
+
+  CalendarDay({
+    required this.count,
+    required this.decks,
+  });
+
+  factory CalendarDay.fromJson(Map<String, dynamic> json) {
+    return CalendarDay(
+      count: json['count'] as int? ?? 0,
+      decks: (json['decks'] as List<dynamic>?)
+          ?.map((e) => DeckCount.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
+    );
+  }
+}
+
+/// Deck count for a day
+class DeckCount {
+  final String name;
+  final int count;
+
+  DeckCount({required this.name, required this.count});
+
+  factory DeckCount.fromJson(Map<String, dynamic> json) {
+    return DeckCount(
+      name: json['name'] as String? ?? 'Unknown',
+      count: json['count'] as int? ?? 0,
+    );
+  }
+}
+
+/// Calendar statistics
+class CalendarStats {
+  final int maxCount;
+  final int totalDaysStudied;
+  final int currentStreak;
+  final int longestStreak;
+  final bool isActiveToday;
+  final int cardsDueToday;
+  final int totalFlashcardsYear;
+  final bool hasStudiedToday;
+  final List<DeckCount> decksDueToday;
+
+  CalendarStats({
+    required this.maxCount,
+    required this.totalDaysStudied,
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.isActiveToday,
+    required this.cardsDueToday,
+    this.totalFlashcardsYear = 0,
+    this.hasStudiedToday = false,
+    this.decksDueToday = const [],
+  });
+
+  factory CalendarStats.fromJson(Map<String, dynamic> json) {
+    return CalendarStats(
+      maxCount: json['max_count'] as int? ?? 0,
+      totalDaysStudied: json['total_days_studied'] as int? ?? 0,
+      currentStreak: json['current_streak'] as int? ?? 0,
+      longestStreak: json['longest_streak'] as int? ?? 0,
+      isActiveToday: json['is_active_today'] as bool? ?? false,
+      cardsDueToday: json['cards_due_today'] as int? ?? 0,
+      totalFlashcardsYear: json['total_flashcards_year'] as int? ?? 0,
+      hasStudiedToday: json['has_studied_today'] as bool? ?? false,
+      decksDueToday: (json['decks_due_today'] as List<dynamic>?)
+          ?.map((e) => DeckCount.fromJson(e as Map<String, dynamic>))
+          .toList() ?? [],
+    );
+  }
+}
+
+/// Calendar date range
+class CalendarRange {
+  final String start;
+  final String end;
+
+  CalendarRange({required this.start, required this.end});
+
+  factory CalendarRange.fromJson(Map<String, dynamic> json) {
+    return CalendarRange(
+      start: json['start'] as String? ?? '',
+      end: json['end'] as String? ?? '',
+    );
+  }
+}
+
+// =============================================
+// EXISTING MODELS
+// =============================================
 
 /// Dashboard data model
 class DashboardData {
@@ -151,7 +305,7 @@ class DashboardData {
     int flashcardsLastWeek = 0;
     if (comparisons?.weekOverWeek != null) {
       final current = quickStats?.flashcardsThisWeek ?? 0;
-      final changePercent = comparisons!.weekOverWeek!.flashcards.percentage;
+      final changePercent = comparisons!.weekOverWeek.flashcards.percentage;
       if (changePercent != 100 && changePercent != 0) {
         // Calculate previous value: current = previous * (1 + change/100)
         // previous = current / (1 + change/100)
@@ -178,7 +332,7 @@ class DashboardData {
     int flashcardsLastMonth = 0;
     if (comparisons?.monthOverMonth != null) {
       final current = quickStats?.flashcardsThisMonth ?? 0;
-      final changePercent = comparisons!.monthOverMonth!.flashcards.percentage;
+      final changePercent = comparisons!.monthOverMonth.flashcards.percentage;
       if (changePercent != 100 && changePercent != 0) {
         flashcardsLastMonth = (current / (1 + changePercent / 100)).round();
       } else if (changePercent == 0) {

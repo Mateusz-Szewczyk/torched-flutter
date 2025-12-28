@@ -225,5 +225,15 @@
   "testsTabTitle": "Tests",
   "loginToAccess": "Log in to access your dashboard",
   "loginToAccessDescription": "Track your progress, study streak, and more",
-  "retry": "Retry"
+  "retry": "Retry",
+  "learningCalendar": "Learning Calendar",
+  "daysStudied": "days studied",
+  "flashcardsStudiedLabel": "Flashcards studied",
+  "scheduledReviews": "Scheduled reviews",
+  "noActivityThisDay": "No activity this day",
+  "noScheduledReviews": "No scheduled reviews",
+  "less": "Less",
+  "more": "More",
+  "scheduled": "Scheduled",
+  "errorLoadingData": "Error loading data"
 }

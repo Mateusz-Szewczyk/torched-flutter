@@ -657,4 +657,34 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get retry => 'Retry';
+
+  @override
+  String get learningCalendar => 'Learning Calendar';
+
+  @override
+  String get daysStudied => 'days studied';
+
+  @override
+  String get flashcardsStudiedLabel => 'Flashcards studied';
+
+  @override
+  String get scheduledReviews => 'Scheduled reviews';
+
+  @override
+  String get noActivityThisDay => 'No activity this day';
+
+  @override
+  String get noScheduledReviews => 'No scheduled reviews';
+
+  @override
+  String get less => 'Less';
+
+  @override
+  String get more => 'More';
+
+  @override
+  String get scheduled => 'Scheduled';
+
+  @override
+  String get errorLoadingData => 'Error loading data';
 }

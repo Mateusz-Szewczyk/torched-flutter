@@ -1351,6 +1351,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry'**
   String get retry;
+
+  /// No description provided for @learningCalendar.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning Calendar'**
+  String get learningCalendar;
+
+  /// No description provided for @daysStudied.
+  ///
+  /// In en, this message translates to:
+  /// **'days studied'**
+  String get daysStudied;
+
+  /// No description provided for @flashcardsStudiedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Flashcards studied'**
+  String get flashcardsStudiedLabel;
+
+  /// No description provided for @scheduledReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled reviews'**
+  String get scheduledReviews;
+
+  /// No description provided for @noActivityThisDay.
+  ///
+  /// In en, this message translates to:
+  /// **'No activity this day'**
+  String get noActivityThisDay;
+
+  /// No description provided for @noScheduledReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'No scheduled reviews'**
+  String get noScheduledReviews;
+
+  /// No description provided for @less.
+  ///
+  /// In en, this message translates to:
+  /// **'Less'**
+  String get less;
+
+  /// No description provided for @more.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get more;
+
+  /// No description provided for @scheduled.
+  ///
+  /// In en, this message translates to:
+  /// **'Scheduled'**
+  String get scheduled;
+
+  /// No description provided for @errorLoadingData.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading data'**
+  String get errorLoadingData;
 }
 
 class _AppLocalizationsDelegate

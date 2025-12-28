@@ -23,52 +23,11 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-// Widget to display generated actions after the last bot message
-class _GeneratedActionsWidget extends StatelessWidget {
-  final List<GeneratedAction> actions;
-  final void Function(GeneratedAction action) onNavigate;
-
-  const _GeneratedActionsWidget({
-    required this.actions,
-    required this.onNavigate,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8.0, left: 40, right: 40, bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: actions.map((action) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8.0),
-            child: ElevatedButton.icon(
-              icon: Icon(Icons.arrow_forward, color: colorScheme.onPrimary),
-              label: Text(action.label),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              ),
-              onPressed: () => onNavigate(action),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _inputFocusNode = FocusNode();
 
-  bool _areStepsExpanded = false;
   bool _hasInitialized = false;
   int _lastMessageCount = 0;
 
@@ -77,7 +36,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeConversation();
-      // Use delayed scroll for initial load to ensure content is rendered
       _scrollToBottom(animated: false, delayed: true);
     });
   }
@@ -87,8 +45,6 @@ class _ChatScreenState extends State<ChatScreen> {
     _hasInitialized = true;
 
     final provider = context.read<ConversationProvider>();
-
-    // If we have an initial conversation ID from deep link, select it
     if (widget.initialConversationId != null) {
       provider.setCurrentConversation(widget.initialConversationId);
     }
@@ -97,15 +53,12 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void didUpdateWidget(ChatScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    // Handle navigation to different conversation
     if (widget.initialConversationId != oldWidget.initialConversationId &&
         widget.initialConversationId != null) {
-      _lastMessageCount = 0; // Reset to trigger scroll on new conversation
+      _lastMessageCount = 0;
       context.read<ConversationProvider>().setCurrentConversation(
         widget.initialConversationId,
       );
-      // Scroll to bottom after conversation change
       _scrollToBottom(animated: false, delayed: true);
     }
   }
@@ -135,7 +88,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     if (delayed) {
-      // Use multiple delays to ensure content is fully rendered
       Future.delayed(const Duration(milliseconds: 100), doScroll);
       Future.delayed(const Duration(milliseconds: 300), doScroll);
     } else {
@@ -150,9 +102,23 @@ class _ChatScreenState extends State<ChatScreen> {
     HapticFeedback.lightImpact();
     _messageController.clear();
     provider.sendMessage(text);
-
-    // Scroll to bottom after sending with delay
     _scrollToBottom(delayed: true);
+  }
+
+  void _showToolsBottomSheet(BuildContext context, ConversationProvider provider) {
+    final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ToolsBottomSheet(
+        provider: provider,
+        l10n: l10n,
+        colorScheme: colorScheme,
+      ),
+    );
   }
 
   @override
@@ -166,35 +132,28 @@ class _ChatScreenState extends State<ChatScreen> {
         final hasConversation = provider.currentConversationId != null;
         final currentMessageCount = provider.messages.length;
 
-        // Scroll to bottom when messages change or during streaming
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          // Scroll when new messages arrive or during streaming
           if (currentMessageCount > _lastMessageCount || provider.isStreaming) {
             _scrollToBottom();
             _lastMessageCount = currentMessageCount;
-          }
-          // Also scroll on initial load when messages are present
-          else if (currentMessageCount > 0 && _lastMessageCount == 0) {
+          } else if (currentMessageCount > 0 && _lastMessageCount == 0) {
             _scrollToBottom(animated: false, delayed: true);
             _lastMessageCount = currentMessageCount;
           }
         });
 
         if (!hasConversation) {
-          _lastMessageCount = 0; // Reset when no conversation
+          _lastMessageCount = 0;
           return _buildNoConversationState(context, l10n, colorScheme, provider);
         }
 
         return Column(
           children: [
-            // Messages list
             Expanded(
               child: provider.isLoadingMessages
                   ? const Center(child: CircularProgressIndicator())
                   : _buildMessagesList(context, provider, colorScheme),
             ),
-
-            // Input area
             _buildInputArea(context, provider, l10n, colorScheme),
           ],
         );
@@ -210,38 +169,47 @@ class _ChatScreenState extends State<ChatScreen> {
   ) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 64,
-              color: colorScheme.primary.withOpacity(0.5),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                size: 48,
+                color: colorScheme.primary,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
-              l10n?.selectConversation ?? 'Select a conversation',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.7),
-                  ),
+              l10n?.selectConversation ?? 'Start a conversation',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              l10n?.orCreateNew ?? 'or create a new one from the sidebar',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                  ),
+              l10n?.orCreateNew ?? 'Ask me anything about your studies',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 32),
             FilledButton.icon(
-              onPressed: () async {
-                await provider.createConversation();
-              },
-              icon: const Icon(Icons.add),
+              onPressed: () async => await provider.createConversation(),
+              icon: const Icon(Icons.add_rounded),
               label: Text(l10n?.new_conversation ?? 'New Conversation'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              ),
             ),
           ],
         ),
@@ -249,103 +217,91 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-Widget _buildMessagesList(BuildContext context, ConversationProvider provider, ColorScheme colorScheme) {
-  final allMessages = [...provider.messages];
+  Widget _buildMessagesList(BuildContext context, ConversationProvider provider, ColorScheme colorScheme) {
+    final allMessages = [...provider.messages];
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
-  // Dodaj streamowaną wiadomość bota jeśli jest streaming
-  if (provider.isStreaming) {
-    // Dodaj wiadomość nawet jeśli tekst jest pusty - żeby panel kroków się wyświetlił
-    allMessages.add(
-      Message(
-        role: 'bot',
-        content: provider.streamingText,
-        timestamp: null,
+    if (provider.isStreaming) {
+      allMessages.add(
+        Message(role: 'bot', content: provider.streamingText, timestamp: null),
+      );
+    }
+
+    if (allMessages.isEmpty) {
+      return _buildEmptyChat(context, colorScheme);
+    }
+
+    return ListView.builder(
+      controller: _scrollController,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 8 : 24,
+        vertical: 16,
       ),
+      itemCount: allMessages.length,
+      itemBuilder: (context, index) {
+        final message = allMessages[index];
+        final isLastMessage = index == allMessages.length - 1;
+        final isBot = message.role == 'bot';
+
+        final parsedMetadata = message.parsedMetadata;
+        final hasPersistedSteps = parsedMetadata?.steps?.isNotEmpty ?? false;
+        final hasPersistedActions = parsedMetadata?.actions?.isNotEmpty ?? false;
+
+        final bool hasLiveSteps = provider.currentSteps.isNotEmpty;
+        final bool hasLiveActions = provider.generatedActions.isNotEmpty;
+
+        final bool showLiveSteps = isBot && isLastMessage && hasLiveSteps;
+        final bool showPersistedSteps = isBot && hasPersistedSteps && (!isLastMessage || !hasLiveSteps);
+
+        final bool showLiveActions = isBot && isLastMessage && !provider.isStreaming && hasLiveActions;
+        final bool showPersistedActions = isBot && hasPersistedActions && (!isLastMessage || !hasLiveActions);
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLastMessage ? 8 : 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Steps panel (live or persisted)
+              if (showLiveSteps)
+                _MinimalStepsPanel(steps: List.from(provider.currentSteps))
+              else if (showPersistedSteps)
+                _MinimalPersistedStepsPanel(steps: parsedMetadata!.steps!),
+
+              // Message bubble - skip empty streaming messages
+              if (!(isBot && provider.isStreaming && message.content.isEmpty))
+                _MinimalMessageBubble(
+                  message: message,
+                  isUser: message.role == 'user',
+                  isStreaming: provider.isStreaming && isLastMessage && isBot,
+                  colorScheme: colorScheme,
+                  isMobile: isMobile,
+                ),
+
+              // Actions (live or persisted)
+              if (showLiveActions)
+                _MinimalActionsWidget(
+                  actions: provider.generatedActions,
+                  isMobile: isMobile,
+                  onNavigate: (action) {
+                    provider.clearGeneratedActions();
+                    context.go(action.routePath);
+                  },
+                )
+              else if (showPersistedActions)
+                _MinimalPersistedActionsWidget(
+                  actions: parsedMetadata!.actions!,
+                  isMobile: isMobile,
+                  onNavigate: (action) {
+                    context.go(action.type == 'flashcards' ? '/flashcards' : '/tests');
+                  },
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  // Jeśli nie ma żadnych wiadomości, pokaż empty state
-  if (allMessages.isEmpty) {
-    return _buildEmptyChat(context, colorScheme);
-  }
-
-  return ListView.builder(
-    controller: _scrollController,
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    itemCount: allMessages.length,
-    itemBuilder: (context, index) {
-      final message = allMessages[index];
-      final isLastMessage = index == allMessages.length - 1;
-      final isBot = message.role == 'bot';
-
-      // Parse metadata from the message (for persisted messages)
-      final parsedMetadata = message.parsedMetadata;
-      final hasPersistedSteps = parsedMetadata?.steps?.isNotEmpty ?? false;
-      final hasPersistedActions = parsedMetadata?.actions?.isNotEmpty ?? false;
-
-      // For the last message during streaming, use live steps/actions
-      // For other messages (or after refresh when live data is empty), use persisted metadata
-      final bool hasLiveSteps = provider.currentSteps.isNotEmpty;
-      final bool hasLiveActions = provider.generatedActions.isNotEmpty;
-
-      // Show live steps only if we have them (during current session)
-      final bool showLiveSteps = isBot && isLastMessage && hasLiveSteps;
-      // Show persisted steps for non-last messages, OR for last message when there are no live steps
-      final bool showPersistedSteps = isBot && hasPersistedSteps &&
-          (!isLastMessage || !hasLiveSteps);
-
-      // Show live actions only if we have them and not streaming
-      final bool showLiveActions = isBot && isLastMessage && !provider.isStreaming && hasLiveActions;
-      // Show persisted actions for non-last messages, OR for last message when there are no live actions
-      final bool showPersistedActions = isBot && hasPersistedActions &&
-          (!isLastMessage || !hasLiveActions);
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Wyświetl panel kroków dla bieżącej wiadomości (live lub z metadata)
-          if (showLiveSteps)
-            _StepsPanel(
-              steps: List.from(provider.currentSteps),
-              isExpanded: _areStepsExpanded,
-              completedCount: provider.currentSteps.where((s) => s.status == 'complete').length,
-              onToggle: () => setState(() => _areStepsExpanded = !_areStepsExpanded),
-            )
-          else if (showPersistedSteps)
-            _PersistedStepsPanel(
-              steps: parsedMetadata!.steps!,
-            ),
-
-          // Nie wyświetlaj pustej bańki wiadomości podczas streamingu
-          if (!(isBot && provider.isStreaming && message.content.isEmpty))
-            _MessageBubble(
-              message: message,
-              isUser: message.role == 'user',
-              isStreaming: provider.isStreaming && isLastMessage && isBot,
-              colorScheme: colorScheme,
-            ),
-
-          // Wyświetl akcje nawigacji (live lub z metadata)
-          if (showLiveActions)
-            _GeneratedActionsWidget(
-              actions: provider.generatedActions,
-              onNavigate: (action) {
-                provider.clearGeneratedActions();
-                context.go(action.routePath);
-              },
-            )
-          else if (showPersistedActions)
-            _PersistedActionsWidget(
-              actions: parsedMetadata!.actions!,
-              onNavigate: (action) {
-                context.go(action.type == 'flashcards' ? '/flashcards' : '/tests');
-              },
-            ),
-        ],
-      );
-    },
-  );
-}
   Widget _buildEmptyChat(BuildContext context, ColorScheme colorScheme) {
     final l10n = AppLocalizations.of(context);
 
@@ -354,57 +310,23 @@ Widget _buildMessagesList(BuildContext context, ConversationProvider provider, C
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.auto_awesome,
-            size: 48,
-            color: colorScheme.primary.withOpacity(0.5),
+            Icons.chat_bubble_outline_rounded,
+            size: 56,
+            color: colorScheme.outlineVariant,
           ),
           const SizedBox(height: 16),
           Text(
             l10n?.startChatting ?? 'Start chatting',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             l10n?.askAnything ?? 'Ask me anything!',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface.withOpacity(0.5),
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTypingIndicator(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _DotAnimation(color: colorScheme.primary, delay: 0),
-                const SizedBox(width: 4),
-                _DotAnimation(color: colorScheme.primary, delay: 150),
-                const SizedBox(width: 4),
-                _DotAnimation(color: colorScheme.primary, delay: 300),
-                const SizedBox(width: 8),
-                Text(
-                  'Thinking...',
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+              color: colorScheme.outline,
             ),
           ),
         ],
@@ -418,96 +340,116 @@ Widget _buildMessagesList(BuildContext context, ConversationProvider provider, C
     AppLocalizations? l10n,
     ColorScheme colorScheme,
   ) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final edgePadding = isMobile ? 16.0 : 20.0;
+
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
         border: Border(
-          top: BorderSide(color: colorScheme.outlineVariant),
+          top: BorderSide(
+            color: colorScheme.outlineVariant.withAlpha(50),
+            width: 0.5,
+          ),
         ),
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.only(
+            left: edgePadding,
+            right: edgePadding,
+            top: 12,
+            bottom: edgePadding,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Tools button row
+              // Selected tools chips - horizontal scroll
               if (provider.selectedTools.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Wrap(
-                    spacing: 8,
-                    children: provider.selectedTools.map((tool) {
-                      return Chip(
-                        label: Text(tool, style: const TextStyle(fontSize: 12)),
-                        onDeleted: () => provider.toggleTool(tool),
-                        deleteIcon: const Icon(Icons.close, size: 16),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
+                Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  height: 28,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: provider.selectedTools.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
+                    itemBuilder: (context, index) {
+                      final tool = provider.selectedTools[index];
+                      return _ToolChip(
+                        label: _getToolShortName(tool),
+                        onRemove: () => provider.toggleTool(tool),
+                        colorScheme: colorScheme,
                       );
-                    }).toList(),
+                    },
                   ),
                 ),
 
-              // Input row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  // Tools button
-                  IconButton(
-                    icon: Badge(
-                      isLabelVisible: provider.selectedTools.isNotEmpty,
-                      label: Text('${provider.selectedTools.length}'),
-                      child: const Icon(Icons.build_outlined),
-                    ),
-                    onPressed: () => _showToolsDialog(context, provider, l10n),
-                    tooltip: l10n?.tools ?? 'Tools',
-                  ),
-
-                  // Text input
-                  Expanded(
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 120),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(24),
+              // Main input row - pill style
+              Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Tools button
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: _ToolsButton(
+                        hasTools: provider.selectedTools.isNotEmpty,
+                        toolCount: provider.selectedTools.length,
+                        onPressed: () => _showToolsBottomSheet(context, provider),
+                        colorScheme: colorScheme,
                       ),
-                      child: TextField(
-                        controller: _messageController,
-                        focusNode: _inputFocusNode,
-                        maxLines: null,
-                        textInputAction: TextInputAction.newline,
-                        onSubmitted: (_) => _sendMessage(provider),
-                        decoration: InputDecoration(
-                          hintText: l10n?.type_message ?? 'Type your message...',
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Text input
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        child: TextField(
+                          controller: _messageController,
+                          focusNode: _inputFocusNode,
+                          maxLines: null,
+                          textInputAction: TextInputAction.newline,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: colorScheme.onSurface,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: l10n?.type_message ?? 'Ask anything...',
+                            hintStyle: TextStyle(
+                              color: colorScheme.onSurfaceVariant.withAlpha(130),
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 0,
+                              vertical: 14,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
 
-                  // Send button
-                  IconButton.filled(
-                    icon: provider.isSending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.send),
-                    onPressed: provider.isSending
-                        ? null
-                        : () => _sendMessage(provider),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+
+                    // Send button
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: _SendButton(
+                        isSending: provider.isSending,
+                        onPressed: () => _sendMessage(provider),
+                        colorScheme: colorScheme,
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
               // Error message
@@ -526,51 +468,175 @@ Widget _buildMessagesList(BuildContext context, ConversationProvider provider, C
     );
   }
 
-  void _showToolsDialog(
-    BuildContext context,
-    ConversationProvider provider,
-    AppLocalizations? l10n,
-  ) {
-    final availableTools = [
-      'Wiedza z plików',
-      'Generowanie fiszek',
-      'Generowanie egzaminu',
-      'Wyszukaj w internecie',
-    ];
+  String _getToolShortName(String tool) {
+    switch (tool) {
+      case 'Wiedza z plików':
+        return 'Files';
+      case 'Generowanie fiszek':
+        return 'Flashcards';
+      case 'Generowanie egzaminu':
+        return 'Exam';
+      case 'Wyszukaj w internecie':
+        return 'Web';
+      default:
+        return tool;
+    }
+  }
+}
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n?.selectTools ?? 'Select Tools'),
-        content: StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: availableTools.map((tool) {
-                final isSelected = provider.selectedTools.contains(tool);
-                return CheckboxListTile(
-                  title: Text(tool),
-                  value: isSelected,
-                  onChanged: (value) {
-                    provider.toggleTool(tool);
-                    setDialogState(() {});
-                  },
-                );
-              }).toList(),
-            );
-          },
+// ============================================================================
+// MINIMAL COMPONENTS
+// ============================================================================
+
+/// Clean tools button - simple plus icon with badge
+class _ToolsButton extends StatelessWidget {
+  final bool hasTools;
+  final int toolCount;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+
+  const _ToolsButton({
+    required this.hasTools,
+    required this.toolCount,
+    required this.onPressed,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.add_rounded,
+              size: 28,
+              color: hasTools
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant,
+            ),
+            // Badge
+            if (hasTools)
+              Positioned(
+                right: 2,
+                top: 2,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$toolCount',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              provider.clearTools();
-              Navigator.of(context).pop();
-            },
-            child: Text(l10n?.clearAll ?? 'Clear All'),
+      ),
+    );
+  }
+}
+
+/// Clean send button - circular with white arrow
+class _SendButton extends StatelessWidget {
+  final bool isSending;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+
+  const _SendButton({
+    required this.isSending,
+    required this.onPressed,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isSending ? null : onPressed,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: isSending ? colorScheme.surfaceContainerHigh : colorScheme.primary,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: isSending
+              ? SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 22,
+                  color: colorScheme.onPrimary,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small tool chip - clean design
+class _ToolChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+  final ColorScheme colorScheme;
+
+  const _ToolChip({
+    required this.label,
+    required this.onRemove,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.only(left: 10, right: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withAlpha(120),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: colorScheme.onPrimaryContainer,
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n?.done ?? 'Done'),
+          GestureDetector(
+            onTap: onRemove,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                Icons.close_rounded,
+                size: 14,
+                color: colorScheme.onPrimaryContainer.withAlpha(180),
+              ),
+            ),
           ),
         ],
       ),
@@ -578,110 +644,111 @@ Widget _buildMessagesList(BuildContext context, ConversationProvider provider, C
   }
 }
 
-class _MessageBubble extends StatelessWidget {
+/// Minimal message bubble - Perplexity style
+class _MinimalMessageBubble extends StatelessWidget {
   final Message message;
   final bool isUser;
   final bool isStreaming;
   final ColorScheme colorScheme;
+  final bool isMobile;
 
-  const _MessageBubble({
+  const _MinimalMessageBubble({
     required this.message,
     required this.isUser,
     required this.isStreaming,
     required this.colorScheme,
+    required this.isMobile,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: EdgeInsets.symmetric(vertical: isMobile ? 6 : 8),
       child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Bot avatar
           if (!isUser) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: colorScheme.primaryContainer,
+            Container(
+              width: isMobile ? 28 : 32,
+              height: isMobile ? 28 : 32,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Icon(
-                Icons.smart_toy,
-                size: 18,
+                Icons.auto_awesome_rounded,
+                size: isMobile ? 16 : 18,
                 color: colorScheme.onPrimaryContainer,
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: isMobile ? 8 : 12),
           ],
+
+          // Message content
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
+                maxWidth: isMobile
+                    ? MediaQuery.of(context).size.width * 0.85
+                    : MediaQuery.of(context).size.width * 0.7,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 14 : 16,
+                vertical: isMobile ? 10 : 12,
+              ),
               decoration: BoxDecoration(
                 color: isUser
                     ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
+                    : colorScheme.surfaceContainerHighest.withOpacity(0.6),
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
+                  topLeft: Radius.circular(isUser ? 18 : 4),
+                  topRight: Radius.circular(isUser ? 4 : 18),
+                  bottomLeft: const Radius.circular(18),
+                  bottomRight: const Radius.circular(18),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  MarkdownBody(
-                    data: message.content + (isStreaming ? '▊' : ''),
-                    styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(
-                        color: isUser
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurface,
-                        height: 1.4,
-                      ),
-                      code: TextStyle(
-                        backgroundColor: isUser
-                            ? colorScheme.onPrimary.withOpacity(0.1)
-                            : colorScheme.surfaceContainerHigh,
-                        color: isUser
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurface,
-                      ),
-                      codeblockDecoration: BoxDecoration(
-                        color: isUser
-                            ? colorScheme.onPrimary.withOpacity(0.1)
-                            : colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    selectable: true,
+              child: MarkdownBody(
+                data: message.content + (isStreaming ? ' ▌' : ''),
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    color: isUser ? colorScheme.onPrimary : colorScheme.onSurface,
+                    fontSize: isMobile ? 14 : 15,
+                    height: 1.5,
                   ),
-                  if (message.timestamp != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatTime(message.timestamp!),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isUser
-                            ? colorScheme.onPrimary.withOpacity(0.7)
-                            : colorScheme.onSurface.withOpacity(0.5),
-                      ),
-                    ),
-                  ],
-                ],
+                  code: TextStyle(
+                    backgroundColor: isUser
+                        ? colorScheme.onPrimary.withOpacity(0.15)
+                        : colorScheme.surfaceContainerHigh,
+                    color: isUser ? colorScheme.onPrimary : colorScheme.onSurface,
+                    fontSize: 13,
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: isUser
+                        ? colorScheme.onPrimary.withOpacity(0.1)
+                        : colorScheme.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                selectable: true,
               ),
             ),
           ),
+
+          // User avatar
           if (isUser) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: colorScheme.secondaryContainer,
+            SizedBox(width: isMobile ? 8 : 12),
+            Container(
+              width: isMobile ? 28 : 32,
+              height: isMobile ? 28 : 32,
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Icon(
-                Icons.person,
-                size: 18,
+                Icons.person_rounded,
+                size: isMobile ? 16 : 18,
                 color: colorScheme.onSecondaryContainer,
               ),
             ),
@@ -690,211 +757,19 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
-
-  String _formatTime(String timestamp) {
-    try {
-      final date = DateTime.parse(timestamp);
-      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-    } catch (e) {
-      return '';
-    }
-  }
 }
 
-class _DotAnimation extends StatefulWidget {
-  final Color color;
-  final int delay;
-
-  const _DotAnimation({required this.color, required this.delay});
-
-  @override
-  State<_DotAnimation> createState() => _DotAnimationState();
-}
-
-class _DotAnimationState extends State<_DotAnimation>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _animation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
-
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) {
-        _controller.repeat(reverse: true);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, -4 * _animation.value),
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: widget.color.withOpacity(0.5 + 0.5 * _animation.value),
-              shape: BoxShape.circle,
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _StepsPanel extends StatelessWidget {
+/// Minimal steps panel - clean, collapsed by default
+class _MinimalStepsPanel extends StatefulWidget {
   final List<ChatStep> steps;
-  final bool isExpanded;
-  final int completedCount;
-  final VoidCallback onToggle;
 
-  const _StepsPanel({
-    required this.steps,
-    required this.isExpanded,
-    required this.completedCount,
-    required this.onToggle,
-  });
+  const _MinimalStepsPanel({required this.steps});
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    final allCompleted = steps.every((s) => s.status == 'complete');
-
-    return Container(
-      margin: const EdgeInsets.only(left: 40, right: 40, bottom: 12, top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // GÓRNY RZĄD – przycisk “x ukończonych kroków” + ikona rozwinięcia
-          InkWell(
-            onTap: onToggle,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Row(
-                children: [
-                  Icon(
-                    allCompleted ? Icons.check_circle : Icons.auto_awesome,
-                    size: 16,
-                    color: allCompleted ? Colors.green : colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '$completedCount ukończonych kroków',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // ROZWIJANA LISTA KROKÓW
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: steps.map((step) {
-                  final isLoading = step.status == 'loading';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: isLoading
-                              ? CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: colorScheme.primary,
-                                )
-                              : const Icon(
-                                  Icons.check_circle,
-                                  size: 14,
-                                  color: Colors.green,
-                                ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            step.content,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: isLoading
-                                  ? colorScheme.onSurface
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
-          ),
-        ],
-      ),
-    );
-  }
+  State<_MinimalStepsPanel> createState() => _MinimalStepsPanelState();
 }
 
-/// Widget to display persisted steps from message metadata (collapsed by default)
-class _PersistedStepsPanel extends StatefulWidget {
-  final List<MessageStep> steps;
-
-  const _PersistedStepsPanel({required this.steps});
-
-  @override
-  State<_PersistedStepsPanel> createState() => _PersistedStepsPanelState();
-}
-
-class _PersistedStepsPanelState extends State<_PersistedStepsPanel> {
+class _MinimalStepsPanelState extends State<_MinimalStepsPanel> {
   bool _isExpanded = false;
 
   @override
@@ -902,86 +777,129 @@ class _PersistedStepsPanelState extends State<_PersistedStepsPanel> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final completedCount = widget.steps.where((s) => s.status == 'complete').length;
+    final isLoading = widget.steps.any((s) => s.status == 'loading');
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Container(
-      margin: const EdgeInsets.only(left: 40, right: 40, bottom: 12, top: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.3)),
+      margin: EdgeInsets.only(
+        left: isMobile ? 36 : 44,
+        right: isMobile ? 8 : 24,
+        bottom: 8,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            onTap: () => setState(() => _isExpanded = !_isExpanded),
+      child: InkWell(
+        onTap: () => setState(() => _isExpanded = !_isExpanded),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow.withOpacity(0.5),
             borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Row(
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header row
+              Row(
                 children: [
-                  Icon(
-                    Icons.check_circle,
-                    size: 16,
-                    color: Colors.green.withOpacity(0.8),
-                  ),
+                  if (isLoading)
+                    SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  else
+                    Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: Colors.green.shade600,
+                    ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '$completedCount kroków wykonanych',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
+                      isLoading
+                          ? 'Thinking...'
+                          : '$completedCount steps completed',
+                      style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   Icon(
-                    _isExpanded
-                        ? Icons.keyboard_arrow_up_rounded
-                        : Icons.keyboard_arrow_down_rounded,
-                    size: 20,
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),
-            ),
+
+              // Expanded steps list
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    children: widget.steps.map((step) => _StepItem(
+                      step: step,
+                      colorScheme: colorScheme,
+                    )).toList(),
+                  ),
+                ),
+                crossFadeState: _isExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
+              ),
+            ],
           ),
-          AnimatedCrossFade(
-            firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: widget.steps.map((step) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.check_circle,
-                          size: 14,
-                          color: Colors.green,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            step.content,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepItem extends StatelessWidget {
+  final ChatStep step;
+  final ColorScheme colorScheme;
+
+  const _StepItem({required this.step, required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = step.status == 'loading';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 12,
+            height: 12,
+            child: isLoading
+                ? CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    color: colorScheme.primary,
+                  )
+                : Icon(
+                    Icons.check_rounded,
+                    size: 12,
+                    color: Colors.green.shade600,
+                  ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              step.content,
+              style: TextStyle(
+                fontSize: 12,
+                color: isLoading
+                    ? colorScheme.onSurface
+                    : colorScheme.onSurfaceVariant,
               ),
             ),
-            crossFadeState: _isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
           ),
         ],
       ),
@@ -989,91 +907,499 @@ class _PersistedStepsPanelState extends State<_PersistedStepsPanel> {
   }
 }
 
-/// Widget to display persisted actions from message metadata
-class _PersistedActionsWidget extends StatelessWidget {
-  final List<MessageAction> actions;
-  final Function(MessageAction) onNavigate;
+/// Minimal persisted steps panel
+class _MinimalPersistedStepsPanel extends StatefulWidget {
+  final List<MessageStep> steps;
 
-  const _PersistedActionsWidget({
-    required this.actions,
-    required this.onNavigate,
-  });
+  const _MinimalPersistedStepsPanel({required this.steps});
+
+  @override
+  State<_MinimalPersistedStepsPanel> createState() => _MinimalPersistedStepsPanelState();
+}
+
+class _MinimalPersistedStepsPanelState extends State<_MinimalPersistedStepsPanel> {
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final completedCount = widget.steps.length;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+
+    return Container(
+      margin: EdgeInsets.only(
+        left: isMobile ? 36 : 44,
+        right: isMobile ? 8 : 24,
+        bottom: 8,
+      ),
+      child: InkWell(
+        onTap: () => setState(() => _isExpanded = !_isExpanded),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerLow.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    size: 14,
+                    color: Colors.green.shade600.withOpacity(0.7),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$completedCount steps',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  ),
+                ],
+              ),
+              AnimatedCrossFade(
+                firstChild: const SizedBox.shrink(),
+                secondChild: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Column(
+                    children: widget.steps.map((step) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.check_rounded,
+                            size: 12,
+                            color: Colors.green.shade600.withOpacity(0.7),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              step.content,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )).toList(),
+                  ),
+                ),
+                crossFadeState: _isExpanded
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 200),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Minimal actions widget - clean cards
+class _MinimalActionsWidget extends StatelessWidget {
+  final List<GeneratedAction> actions;
+  final bool isMobile;
+  final void Function(GeneratedAction action) onNavigate;
+
+  const _MinimalActionsWidget({
+    required this.actions,
+    required this.isMobile,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.only(left: 40, right: 40, bottom: 16, top: 8),
+      padding: EdgeInsets.only(
+        left: isMobile ? 36 : 44,
+        right: isMobile ? 8 : 24,
+        top: 4,
+        bottom: 8,
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: actions.map((action) => _ActionCard(
+          label: action.label,
+          onTap: () => onNavigate(action),
+          colorScheme: colorScheme,
+          isMobile: isMobile,
+        )).toList(),
+      ),
+    );
+  }
+}
+
+/// Minimal persisted actions widget
+class _MinimalPersistedActionsWidget extends StatelessWidget {
+  final List<MessageAction> actions;
+  final bool isMobile;
+  final Function(MessageAction) onNavigate;
+
+  const _MinimalPersistedActionsWidget({
+    required this.actions,
+    required this.isMobile,
+    required this.onNavigate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: isMobile ? 36 : 44,
+        right: isMobile ? 8 : 24,
+        top: 4,
+        bottom: 8,
+      ),
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: actions.map((action) {
           final icon = action.type == 'flashcards' ? '📚' : '📝';
-          final itemLabel = action.type == 'flashcards' ? 'fiszek' : 'pytań';
+          final itemLabel = action.type == 'flashcards' ? 'flashcards' : 'questions';
 
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => onNavigate(action),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primaryContainer,
-                      colorScheme.primaryContainer.withOpacity(0.8),
-                    ],
+          return _ActionCard(
+            label: '$icon ${action.name} (${action.count} $itemLabel)',
+            onTap: () => onNavigate(action),
+            colorScheme: colorScheme,
+            isMobile: isMobile,
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+/// Clean action card
+class _ActionCard extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final ColorScheme colorScheme;
+  final bool isMobile;
+
+  const _ActionCard({
+    required this.label,
+    required this.onTap,
+    required this.colorScheme,
+    required this.isMobile,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 16,
+            vertical: isMobile ? 10 : 12,
+          ),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: colorScheme.primary.withOpacity(0.2),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: isMobile ? 13 : 14,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onPrimaryContainer,
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: colorScheme.primary.withOpacity(0.3),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.shadow.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(icon, style: const TextStyle(fontSize: 18)),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          action.name,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        Text(
-                          '${action.count} $itemLabel',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onPrimaryContainer.withOpacity(0.7),
-                          ),
-                        ),
-                      ],
+              ),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward_rounded,
+                size: 16,
+                color: colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// TOOLS BOTTOM SHEET
+// ============================================================================
+
+class _ToolsBottomSheet extends StatefulWidget {
+  final ConversationProvider provider;
+  final AppLocalizations? l10n;
+  final ColorScheme colorScheme;
+
+  const _ToolsBottomSheet({
+    required this.provider,
+    required this.l10n,
+    required this.colorScheme,
+  });
+
+  @override
+  State<_ToolsBottomSheet> createState() => _ToolsBottomSheetState();
+}
+
+class _ToolsBottomSheetState extends State<_ToolsBottomSheet> {
+  final List<_ToolOption> _tools = [
+    _ToolOption(
+      id: 'Wiedza z plików',
+      name: 'Knowledge from files',
+      description: 'Search your uploaded documents',
+      icon: Icons.folder_rounded,
+    ),
+    _ToolOption(
+      id: 'Generowanie fiszek',
+      name: 'Generate flashcards',
+      description: 'Create flashcards from your materials',
+      icon: Icons.style_rounded,
+    ),
+    _ToolOption(
+      id: 'Generowanie egzaminu',
+      name: 'Generate exam',
+      description: 'Create practice exams',
+      icon: Icons.quiz_rounded,
+    ),
+    _ToolOption(
+      id: 'Wyszukaj w internecie',
+      name: 'Web search',
+      description: 'Search the internet for information',
+      icon: Icons.language_rounded,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final bottomPadding = MediaQuery.of(context).viewPadding.bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.build_rounded,
+                  color: colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    widget.l10n?.selectTools ?? 'Select Tools',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: colorScheme.onPrimaryContainer.withOpacity(0.7),
+                  ),
+                ),
+                if (widget.provider.selectedTools.isNotEmpty)
+                  TextButton(
+                    onPressed: () {
+                      widget.provider.clearTools();
+                      setState(() {});
+                    },
+                    child: Text(
+                      widget.l10n?.clearAll ?? 'Clear',
+                      style: TextStyle(color: colorScheme.error),
                     ),
-                  ],
+                  ),
+              ],
+            ),
+          ),
+
+          // Divider
+          Divider(color: colorScheme.outlineVariant.withOpacity(0.5), height: 1),
+
+          // Tools list
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              children: _tools.map((tool) {
+                final isSelected = widget.provider.selectedTools.contains(tool.id);
+                return _ToolListItem(
+                  tool: tool,
+                  isSelected: isSelected,
+                  colorScheme: colorScheme,
+                  onTap: () {
+                    widget.provider.toggleTool(tool.id);
+                    setState(() {});
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+
+          // Bottom button
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + bottomPadding),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  widget.l10n?.done ?? 'Done',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolOption {
+  final String id;
+  final String name;
+  final String description;
+  final IconData icon;
+
+  const _ToolOption({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.icon,
+  });
+}
+
+class _ToolListItem extends StatelessWidget {
+  final _ToolOption tool;
+  final bool isSelected;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+
+  const _ToolListItem({
+    required this.tool,
+    required this.isSelected,
+    required this.colorScheme,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        color: isSelected ? colorScheme.primaryContainer.withOpacity(0.3) : null,
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? colorScheme.primary.withOpacity(0.15)
+                    : colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                tool.icon,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tool.name,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    tool.description,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: isSelected ? colorScheme.primary : Colors.transparent,
+                border: Border.all(
+                  color: isSelected ? colorScheme.primary : colorScheme.outline,
+                  width: isSelected ? 0 : 2,
+                ),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: isSelected
+                  ? Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: colorScheme.onPrimary,
+                    )
+                  : null,
+            ),
+          ],
+        ),
       ),
     );
   }

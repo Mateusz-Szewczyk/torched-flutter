@@ -154,7 +154,8 @@ class DeckService {
         },
       );
 
-      return response.statusCode == 200;
+      // Backend returns 201 for successful creation
+      return response.statusCode == 201 || response.statusCode == 200;
     } catch (e) {
       rethrow;
     }

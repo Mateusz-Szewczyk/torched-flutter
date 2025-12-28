@@ -656,4 +656,34 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get retry => 'Ponów';
+
+  @override
+  String get learningCalendar => 'Kalendarz Nauki';
+
+  @override
+  String get daysStudied => 'dni nauki';
+
+  @override
+  String get flashcardsStudiedLabel => 'Fiszki przerobione';
+
+  @override
+  String get scheduledReviews => 'Zaplanowane powtórki';
+
+  @override
+  String get noActivityThisDay => 'Brak aktywności tego dnia';
+
+  @override
+  String get noScheduledReviews => 'Brak zaplanowanych powtórek';
+
+  @override
+  String get less => 'Mniej';
+
+  @override
+  String get more => 'Więcej';
+
+  @override
+  String get scheduled => 'Zaplanowane';
+
+  @override
+  String get errorLoadingData => 'Błąd ładowania danych';
 }

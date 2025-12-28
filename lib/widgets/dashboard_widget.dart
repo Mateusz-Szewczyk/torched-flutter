@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/dashboard_service.dart';
+import 'learning_calendar_widget.dart';
 
 /// Mobile-First Dashboard Widget - TorchED Learning Dashboard
 /// Designed for phone first, then responsive for tablet/web
@@ -19,6 +20,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
   bool _isLoading = true;
   String? _error;
   bool _showFilters = false;
+  DateTime _lastRefreshTime = DateTime.now();
 
   // Filter state
   DateTime? _filterStartDate;
@@ -42,6 +44,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
         setState(() {
           _data = data;
           _isLoading = false;
+          _lastRefreshTime = DateTime.now();
         });
       }
     } catch (e) {
@@ -113,57 +116,10 @@ class _DashboardWidgetState extends State<DashboardWidget> {
 
               const SizedBox(height: 24),
 
-              // 3. Weekly Summary (moved higher for quick overview)
-              _WeeklySummarySection(
-                data: _data!,
-                extendedSummary: extendedSummary,
+              // 3. Learning Calendar (GitHub-style contribution graph)
+              LearningCalendarWidget(
+                key: ValueKey(_lastRefreshTime),
               ),
-
-              const SizedBox(height: 24),
-
-              // 4. Stats Cards (mobile: stack, desktop: 3 column grid)
-              _buildStatCardsSection(context, summary, extendedSummary),
-
-              const SizedBox(height: 24),
-
-              // 5. Milestones/Achievements Strip (horizontal scroll)
-              _MilestoneStrip(
-                summary: summary,
-                extendedSummary: extendedSummary,
-              ),
-
-              const SizedBox(height: 24),
-
-              // 6. Filter Bar (collapsible)
-              _FilterBar(
-                isExpanded: _showFilters,
-                onToggle: () => setState(() => _showFilters = !_showFilters),
-                startDate: _filterStartDate,
-                endDate: _filterEndDate,
-                onStartDateChanged: (d) => setState(() => _filterStartDate = d),
-                onEndDateChanged: (d) => setState(() => _filterEndDate = d),
-                onClear: () => setState(() {
-                  _filterStartDate = null;
-                  _filterEndDate = null;
-                }),
-              ),
-
-              const SizedBox(height: 24),
-
-              // 7. Exam Analysis Section
-              if (_data!.examResults.isNotEmpty)
-                _ExamAnalysisSection(data: _data!),
-
-              const SizedBox(height: 24),
-
-              // 8. Flashcard Analysis Section
-              if (_data!.studyRecords.isNotEmpty)
-                _FlashcardAnalysisSection(data: _data!),
-
-              const SizedBox(height: 24),
-
-              // 9. Cookbook/Tips Section
-              const _CookbookSection(),
 
               const SizedBox(height: 32),
             ],
@@ -275,76 +231,6 @@ class _DashboardWidgetState extends State<DashboardWidget> {
         ),
       ),
     );
-  }
-
-  Widget _buildStatCardsSection(BuildContext context, DashboardSummary summary, ExtendedDashboardSummary extendedSummary) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // Mobile-first: stack cards, on wider screens use grid
-        final isWide = constraints.maxWidth > 600;
-
-        final cards = [
-          _MotivationalStatCard(
-            icon: Icons.timer_outlined,
-            iconColor: Colors.blue,
-            title: '📚 Flashcard Study Time',
-            value: extendedSummary.studyHoursThisMonth.toStringAsFixed(1),
-            unit: 'hours this month',
-            subtitle: _getStudyTimeSubtitle(extendedSummary),
-            progress: (extendedSummary.studyHoursThisMonth / 50).clamp(0.0, 1.0),
-            progressColor: Colors.blue,
-          ),
-          _MotivationalStatCard(
-            icon: Icons.emoji_events,
-            iconColor: Colors.amber.shade700,
-            title: '📝 Exam Average Score',
-            value: '${summary.averageExamScore.toStringAsFixed(0)}',
-            unit: 'out of 100',
-            subtitle: summary.averageExamScore >= 80 ? 'Excellent! 🌟' : 'Keep improving!',
-            progress: summary.averageExamScore / 100,
-            progressColor: Colors.amber.shade700,
-          ),
-          _MotivationalStatCard(
-            icon: Icons.style,
-            iconColor: Colors.green,
-            title: '🃏 Flashcards Reviewed',
-            value: '${extendedSummary.flashcardsThisMonth}',
-            unit: 'this month',
-            subtitle: '${extendedSummary.flashcardsThisYear} total this year',
-            progress: (extendedSummary.flashcardsThisMonth / 500).clamp(0.0, 1.0),
-            progressColor: Colors.green,
-          ),
-        ];
-
-        if (isWide) {
-          // Desktop: 3 column grid
-          return GridView.count(
-            crossAxisCount: 3,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.5,
-            children: cards,
-          );
-        } else {
-          // Mobile: vertical stack with full width cards
-          return Column(
-            children: cards.map((card) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: card,
-            )).toList(),
-          );
-        }
-      },
-    );
-  }
-
-  String _getStudyTimeSubtitle(ExtendedDashboardSummary summary) {
-    if (summary.studyHoursThisWeek > 0) {
-      return '${summary.studyHoursThisWeek.toStringAsFixed(1)}h this week';
-    }
-    return 'Start studying!';
   }
 }
 

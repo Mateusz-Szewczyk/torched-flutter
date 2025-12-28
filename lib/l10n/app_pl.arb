@@ -180,6 +180,16 @@
   "testsTabTitle": "Egzaminy",
   "loginToAccess": "Zaloguj się, aby uzyskać dostęp do panelu",
   "loginToAccessDescription": "Śledź swoje postępy, serię nauki i więcej",
-  "retry": "Ponów"
+  "retry": "Ponów",
+  "learningCalendar": "Kalendarz Nauki",
+  "daysStudied": "dni nauki",
+  "flashcardsStudiedLabel": "Fiszki przerobione",
+  "scheduledReviews": "Zaplanowane powtórki",
+  "noActivityThisDay": "Brak aktywności tego dnia",
+  "noScheduledReviews": "Brak zaplanowanych powtórek",
+  "less": "Mniej",
+  "more": "Więcej",
+  "scheduled": "Zaplanowane",
+  "errorLoadingData": "Błąd ładowania danych"
 }
 
