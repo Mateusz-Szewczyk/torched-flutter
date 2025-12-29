@@ -204,7 +204,14 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             const SizedBox(height: 32),
             FilledButton.icon(
-              onPressed: () async => await provider.createConversation(),
+              onPressed: () async {
+                final conv = await provider.createConversation();
+                if (conv != null && context.mounted) {
+                  // Set current conversation first, then navigate
+                  provider.setCurrentConversation(conv.id);
+                  context.go('/chat/${conv.id}');
+                }
+              },
               icon: const Icon(Icons.add_rounded),
               label: Text(l10n?.new_conversation ?? 'New Conversation'),
               style: FilledButton.styleFrom(

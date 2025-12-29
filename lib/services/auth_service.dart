@@ -319,5 +319,43 @@ class AuthService {
       return (false, _api.getErrorMessage(e));
     }
   }
+
+  // ============================================================================
+  // TOKEN REFRESH (for subscription upgrades)
+  // ============================================================================
+
+  /// Refreshes the auth token to get updated role from database.
+  /// Call this after subscription purchase to get new token with updated role.
+  /// Returns (success, newRole, errorMessage)
+  Future<(bool, String?, String?)> refreshToken() async {
+    try {
+      debugPrint('[AuthService] Refreshing token...');
+
+      final response = await _api.post<Map<String, dynamic>>(
+        '${AppConfig.authEndpoint}/refresh-token',
+        data: {},
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data!['success'] as bool? ?? false;
+        final newToken = response.data!['token'] as String?;
+        final newRole = response.data!['role'] as String?;
+
+        if (success && newToken != null && newToken.isNotEmpty) {
+          // Save new token
+          await _storage.saveToken(newToken);
+          debugPrint('[AuthService] Token refreshed successfully, new role: $newRole');
+          return (true, newRole, null);
+        }
+
+        return (false, null, response.data!['error'] as String? ?? 'Token refresh failed');
+      }
+
+      return (false, null, response.data?['error'] as String? ?? 'Token refresh failed');
+    } catch (e) {
+      debugPrint('[AuthService] Token refresh error: $e');
+      return (false, null, _api.getErrorMessage(e));
+    }
+  }
 }
 

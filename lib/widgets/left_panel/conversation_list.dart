@@ -20,6 +20,7 @@ class ConversationList extends StatefulWidget {
 
 class _ConversationListState extends State<ConversationList> {
   bool _isExpanded = true;
+  bool _isCreating = false; // new flag to avoid duplicate creation taps
 
   @override
   void initState() {
@@ -74,15 +75,21 @@ class _ConversationListState extends State<ConversationList> {
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => _createNewConversation(context),
+                    onTap: _isCreating ? null : () => _createNewConversation(context),
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.add,
-                        size: 18,
-                        color: colorScheme.primary,
-                      ),
+                      child: _isCreating
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation(colorScheme.primary)),
+                            )
+                          : Icon(
+                              Icons.add,
+                              size: 18,
+                              color: colorScheme.primary,
+                            ),
                     ),
                   ),
                 ),
@@ -151,7 +158,7 @@ class _ConversationListState extends State<ConversationList> {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => _createNewConversation(context),
+                onPressed: _isCreating ? null : () => _createNewConversation(context),
                 icon: const Icon(Icons.add, size: 16),
                 label: const Text('Start chatting'),
                 style: TextButton.styleFrom(
@@ -189,10 +196,115 @@ class _ConversationListState extends State<ConversationList> {
 
   Future<void> _createNewConversation(BuildContext context) async {
     HapticFeedback.lightImpact();
+    setState(() => _isCreating = true);
     final provider = context.read<ConversationProvider>();
-    final newConv = await provider.createConversation();
-    if (newConv != null && mounted) {
-      widget.onConversationClick(newConv.id);
+    try {
+      final newConv = await provider.createConversation();
+
+      if (newConv != null && mounted) {
+        final newId = newConv.id;
+        debugPrint('[ConversationList] Created new conversation id=$newId');
+
+        // Immediately set current conversation to avoid races where parent reads provider
+        provider.setCurrentConversation(newId);
+
+        // Poll the server until the new conversation appears in the list or timeout
+        const int maxAttempts = 15;
+        const Duration attemptDelay = Duration(milliseconds: 300);
+        bool found = false;
+
+        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+          try {
+            await provider.fetchConversations(forceRefresh: attempt == 0);
+          } catch (e) {
+            // ignore transient fetch errors
+            debugPrint('[ConversationList] fetchConversations attempt=$attempt failed: $e');
+          }
+
+          final list = provider.conversations;
+          if (list.any((c) => c.id == newId)) {
+            found = true;
+            break;
+          }
+
+          await Future.delayed(attemptDelay);
+        }
+
+        if (!found) {
+          debugPrint('[ConversationList] Warning: new conversation id=$newId not found after polling');
+          // Still proceed — backend may be eventually consistent. But ensure we have latest list once more.
+          try {
+            await provider.fetchConversations(forceRefresh: true);
+          } catch (_) {}
+        }
+
+        // small delay to allow listeners to update and routing to be stable
+        await Future.delayed(const Duration(milliseconds: 120));
+
+        // navigate to the new conversation (use the authoritative id)
+        widget.onConversationClick(newId);
+
+        // small grace period: re-assert current conversation and refresh to avoid race conditions
+        await Future.delayed(const Duration(milliseconds: 250));
+        try {
+          provider.setCurrentConversation(newId);
+          await provider.fetchConversations(forceRefresh: true);
+        } catch (e) {
+          debugPrint('[ConversationList] post-navigate reconciliation failed: $e');
+        }
+
+        // Give server and other clients a little time and schedule refreshes to be robust
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          try {
+            await provider.fetchConversations();
+          } catch (_) {}
+        });
+
+        Future.delayed(const Duration(milliseconds: 1200), () async {
+          try {
+            await provider.fetchConversations();
+          } catch (_) {}
+        });
+      } else if (mounted) {
+        // Provider may not return the new conversation object; try fetching list and pick the newest one
+        debugPrint('[ConversationList] createConversation returned null, attempting recovery fetch');
+        await Future.delayed(const Duration(milliseconds: 200));
+        try {
+          await provider.fetchConversations(forceRefresh: true);
+          final list = provider.conversations;
+          if (list.isNotEmpty) {
+            // pick the most recently created conversation by highest id (safer than first)
+            final picked = list.reduce((a, b) => (a.id >= b.id) ? a : b);
+
+            // set as current and navigate
+            provider.setCurrentConversation(picked.id);
+            await Future.delayed(const Duration(milliseconds: 120));
+            widget.onConversationClick(picked.id);
+
+            // additional fetch to be safe
+            await Future.delayed(const Duration(milliseconds: 500));
+            try {
+              await provider.fetchConversations();
+            } catch (_) {}
+          }
+        } catch (e) {
+          // couldn't recover - show error
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Created conversation but failed to fetch list: $e')),
+            );
+          }
+        }
+      }
+    } catch (e, st) {
+      // show an error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create conversation: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isCreating = false);
     }
   }
 

@@ -10,6 +10,12 @@ class DeckService {
 
   final _api = ApiService();
 
+  // simple in-memory cache for overdue stats to avoid flooding the API when
+  // widgets rebuild while scrolling. TTL is short (30s) to keep data fresh.
+  final Map<int, _OverdueCacheEntry> _overdueCache = {};
+  final Map<int, Future<OverdueStats?>> _overdueInFlight = {};
+  final Duration _overdueTtl = const Duration(seconds: 30);
+
   // ============================================================================
   // DECK CRUD OPERATIONS
   // ============================================================================
@@ -213,6 +219,65 @@ class DeckService {
     }
   }
 
+  /// Get overdue statistics for a deck
+  Future<OverdueStats?> getOverdueStats(int deckId) async {
+    try {
+      final now = DateTime.now();
+      final cacheEntry = _overdueCache[deckId];
+      if (cacheEntry != null && now.difference(cacheEntry.fetchedAt) < _overdueTtl) {
+        return cacheEntry.stats;
+      }
+
+      // If a request for the same deck is already in-flight, return that future
+      if (_overdueInFlight.containsKey(deckId)) {
+        return _overdueInFlight[deckId];
+      }
+
+      final future = _api.ragGet<Map<String, dynamic>>(
+        '/study_sessions/overdue_stats',
+        queryParameters: {'deck_id': deckId},
+      ).then((response) {
+        if (response.statusCode == 200 && response.data != null) {
+          final stats = OverdueStats.fromJson(response.data!);
+          // store in cache
+          _overdueCache[deckId] = _OverdueCacheEntry(stats: stats, fetchedAt: DateTime.now());
+          return stats;
+        }
+        return null;
+      }).catchError((e) {
+        // swallow and return null; callers should handle null
+        return null;
+      }).whenComplete(() {
+        // remove in-flight marker
+        _overdueInFlight.remove(deckId);
+      });
+
+      _overdueInFlight[deckId] = future;
+      return future;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Reset stale cards (cards not reviewed for 30+ days)
+  Future<ResetStaleCardsResponse?> resetStaleCards({
+    required int deckId,
+    int daysThreshold = 30,
+  }) async {
+    try {
+      final response = await _api.ragPost<Map<String, dynamic>>(
+        '/study_sessions/reset_stale_cards?deck_id=$deckId&days_threshold=$daysThreshold',
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return ResetStaleCardsResponse.fromJson(response.data!);
+      }
+      return null;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // ============================================================================
   // SHARING OPERATIONS
   // ============================================================================
@@ -362,5 +427,76 @@ class StudySessionResponse {
       nextSessionDate: json['next_session_date'] as String?,
     );
   }
+}
+
+/// Overdue statistics model
+class OverdueStats {
+  final int totalCards;
+  final int overdueCards;
+  final int dueToday;
+  final OverdueBreakdown overdueBreakdown;
+
+  OverdueStats({
+    required this.totalCards,
+    required this.overdueCards,
+    required this.dueToday,
+    required this.overdueBreakdown,
+  });
+
+  factory OverdueStats.fromJson(Map<String, dynamic> json) {
+    return OverdueStats(
+      totalCards: json['total_cards'] as int? ?? 0,
+      overdueCards: json['overdue_cards'] as int? ?? 0,
+      dueToday: json['due_today'] as int? ?? 0,
+      overdueBreakdown: OverdueBreakdown.fromJson(
+        json['overdue_breakdown'] as Map<String, dynamic>? ?? {},
+      ),
+    );
+  }
+}
+
+/// Overdue breakdown by severity
+class OverdueBreakdown {
+  final int slightlyOverdue; // 1-2 days
+  final int moderatelyOverdue; // 3-7 days
+  final int veryOverdue; // >7 days
+
+  OverdueBreakdown({
+    required this.slightlyOverdue,
+    required this.moderatelyOverdue,
+    required this.veryOverdue,
+  });
+
+  factory OverdueBreakdown.fromJson(Map<String, dynamic> json) {
+    return OverdueBreakdown(
+      slightlyOverdue: json['slightly_overdue'] as int? ?? 0,
+      moderatelyOverdue: json['moderately_overdue'] as int? ?? 0,
+      veryOverdue: json['very_overdue'] as int? ?? 0,
+    );
+  }
+}
+
+/// Reset stale cards response
+class ResetStaleCardsResponse {
+  final String message;
+  final int resetCount;
+
+  ResetStaleCardsResponse({
+    required this.message,
+    required this.resetCount,
+  });
+
+  factory ResetStaleCardsResponse.fromJson(Map<String, dynamic> json) {
+    return ResetStaleCardsResponse(
+      message: json['message'] as String? ?? '',
+      resetCount: json['reset_count'] as int? ?? 0,
+    );
+  }
+}
+
+class _OverdueCacheEntry {
+  final OverdueStats stats;
+  final DateTime fetchedAt;
+  _OverdueCacheEntry({required this.stats, required this.fetchedAt});
 }
 

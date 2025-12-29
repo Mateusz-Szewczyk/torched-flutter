@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../models/subscription_stats.dart';
 import '../services/subscription_service.dart';
+import '../services/auth_service.dart';
 
 class SubscriptionProvider extends ChangeNotifier {
   final SubscriptionService _subscriptionService;
+  final AuthService _authService = AuthService();
   SubscriptionStats? _stats;
   List<SubscriptionPlan>? _plans;
   bool _isLoading = false;
@@ -81,8 +83,53 @@ class SubscriptionProvider extends ChangeNotifier {
   }
 
   Future<void> refreshAfterPayment() async {
+    debugPrint('[SubscriptionProvider] Refreshing after payment...');
+
+    // First, refresh the auth token to get updated role
+    try {
+      final (success, newRole, error) = await _authService.refreshToken();
+      if (success) {
+        debugPrint('[SubscriptionProvider] Token refreshed, new role: $newRole');
+      } else {
+        debugPrint('[SubscriptionProvider] Token refresh failed: $error');
+      }
+    } catch (e) {
+      debugPrint('[SubscriptionProvider] Error refreshing token: $e');
+    }
+
+    // Then refresh stats
     _stats = null;
     await fetchStats();
+  }
+
+  /// Polls for subscription update after payment
+  /// Retries token refresh until role changes or max attempts reached
+  Future<bool> pollForSubscriptionUpdate({
+    required String expectedRole,
+    int maxAttempts = 10,
+    Duration interval = const Duration(seconds: 3),
+  }) async {
+    debugPrint('[SubscriptionProvider] Polling for subscription update to: $expectedRole');
+
+    for (var i = 0; i < maxAttempts; i++) {
+      await Future.delayed(interval);
+
+      try {
+        final (success, newRole, _) = await _authService.refreshToken();
+        if (success && newRole?.toLowerCase() == expectedRole.toLowerCase()) {
+          debugPrint('[SubscriptionProvider] Subscription updated to: $newRole');
+          _stats = null;
+          await fetchStats();
+          return true;
+        }
+        debugPrint('[SubscriptionProvider] Attempt ${i + 1}: current role = $newRole');
+      } catch (e) {
+        debugPrint('[SubscriptionProvider] Poll attempt ${i + 1} error: $e');
+      }
+    }
+
+    debugPrint('[SubscriptionProvider] Subscription update polling timed out');
+    return false;
   }
 
   void clear() {

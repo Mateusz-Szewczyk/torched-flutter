@@ -607,7 +607,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 // DECK CARD WIDGET
 // ============================================================================
 
-class _DeckCard extends StatelessWidget {
+class _DeckCard extends StatefulWidget {
   final DeckInfo deckInfo;
   final VoidCallback onStudy;
   final VoidCallback onEdit;
@@ -625,16 +625,48 @@ class _DeckCard extends StatelessWidget {
   });
 
   @override
+  State<_DeckCard> createState() => _DeckCardState();
+}
+
+class _DeckCardState extends State<_DeckCard> {
+  OverdueStats? _overdueStats;
+  bool _isLoadingStats = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOverdueStats();
+  }
+
+  Future<void> _loadOverdueStats() async {
+    setState(() => _isLoadingStats = true);
+    try {
+      final stats = await DeckService().getOverdueStats(widget.deckInfo.id);
+      if (mounted) {
+        setState(() {
+          _overdueStats = stats;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading overdue stats: $e');
+      if (mounted) {
+        setState(() => _isLoadingStats = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final isShared = deckInfo.accessType == 'shared' || deckInfo.isOwn == false;
+    final isShared = widget.deckInfo.accessType == 'shared' || widget.deckInfo.isOwn == false;
 
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onStudy,
+        onTap: widget.onStudy,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -649,7 +681,7 @@ class _DeckCard extends StatelessWidget {
                       children: [
                         // Title
                         Text(
-                          deckInfo.name,
+                          widget.deckInfo.name,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -657,23 +689,29 @@ class _DeckCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
-                        // Card count
-                        Row(
+                        // Card count and badges
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
-                            Icon(
-                              Icons.style,
-                              size: 14,
-                              color: colorScheme.primary,
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.style,
+                                  size: 14,
+                                  color: colorScheme.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${widget.deckInfo.flashcardCount} ${l10n?.cards ?? 'cards'}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${deckInfo.flashcardCount} ${l10n?.cards ?? 'cards'}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            if (isShared) ...[
-                              const SizedBox(width: 8),
+                            if (isShared)
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 6,
@@ -690,7 +728,65 @@ class _DeckCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                            ],
+                            // Overdue badge
+                            if (_overdueStats != null && _overdueStats!.overdueCards > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      size: 12,
+                                      color: colorScheme.onErrorContainer,
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${_overdueStats!.overdueCards} overdue',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: colorScheme.onErrorContainer,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            // Due today badge
+                            if (_overdueStats != null && _overdueStats!.dueToday > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.tertiaryContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.today,
+                                      size: 12,
+                                      color: colorScheme.onTertiaryContainer,
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${_overdueStats!.dueToday} due',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: colorScheme.onTertiaryContainer,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ],
@@ -702,16 +798,16 @@ class _DeckCard extends StatelessWidget {
                     onSelected: (value) {
                       switch (value) {
                         case 'edit':
-                          onEdit();
+                          widget.onEdit();
                           break;
                         case 'delete':
-                          onDelete();
+                          widget.onDelete();
                           break;
                         case 'share':
-                          onShare();
+                          widget.onShare();
                           break;
                         case 'remove_shared':
-                          onRemoveShared();
+                          widget.onRemoveShared();
                           break;
                       }
                     },
@@ -770,11 +866,11 @@ class _DeckCard extends StatelessWidget {
               ),
 
               // Description
-              if (deckInfo.description != null && deckInfo.description!.isNotEmpty) ...[
+              if (widget.deckInfo.description != null && widget.deckInfo.description!.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Expanded(
                   child: Text(
-                    deckInfo.description!,
+                    widget.deckInfo.description!,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -785,46 +881,101 @@ class _DeckCard extends StatelessWidget {
               ] else
                 const Spacer(),
 
-              // Footer
+              // Footer with overdue breakdown
               const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Last session
-                  if (deckInfo.lastSession != null)
-                    Row(
+                  // Overdue breakdown (if available)
+                  if (_overdueStats != null && _overdueStats!.overdueCards > 0) ...[
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 14,
-                          color: colorScheme.outline,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _formatDate(deckInfo.lastSession!),
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: colorScheme.outline,
+                        if (_overdueStats!.overdueBreakdown.veryOverdue > 0)
+                          _buildOverdueBadge(
+                            context,
+                            '${_overdueStats!.overdueBreakdown.veryOverdue} very overdue (>7d)',
+                            Colors.red.shade100,
+                            Colors.red.shade900,
                           ),
-                        ),
+                        if (_overdueStats!.overdueBreakdown.moderatelyOverdue > 0)
+                          _buildOverdueBadge(
+                            context,
+                            '${_overdueStats!.overdueBreakdown.moderatelyOverdue} overdue (3-7d)',
+                            Colors.orange.shade100,
+                            Colors.orange.shade900,
+                          ),
+                        if (_overdueStats!.overdueBreakdown.slightlyOverdue > 0)
+                          _buildOverdueBadge(
+                            context,
+                            '${_overdueStats!.overdueBreakdown.slightlyOverdue} overdue (1-2d)',
+                            Colors.amber.shade100,
+                            Colors.amber.shade900,
+                          ),
                       ],
-                    )
-                  else
-                    const SizedBox.shrink(),
-
-                  // Study button
-                  FilledButton.icon(
-                    onPressed: onStudy,
-                    icon: const Icon(Icons.play_arrow, size: 18),
-                    label: Text(l10n?.study ?? 'Study'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      minimumSize: const Size(0, 36),
                     ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Last session and study button row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      if (widget.deckInfo.lastSession != null)
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time,
+                              size: 14,
+                              color: colorScheme.outline,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDate(widget.deckInfo.lastSession!),
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.outline,
+                              ),
+                            ),
+                          ],
+                        )
+                      else
+                        const SizedBox.shrink(),
+
+                      // Study button
+                      FilledButton.icon(
+                        onPressed: widget.onStudy,
+                        icon: const Icon(Icons.play_arrow, size: 18),
+                        label: Text(l10n?.study ?? 'Study'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverdueBadge(BuildContext context, String text, Color bgColor, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: textColor,
+          fontSize: 10,
         ),
       ),
     );

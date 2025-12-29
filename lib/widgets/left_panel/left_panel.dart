@@ -150,7 +150,11 @@ class _LeftPanelState extends State<LeftPanel> {
                       message: 'Home',
                       child: IconButton(
                         icon: const Icon(Icons.home_outlined, size: 20),
-                        onPressed: () => context.go('/'),
+                        onPressed: () {
+                          context.go('/');
+                          // Auto-close panel on mobile after navigation
+                          if (widget.isMobile) widget.togglePanel();
+                        },
                         padding: const EdgeInsets.all(8),
                         constraints: const BoxConstraints(),
                       ),
@@ -174,7 +178,10 @@ class _LeftPanelState extends State<LeftPanel> {
                 message: 'Home',
                 child: IconButton(
                   icon: const Icon(Icons.home_outlined, size: 20),
-                  onPressed: () => context.go('/'),
+                  onPressed: () {
+                    context.go('/');
+                    if (widget.isMobile) widget.togglePanel();
+                  },
                   padding: const EdgeInsets.all(8),
                   constraints: const BoxConstraints(),
                 ),
@@ -209,17 +216,29 @@ class _LeftPanelState extends State<LeftPanel> {
               label: 'Flashcards',
               route: '/flashcards',
               isPanelVisible: widget.isPanelVisible,
+              isMobile: widget.isMobile,
+              onTap: () {
+                // Navigate and close panel on mobile to avoid manual closing
+                context.go('/flashcards');
+                if (widget.isMobile) widget.togglePanel();
+              },
             ),
             _NavItem(
               icon: Icons.quiz_outlined,
               label: 'Tests',
               route: '/tests',
               isPanelVisible: widget.isPanelVisible,
+              isMobile: widget.isMobile,
+              onTap: () {
+                context.go('/tests');
+                if (widget.isMobile) widget.togglePanel();
+              },
             ),
             _NavItem(
               icon: Icons.folder_outlined,
               label: 'My Files',
               isPanelVisible: widget.isPanelVisible,
+              isMobile: widget.isMobile,
               onTap: () {
                 ManageFilesDialog.show(context);
               },
@@ -317,6 +336,7 @@ class _LeftPanelState extends State<LeftPanel> {
                   isMobile: widget.isMobile,
                   onTap: () {
                     showProfileDialog(context);
+                    if (widget.isMobile) widget.togglePanel();
                   },
                 ),
               )
@@ -334,6 +354,7 @@ class _LeftPanelState extends State<LeftPanel> {
                       context: context,
                       builder: (context) => const LoginRegisterDialog(),
                     );
+                    if (widget.isMobile) widget.togglePanel();
                   },
                 ),
               ),
@@ -348,6 +369,7 @@ class _LeftPanelState extends State<LeftPanel> {
                 isMobile: widget.isMobile,
                 onTap: () {
                   showSettingsDialog(context);
+                  if (widget.isMobile) widget.togglePanel();
                 },
               ),
             ),
@@ -363,6 +385,7 @@ class _LeftPanelState extends State<LeftPanel> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Feedback dialog - TODO')),
                 );
+                if (widget.isMobile) widget.togglePanel();
               },
             ),
           ],
@@ -482,7 +505,7 @@ class _SubscriptionInfo extends StatelessWidget {
 
   bool _isUnlimited(dynamic value) {
     if (value == null) return false;
-    if (value == -1) return true;
+    if (value is String && (value.toLowerCase() == 'unlimited' || value == '-1')) return true;
     if (value is num && value < 0) return true;
     return false;
   }
@@ -491,125 +514,101 @@ class _SubscriptionInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final subscriptionProvider = context.watch<SubscriptionProvider>();
     final stats = subscriptionProvider.stats;
-    final theme = Theme.of(context);
 
-    // Show nothing if no stats and not loading
-    if (stats == null && !subscriptionProvider.isLoading && subscriptionProvider.error == null) {
-      return const SizedBox.shrink();
-    }
-    // Show loading state
-    if (subscriptionProvider.isLoading && stats == null) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withAlpha(76),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor.withAlpha(128)),
-        ),
-        child: const Center(
+    if (stats == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Center(
           child: SizedBox(
-            width: 16,
-            height: 16,
+            height: 24,
+            width: 24,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
       );
     }
 
-    // Show error state
-    if (subscriptionProvider.error != null && stats == null) {
-      return const SizedBox.shrink(); // Silently hide on error
+    final role = stats.role ?? 'user';
+    final limits = stats.limits;
+    final usage = stats.usage;
+
+    double _calcProgress(num? used, num? limit) {
+      if (used == null || limit == null) return 0.0;
+      if (_isUnlimited(limit)) return 0.0;
+      if (limit == 0) return 1.0;
+      return (used / limit).clamp(0.0, 1.0).toDouble();
     }
 
-    if (stats == null) {
-      return const SizedBox.shrink();
-    }
+    final filesProgress = _calcProgress(usage?['files'] as num?, limits?['max_files'] as num?);
+    final decksProgress = _calcProgress(usage?['decks'] as num?, limits?['max_decks'] as num?);
+    final questionsProgress = _calcProgress(usage?['questions_period'] as num?, limits?['max_questions_period'] as num?);
 
-    final role = stats.role.toUpperCase();
-    final isPro = role == 'PRO' || role == 'EXPERT';
-
-    // Calculate usage percentages
-    final questionsUsed = stats.usage['questions_period'] as int? ?? 0;
-    final questionsLimit = stats.limits['max_questions_period'];
-    final questionsLimitVal = questionsLimit is num ? questionsLimit.toInt() : 0;
-    final questionsInfinite = _isUnlimited(questionsLimit);
-
-    final filesUsed = stats.usage['files'] as int? ?? 0;
-    final filesLimit = stats.limits['max_files'];
-    final filesLimitVal = filesLimit is num ? filesLimit.toInt() : 0;
-    final filesInfinite = _isUnlimited(filesLimit);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(76),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor.withAlpha(128)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                role,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isPro ? theme.primaryColor : theme.colorScheme.onSurface,
-                  fontSize: 12,
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              if (!isPro)
-                InkWell(
-                  onTap: () {
-                    showProfileDialog(context);
-                    // Note: Tab controller is inside the dialog, so we can't directly switch tabs
-                    // User will need to navigate to the Subscription tab manually
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: theme.primaryColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'UPGRADE',
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+              child: Text(
+                role.toUpperCase(),
+                style: TextStyle(
+                  fontSize: isMobile ? 12 : 11,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).primaryColor,
                 ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (!questionsInfinite) ...[
-            _buildProgressBar(context, 'Questions', questionsUsed, questionsLimitVal),
-            const SizedBox(height: 4),
-          ],
-          if (!filesInfinite)
-            _buildProgressBar(context, 'Files', filesUsed, filesLimitVal),
-          if (questionsInfinite && filesInfinite)
-            Text(
-              'Unlimited resources',
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            const SizedBox(width: 8),
+            if (isPanelVisible)
+              Expanded(
+                child: Text(
+                  'Subscription',
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
+                ),
+              ),
+            if (role.toLowerCase() == 'user')
+              TextButton(
+                onPressed: () async {
+                  // open profile / plans dialog
+                  await subscriptionProvider.fetchPlans();
+                  // show simple dialog
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      title: const Text('Upgrade'),
+                      content: const Text('Open subscription plans in Profile.'),
+                      actions: [
+                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+                      ],
+                    ),
+                  );
+                },
+                child: const Text('Upgrade'),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (isPanelVisible) ...[
+          _buildUsageRow(context, 'Files', usage?['files']?.toString() ?? '0', limits?['max_files']),
+          const SizedBox(height: 6),
+          _buildUsageRow(context, 'Decks', usage?['decks']?.toString() ?? '0', limits?['max_decks']),
+          const SizedBox(height: 6),
+          _buildUsageRow(context, 'Questions (period)', usage?['questions_period']?.toString() ?? '0', limits?['max_questions_period']),
         ],
-      ),
+      ],
     );
   }
 
-  Widget _buildProgressBar(BuildContext context, String label, int used, int limit) {
-    final theme = Theme.of(context);
-    final progress = limit > 0 ? (used / limit).clamp(0.0, 1.0) : 0.0;
+  Widget _buildUsageRow(BuildContext context, String label, String usedText, dynamic limit) {
+    final used = int.tryParse(usedText) ?? 0;
+    final isUnlimited = _isUnlimited(limit);
+    final limitText = isUnlimited ? '∞' : (limit?.toString() ?? '-');
+    final progress = isUnlimited ? 0.0 : (limit is num ? (used / (limit as num)).clamp(0.0, 1.0).toDouble() : 0.0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,17 +616,19 @@ class _SubscriptionInfo extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
-            Text('$used/$limit', style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
+            Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
+            Text('$used/$limitText', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
-        const SizedBox(height: 2),
-        LinearProgressIndicator(
-          value: progress,
-          backgroundColor: theme.colorScheme.surfaceContainerHighest,
-          color: progress > 0.9 ? theme.colorScheme.error : theme.primaryColor,
-          minHeight: 4,
-          borderRadius: BorderRadius.circular(2),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor: Theme.of(context).dividerColor.withOpacity(0.08),
+            valueColor: AlwaysStoppedAnimation(Theme.of(context).primaryColor),
+          ),
         ),
       ],
     );

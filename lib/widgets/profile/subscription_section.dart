@@ -503,30 +503,139 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
   void _showPaymentInProgressDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.payment, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Payment in Progress'),
-          ],
-        ),
-        content: const Text(
-          'Complete your payment in the opened browser tab.\n\n'
-          'Your account will be upgraded automatically within a minute '
-          'after successful payment.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Refresh subscription status
-              context.read<SubscriptionProvider>().refreshAfterPayment();
-            },
-            child: const Text('OK'),
+      barrierDismissible: false,
+      builder: (dialogContext) => _PaymentProgressDialog(
+        onCheckStatus: () async {
+          // Refresh token and check for new role
+          final provider = context.read<SubscriptionProvider>();
+          await provider.refreshAfterPayment();
+          return provider.stats?.role ?? 'user';
+        },
+      ),
+    );
+  }
+}
+
+/// Dialog that shows payment progress and checks for subscription update
+class _PaymentProgressDialog extends StatefulWidget {
+  final Future<String> Function() onCheckStatus;
+
+  const _PaymentProgressDialog({required this.onCheckStatus});
+
+  @override
+  State<_PaymentProgressDialog> createState() => _PaymentProgressDialogState();
+}
+
+class _PaymentProgressDialogState extends State<_PaymentProgressDialog> {
+  bool _isChecking = false;
+  String? _newRole;
+  bool _upgraded = false;
+
+  Future<void> _checkStatus() async {
+    setState(() => _isChecking = true);
+
+    try {
+      final role = await widget.onCheckStatus();
+      setState(() {
+        _newRole = role;
+        _upgraded = role.toLowerCase() != 'user';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isChecking = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            _upgraded ? Icons.check_circle : Icons.payment,
+            color: _upgraded ? Colors.green : Colors.blue,
           ),
+          const SizedBox(width: 12),
+          Text(_upgraded ? 'Subscription Updated!' : 'Payment in Progress'),
         ],
       ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_upgraded) ...[
+            Text(
+              'Congratulations! Your account has been upgraded to ${_newRole?.toUpperCase()}.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.withAlpha(30),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.green, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Your new features are now active!',
+                      style: TextStyle(color: Colors.green),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const Text(
+              'Complete your payment in the opened browser tab.\n\n'
+              'After payment, click "Check Status" to verify your subscription.',
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer.withAlpha(50),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: cs.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your subscription usually updates within 30 seconds after payment.',
+                      style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        if (!_upgraded)
+          OutlinedButton(
+            onPressed: _isChecking ? null : _checkStatus,
+            child: _isChecking
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Check Status'),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(_upgraded ? 'Close' : 'OK'),
+        ),
+      ],
     );
   }
 }

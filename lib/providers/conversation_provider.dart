@@ -137,6 +137,7 @@ class ConversationProvider extends ChangeNotifier {
   }
 
   /// Create a new conversation with optimistic UI
+  /// Note: Does NOT automatically set as current - caller should navigate
   Future<Conversation?> createConversation() async {
     // Haptic feedback for action
     HapticFeedback.lightImpact();
@@ -145,9 +146,15 @@ class ConversationProvider extends ChangeNotifier {
       final conversation = await _repository.createConversation();
 
       if (conversation != null) {
-        _currentConversationId = conversation.id;
-        _messages = [];
-        notifyListeners();
+        // Don't set as current here - let the navigation handle it
+        // This prevents issues with the setCurrentConversation check
+        // _currentConversationId = conversation.id;
+
+        // Clear any existing messages since we're creating a new conversation
+        // but don't set it as current yet
+
+        // Reload conversations to ensure list is up to date
+        await fetchConversations();
       }
 
       return conversation;
