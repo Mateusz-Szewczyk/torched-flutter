@@ -129,9 +129,11 @@ class ApiService {
 
   /// Determines which API to use based on the endpoint path
   Dio _getDioForPath(String path) {
-    // Flask API endpoints (auth-related)
+    // Flask API endpoints (auth-related and user management)
     if (path.startsWith('/auth') ||
-        path.startsWith(AppConfig.authEndpoint)) {
+        path.startsWith('/user') ||
+        path.startsWith(AppConfig.authEndpoint) ||
+        path.startsWith(AppConfig.userEndpoint)) {
       return _flaskDio;
     }
     // RAG API endpoints (everything else)

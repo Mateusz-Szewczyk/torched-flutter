@@ -22,6 +22,7 @@ class AppConfig {
   // FLASK API ENDPOINTS (User management)
   // ============================================================================
   static const String authEndpoint = '/auth';  // Login, register, OAuth, password reset
+  static const String userEndpoint = '/user';  // User profile management
 
   // ============================================================================
   // RAG API ENDPOINTS (Main functionality)

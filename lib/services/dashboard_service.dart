@@ -10,15 +10,52 @@ class DashboardService {
   /// Fetch all dashboard data for the logged-in user
   Future<DashboardData?> fetchDashboardData() async {
     try {
+      debugPrint('[DashboardService] Fetching dashboard data...');
       final response = await _api.ragGet('/dashboard/');
+      debugPrint('[DashboardService] Response status: ${response.statusCode}');
+      debugPrint('[DashboardService] Response data type: ${response.data?.runtimeType}');
 
       if (response.statusCode == 200 && response.data != null) {
-        return DashboardData.fromJson(response.data as Map<String, dynamic>);
+        debugPrint('[DashboardService] Parsing dashboard data...');
+        try {
+          final data = DashboardData.fromJson(response.data as Map<String, dynamic>);
+          debugPrint('[DashboardService] Dashboard data parsed successfully');
+          debugPrint('[DashboardService] Study records count: ${data.studyRecords.length}');
+          debugPrint('[DashboardService] Exam results count: ${data.examResults.length}');
+          return data;
+        } catch (parseError, parseStack) {
+          debugPrint('[DashboardService] PARSE ERROR: $parseError');
+          debugPrint('[DashboardService] Parse stack: $parseStack');
+          // Return a minimal valid object to avoid null crash
+          return DashboardData(
+            studyRecords: [],
+            userFlashcards: [],
+            studySessions: [],
+            examResults: [],
+            sessionDurations: [],
+            examDailyAverage: [],
+            flashcardDailyAverage: [],
+            deckNames: {},
+          );
+        }
       }
-      return null;
-    } catch (e) {
-      debugPrint('Error fetching dashboard data: $e');
-      return null;
+      debugPrint('[DashboardService] No data returned from API');
+      // Return minimal object instead of null
+      return DashboardData(
+        studyRecords: [],
+        userFlashcards: [],
+        studySessions: [],
+        examResults: [],
+        sessionDurations: [],
+        examDailyAverage: [],
+        flashcardDailyAverage: [],
+        deckNames: {},
+      );
+    } catch (e, stackTrace) {
+      debugPrint('[DashboardService] Error fetching dashboard data: $e');
+      debugPrint('[DashboardService] Stack trace: $stackTrace');
+      // Rethrow to let widget handle error state properly
+      rethrow;
     }
   }
 
@@ -306,10 +343,15 @@ class DashboardData {
     if (comparisons?.weekOverWeek != null) {
       final current = quickStats?.flashcardsThisWeek ?? 0;
       final changePercent = comparisons!.weekOverWeek.flashcards.percentage;
-      if (changePercent != 100 && changePercent != 0) {
+      // Safe calculation to avoid NaN and division by zero
+      final divisor = 1 + changePercent / 100;
+      if (changePercent == 0) {
+        flashcardsLastWeek = current;
+      } else if (divisor.isFinite && divisor != 0 && changePercent != 100) {
         // Calculate previous value: current = previous * (1 + change/100)
         // previous = current / (1 + change/100)
-        flashcardsLastWeek = (current / (1 + changePercent / 100)).round();
+        final result = current / divisor;
+        flashcardsLastWeek = result.isFinite ? result.round() : 0;
       } else if (changePercent == 0) {
         flashcardsLastWeek = current;
       }
@@ -333,10 +375,13 @@ class DashboardData {
     if (comparisons?.monthOverMonth != null) {
       final current = quickStats?.flashcardsThisMonth ?? 0;
       final changePercent = comparisons!.monthOverMonth.flashcards.percentage;
-      if (changePercent != 100 && changePercent != 0) {
-        flashcardsLastMonth = (current / (1 + changePercent / 100)).round();
-      } else if (changePercent == 0) {
+      // Safe calculation to avoid NaN and division by zero
+      final divisor = 1 + changePercent / 100;
+      if (changePercent == 0) {
         flashcardsLastMonth = current;
+      } else if (divisor.isFinite && divisor != 0 && changePercent != -100) {
+        final result = current / divisor;
+        flashcardsLastMonth = result.isFinite ? result.round() : 0;
       }
     } else {
       // Calculate from study records
@@ -921,9 +966,16 @@ class ComparisonChange {
   });
 
   factory ComparisonChange.fromJson(Map<String, dynamic> json) {
+    // Safe parsing with NaN/Infinity checks
+    double parseDouble(dynamic val) {
+      if (val == null) return 0;
+      final d = (val as num?)?.toDouble() ?? 0;
+      return d.isFinite ? d : 0;
+    }
+
     return ComparisonChange(
-      value: (json['value'] as num?)?.toDouble() ?? 0,
-      percentage: (json['percentage'] as num?)?.toDouble() ?? 0,
+      value: parseDouble(json['value']),
+      percentage: parseDouble(json['percentage']),
       trend: json['trend'] as String? ?? 'neutral',
     );
   }

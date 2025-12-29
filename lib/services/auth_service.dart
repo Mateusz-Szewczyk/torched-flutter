@@ -290,5 +290,34 @@ class AuthService {
       return false;
     }
   }
+
+  // ============================================================================
+  // PROFILE MANAGEMENT
+  // ============================================================================
+
+  /// Update user's username/nickname
+  /// Returns (success, errorMessage)
+  Future<(bool, String?)> updateUsername(String newUsername) async {
+    try {
+      // Profile endpoint is under /user, not /auth
+      final response = await _api.put<Map<String, dynamic>>(
+        '${AppConfig.userEndpoint}/profile',
+        data: {'username': newUsername},
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data!['success'] as bool? ?? false;
+        if (success) {
+          return (true, null);
+        }
+        return (false, response.data!['error'] as String? ?? 'Update failed');
+      }
+
+      return (false, response.data?['error'] as String? ?? 'Update failed');
+    } catch (e) {
+      debugPrint('[AuthService] Update username error: $e');
+      return (false, _api.getErrorMessage(e));
+    }
+  }
 }
 

@@ -233,5 +233,34 @@ class AuthProvider with ChangeNotifier {
   Future<bool> resendConfirmationEmail(String email) async {
     return await _authService.resendConfirmationEmail(email);
   }
+
+  // Update username and refresh user data
+  Future<(bool, String?)> updateUsername(String newUsername) async {
+    try {
+      final (success, error) = await _authService.updateUsername(newUsername);
+
+      if (success) {
+        // Update local user data with new username
+        if (_currentUser != null) {
+          _currentUser = User(
+            id: _currentUser!.id,
+            email: _currentUser!.email,
+            name: newUsername,
+            role: _currentUser!.role,
+            roleExpiry: _currentUser!.roleExpiry,
+            createdAt: _currentUser!.createdAt,
+          );
+          notifyListeners();
+        }
+        // Optionally refresh from server to ensure consistency
+        await checkSession();
+      }
+
+      return (success, error);
+    } catch (e) {
+      debugPrint('[AuthProvider] Update username error: $e');
+      return (false, e.toString());
+    }
+  }
 }
 

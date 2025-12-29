@@ -15,26 +15,18 @@ class HomeScreen extends StatelessWidget {
 
     // Show loading while checking auth
     if (authProvider.isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+      return const Center(
+        child: CircularProgressIndicator(),
       );
     }
 
-    // Show Dashboard for authenticated users
+    // Show Dashboard for authenticated users (no Scaffold - MainLayout provides it)
     if (authProvider.isAuthenticated) {
-      return const Scaffold(
-        body: SafeArea(
-          child: DashboardWidget(),
-        ),
-      );
+      return const DashboardWidget();
     }
 
-    // Show welcome screen for guests
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
+    // Show welcome screen for guests (no Scaffold - MainLayout provides it)
+    return SingleChildScrollView(
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24.0),
@@ -148,8 +140,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-        ),
-      ),
     );
   }
 }

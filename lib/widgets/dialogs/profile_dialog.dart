@@ -432,7 +432,7 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
   }
 }
 
-class _ProfileContent extends StatelessWidget {
+class _ProfileContent extends StatefulWidget {
   final User? user;
   final SubscriptionStats? subscriptionStats;
   final VoidCallback? onUpgradeTap;
@@ -443,10 +443,40 @@ class _ProfileContent extends StatelessWidget {
     this.onUpgradeTap,
   });
 
+  @override
+  State<_ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends State<_ProfileContent> {
+  bool _isEditingUsername = false;
+  bool _isSaving = false;
+  final _usernameController = TextEditingController();
+  String? _usernameError;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.text = widget.user?.name ?? '';
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user?.name != widget.user?.name && !_isEditingUsername) {
+      _usernameController.text = widget.user?.name ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    super.dispose();
+  }
+
   String _getDisplayRole() {
     // Priority: subscriptionStats role > user role > default
-    final statsRole = subscriptionStats?.displayRole;
-    final userRole = user?.role;
+    final statsRole = widget.subscriptionStats?.displayRole;
+    final userRole = widget.user?.role;
 
     if (statsRole != null && statsRole.isNotEmpty && statsRole != 'Free') {
       return statsRole;
@@ -473,12 +503,12 @@ class _ProfileContent extends StatelessWidget {
 
   String? _getFormattedExpiry() {
     // Use subscriptionStats expiry as priority
-    if (subscriptionStats?.formattedExpiry != null) {
-      return subscriptionStats!.formattedExpiry;
+    if (widget.subscriptionStats?.formattedExpiry != null) {
+      return widget.subscriptionStats!.formattedExpiry;
     }
 
     // Try to format user's roleExpiry if available
-    final expiry = user?.roleExpiry;
+    final expiry = widget.user?.roleExpiry;
     if (expiry == null) return null;
 
     try {
@@ -526,15 +556,15 @@ class _ProfileContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  user?.name ?? user?.email ?? 'User',
+                  widget.user?.name ?? widget.user?.email ?? 'User',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: cs.onPrimaryContainer,
                   ),
                 ),
-                if (user?.email != null)
+                if (widget.user?.email != null)
                   Text(
-                    user!.email,
+                    widget.user!.email,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onPrimaryContainer.withAlpha(180),
                     ),
@@ -550,13 +580,8 @@ class _ProfileContent extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Info cards
-          _buildInfoCard(
-            context,
-            icon: Icons.badge_outlined,
-            label: 'Nickname',
-            value: user?.name ?? 'Not set',
-          ),
+          // Editable Nickname card
+          _buildEditableNicknameCard(context, cs),
 
           const SizedBox(height: 12),
 
@@ -573,7 +598,7 @@ class _ProfileContent extends StatelessWidget {
             context,
             icon: Icons.email_outlined,
             label: 'E-mail',
-            value: user?.email ?? 'Not available',
+            value: widget.user?.email ?? 'Not available',
           ),
 
           const SizedBox(height: 12),
@@ -783,6 +808,185 @@ class _ProfileContent extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildEditableNicknameCard(BuildContext context, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withAlpha(100),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: _isEditingUsername
+              ? cs.primary.withAlpha(100)
+              : cs.outlineVariant.withAlpha(50),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: cs.primary.withAlpha(20),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.badge_outlined, size: 20, color: cs.primary),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: _isEditingUsername
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Nickname',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextField(
+                        controller: _usernameController,
+                        decoration: InputDecoration(
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          errorText: _usernameError,
+                          hintText: 'Enter nickname',
+                        ),
+                        autofocus: true,
+                        onSubmitted: (_) => _saveUsername(),
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Nickname',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.user?.name ?? 'Not set',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          if (_isEditingUsername) ...[
+            if (_isSaving)
+              const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else ...[
+              IconButton(
+                icon: Icon(Icons.check, color: cs.primary),
+                onPressed: _saveUsername,
+                tooltip: 'Save',
+              ),
+              IconButton(
+                icon: Icon(Icons.close, color: cs.error),
+                onPressed: () {
+                  setState(() {
+                    _isEditingUsername = false;
+                    _usernameController.text = widget.user?.name ?? '';
+                    _usernameError = null;
+                  });
+                },
+                tooltip: 'Cancel',
+              ),
+            ],
+          ] else
+            IconButton(
+              icon: Icon(Icons.edit_outlined, color: cs.onSurfaceVariant),
+              onPressed: () {
+                setState(() {
+                  _isEditingUsername = true;
+                });
+              },
+              tooltip: 'Edit nickname',
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveUsername() async {
+    final newUsername = _usernameController.text.trim();
+
+    if (newUsername.isEmpty) {
+      setState(() {
+        _usernameError = 'Nickname cannot be empty';
+      });
+      return;
+    }
+
+    if (newUsername.length < 3) {
+      setState(() {
+        _usernameError = 'Nickname must be at least 3 characters';
+      });
+      return;
+    }
+
+    if (newUsername.length > 50) {
+      setState(() {
+        _usernameError = 'Nickname must be less than 50 characters';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _usernameError = null;
+    });
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final (success, error) = await authProvider.updateUsername(newUsername);
+
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+
+        if (success) {
+          setState(() {
+            _isEditingUsername = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Nickname updated successfully'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } else {
+          setState(() {
+            _usernameError = error ?? 'Failed to update nickname';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+          _usernameError = 'An error occurred';
+        });
+      }
+    }
+  }
+
+  VoidCallback? get onUpgradeTap => widget.onUpgradeTap;
 
   Widget _buildInfoCard(BuildContext context, {
     required IconData icon,

@@ -73,50 +73,69 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     final horizontalPadding = isDesktop ? 40.0 : (isTablet ? 24.0 : 16.0);
 
     return Scaffold(
-      backgroundColor: colorScheme.surface, // Ensure this is dark in your theme
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadData,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: isMobile ? 16.0 : 32.0,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: maxContentWidth),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 1. Header
-                    _DashboardHeader(extendedSummary: extendedSummary),
-                    const SizedBox(height: 24),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: constraints.maxHeight,
+                  ),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding,
+                                vertical: isMobile ? 16.0 : 32.0,
+                              ),
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(maxWidth: maxContentWidth),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    // 1. Header
+                                    _DashboardHeader(extendedSummary: extendedSummary),
+                                    const SizedBox(height: 24),
 
-                    // 2. Top Section: Goal (Left) + Actions (Right)
-                    _TopSection(
-                      flashcardsDone: extendedSummary.flashcardsToday,
-                      flashcardsGoal: 10,
-                      onFlashcardsTap: () => context.go('/flashcards'),
-                      onTestsTap: () => context.go('/tests'),
-                      isMobile: isMobile,
+                                    // 2. Top Section: Goal (Left) + Actions (Right)
+                                    _TopSection(
+                                      flashcardsDone: extendedSummary.flashcardsToday,
+                                      flashcardsGoal: 10,
+                                      onFlashcardsTap: () => context.go('/flashcards'),
+                                      onTestsTap: () => context.go('/tests'),
+                                      isMobile: isMobile,
+                                    ),
+
+                                    const SizedBox(height: 24),
+
+                                    // 3. Main Content: Exams (Left Sidebar) + Calendar (Main Stage)
+                                    _MainContentSection(
+                                      recentExams: recentExams,
+                                      lastRefreshTime: _lastRefreshTime,
+                                      isMobile: isMobile,
+                                      isTablet: isTablet,
+                                    ),
+
+                                    const SizedBox(height: 40),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // 3. Main Content: Exams (Left Sidebar) + Calendar (Main Stage)
-                    _MainContentSection(
-                      recentExams: recentExams,
-                      lastRefreshTime: _lastRefreshTime,
-                      isMobile: isMobile,
-                      isTablet: isTablet,
-                    ),
-
-                    const SizedBox(height: 40),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
@@ -168,7 +187,7 @@ class _DashboardHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF332200), // Dark orange/brown bg
+              color: const Color(0xFF332200),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.orange.withOpacity(0.3)),
             ),
@@ -219,7 +238,11 @@ class _TopSection extends StatelessWidget {
             child: _GoalCard(done: flashcardsDone, goal: flashcardsGoal)
           ),
           const SizedBox(height: 16),
-          _ActionButtons(onStudy: onFlashcardsTap, onExam: onTestsTap),
+          _ActionButtons(
+            onStudy: onFlashcardsTap,
+            onExam: onTestsTap,
+            isMobile: true,
+          ),
         ],
       );
     }
@@ -228,16 +251,18 @@ class _TopSection extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Goal Card takes 40% (approx)
           Expanded(
             flex: 2,
             child: _GoalCard(done: flashcardsDone, goal: flashcardsGoal),
           ),
           const SizedBox(width: 24),
-          // Actions take 60% (approx)
           Expanded(
             flex: 3,
-            child: _ActionButtons(onStudy: onFlashcardsTap, onExam: onTestsTap),
+            child: _ActionButtons(
+              onStudy: onFlashcardsTap,
+              onExam: onTestsTap,
+              isMobile: false,
+            ),
           ),
         ],
       ),
@@ -337,11 +362,54 @@ class _GoalCard extends StatelessWidget {
 class _ActionButtons extends StatelessWidget {
   final VoidCallback onStudy;
   final VoidCallback onExam;
+  final bool isMobile;
 
-  const _ActionButtons({required this.onStudy, required this.onExam});
+  const _ActionButtons({
+    required this.onStudy,
+    required this.onExam,
+    required this.isMobile,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (isMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 56,
+              child: FilledButton.icon(
+                onPressed: onStudy,
+                icon: const Icon(Icons.style, size: 24),
+                label: const Text('Cards', style: TextStyle(fontSize: 16)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE0E0E0),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: SizedBox(
+              height: 56,
+              child: OutlinedButton(
+                onPressed: onExam,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E1E1E),
+                  foregroundColor: Colors.white,
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('Exams', style: TextStyle(fontSize: 16)),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: [
         Expanded(
@@ -352,7 +420,7 @@ class _ActionButtons extends StatelessWidget {
               icon: const Icon(Icons.style, size: 28),
               label: const Text('Study Flashcards', style: TextStyle(fontSize: 18)),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE0E0E0), // Light grey like image
+                backgroundColor: const Color(0xFFE0E0E0),
                 foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
@@ -366,7 +434,7 @@ class _ActionButtons extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onExam,
               style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E1E1E), // Dark button
+                backgroundColor: const Color(0xFF1E1E1E),
                 foregroundColor: Colors.white,
                 side: BorderSide.none,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -398,13 +466,9 @@ class _MainContentSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    // Mobile: Vertical Stack
     if (isMobile) {
       return Column(
         children: [
-          // Calendar first on mobile for priority
           _CalendarContainer(lastRefreshTime: lastRefreshTime, minHeight: 400),
           const SizedBox(height: 24),
           _RecentExamsList(exams: recentExams),
@@ -412,22 +476,14 @@ class _MainContentSection extends StatelessWidget {
       );
     }
 
-    // Desktop/Tablet: Side-by-Side
-    // We use IntrinsicHeight or specific constraints to let the calendar be big
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // LEFT SIDEBAR (EXAMS)
-        // Fixed width ensures it looks like a sidebar
         SizedBox(
           width: isTablet ? 220 : 280,
           child: _RecentExamsList(exams: recentExams),
         ),
-
         const SizedBox(width: 24),
-
-        // RIGHT MAIN (CALENDAR)
-        // Expanded to fill the rest of the screen
         Expanded(
           child: _CalendarContainer(
             lastRefreshTime: lastRefreshTime,
@@ -447,12 +503,16 @@ class _CalendarContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1100;
+
     return Container(
       constraints: BoxConstraints(minHeight: minHeight),
-      // Removed padding and decoration - calendar now uses full space
       child: LearningCalendarWidget(
         key: ValueKey(lastRefreshTime),
         expandToFill: true,
+        sideNavigationButtons: isDesktop,
+        largeNavigationButtons: isDesktop,
       ),
     );
   }
@@ -471,7 +531,7 @@ class _RecentExamsList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.transparent, // Or surfaceContainerLow if you want a bg
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(

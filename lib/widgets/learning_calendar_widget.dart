@@ -7,9 +7,17 @@ class LearningCalendarWidget extends StatefulWidget {
   /// If true, the calendar expands to fill available width
   final bool expandToFill;
 
+  /// If true, navigation buttons are placed on the sides (desktop only)
+  final bool sideNavigationButtons;
+
+  /// If true, navigation buttons are larger (desktop only)
+  final bool largeNavigationButtons;
+
   const LearningCalendarWidget({
     super.key,
     this.expandToFill = false,
+    this.sideNavigationButtons = false,
+    this.largeNavigationButtons = false,
   });
 
   @override
@@ -174,13 +182,14 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     final isSmallMobile = screenWidth < 380;
     final isDesktop = screenWidth >= 900;
 
-    // On desktop, constrain the calendar width to prevent it from stretching
-    // Unless expandToFill is true, then let the parent control the size
+    // On desktop, constrain the calendar width for better readability
+    // Even when expandToFill is true, we cap at a reasonable max width
     final double? maxCalendarWidth;
     if (widget.expandToFill) {
-      maxCalendarWidth = null; // No constraint - fill available space
+      // Cap at reasonable width even when filling - prevents overly wide calendars
+      maxCalendarWidth = isDesktop ? 900.0 : double.infinity;
     } else {
-      maxCalendarWidth = isDesktop ? 320.0 : (isMobile ? double.infinity : 400.0);
+      maxCalendarWidth = isDesktop ? 420.0 : (isMobile ? double.infinity : 460.0);
     }
 
     return Center(
@@ -207,15 +216,17 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Header
-            _buildHeader(context, colorScheme, isMobile, isSmallMobile),
+            _buildHeader(context, colorScheme, isMobile, isSmallMobile, isDesktop),
 
-            // Content
+            // Content - wrap with side navigation if enabled
             if (_isLoading)
               _buildLoadingState(colorScheme)
             else if (_error != null)
               _buildErrorState(colorScheme)
             else if (_calendarData != null)
-              _buildCalendarContent(context, colorScheme, isMobile, isSmallMobile),
+              widget.sideNavigationButtons && isDesktop
+                  ? _buildCalendarWithSideNav(context, colorScheme, isMobile, isSmallMobile)
+                  : _buildCalendarContent(context, colorScheme, isMobile, isSmallMobile),
 
             // Legend
             if (_calendarData != null && !_isLoading)
@@ -226,11 +237,81 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, ColorScheme colorScheme, bool isMobile, bool isSmallMobile) {
+  Widget _buildCalendarWithSideNav(
+    BuildContext context,
+    ColorScheme colorScheme,
+    bool isMobile,
+    bool isSmallMobile,
+  ) {
+    final buttonSize = widget.largeNavigationButtons ? 56.0 : 48.0;
+    final iconSize = widget.largeNavigationButtons ? 32.0 : 24.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Left navigation button
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(buttonSize / 2),
+            child: InkWell(
+              onTap: _previousMonth,
+              borderRadius: BorderRadius.circular(buttonSize / 2),
+              child: Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  border: Border.all(color: colorScheme.outlineVariant),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.chevron_left, size: iconSize, color: colorScheme.onSurface),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 24),
+
+          // Calendar content
+          Expanded(
+            child: _buildCalendarContent(context, colorScheme, isMobile, isSmallMobile),
+          ),
+
+          const SizedBox(width: 24),
+
+          // Right navigation button
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(buttonSize / 2),
+            child: InkWell(
+              onTap: _nextMonth,
+              borderRadius: BorderRadius.circular(buttonSize / 2),
+              child: Container(
+                width: buttonSize,
+                height: buttonSize,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  border: Border.all(color: colorScheme.outlineVariant),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.chevron_right, size: iconSize, color: colorScheme.onSurface),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ColorScheme colorScheme, bool isMobile, bool isSmallMobile, bool isDesktop) {
     final monthName = _getMonthName(_currentMonth.month);
     final scheduledCount = _getScheduledCountForMonth();
     final screenWidth = MediaQuery.of(context).size.width;
-    final isDesktop = screenWidth >= 900;
+
+    // Don't show navigation buttons in header if they're on the sides
+    final showNavButtons = !widget.sideNavigationButtons || !isDesktop;
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : (isDesktop ? 12 : 16)),
@@ -264,55 +345,93 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
           SizedBox(height: isMobile ? 12 : (isDesktop ? 8 : 12)),
 
-          // Month navigation
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildNavButton(Icons.chevron_left, _previousMonth, colorScheme),
+          // Month navigation - only show if not using side navigation
+          if (showNavButtons)
+            Row(
+              mainAxisAlignment: isDesktop ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
+              children: [
+                _buildNavButton(Icons.chevron_left, _previousMonth, colorScheme, isDesktop: isDesktop),
 
-              Column(
-                children: [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: isDesktop ? 16 : 0),
+                  child: Column(
+                    children: [
+                      Text(
+                        isSmallMobile || isDesktop
+                            ? '${monthName.substring(0, 3)} ${_currentMonth.year}'
+                            : '$monthName ${_currentMonth.year}',
+                        style: TextStyle(
+                          fontSize: isDesktop ? 16 : 14,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      if (scheduledCount > 0)
+                        Text(
+                          '$scheduledCount scheduled',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+
+                _buildNavButton(Icons.chevron_right, _nextMonth, colorScheme, isDesktop: isDesktop),
+              ],
+            )
+          else
+            // Show just the month name when side nav is active
+            Column(
+              children: [
+                Text(
+                  isSmallMobile || isDesktop
+                      ? '${monthName.substring(0, 3)} ${_currentMonth.year}'
+                      : '$monthName ${_currentMonth.year}',
+                  style: TextStyle(
+                    fontSize: isDesktop ? 18 : 16,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                if (scheduledCount > 0)
                   Text(
-                    isSmallMobile || isDesktop
-                        ? '${monthName.substring(0, 3)} ${_currentMonth.year}'
-                        : '$monthName ${_currentMonth.year}',
+                    '$scheduledCount scheduled',
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
+                      fontSize: 11,
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (scheduledCount > 0)
-                    Text(
-                      '$scheduledCount scheduled',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.blueAccent, // Flat blue for text
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ],
-              ),
-
-              _buildNavButton(Icons.chevron_right, _nextMonth, colorScheme),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildNavButton(IconData icon, VoidCallback onTap, ColorScheme colorScheme) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          border: Border.all(color: colorScheme.outlineVariant.withAlpha(128)),
-          borderRadius: BorderRadius.circular(6),
+  Widget _buildNavButton(IconData icon, VoidCallback onTap, ColorScheme colorScheme, {bool isDesktop = false}) {
+    final buttonSize = isDesktop ? 48.0 : 36.0;
+    final iconSize = isDesktop ? 32.0 : 22.0;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: buttonSize,
+          height: buttonSize,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            border: Border.all(color: colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: iconSize, color: colorScheme.onSurface),
         ),
-        child: Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
       ),
     );
   }
@@ -384,7 +503,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           final availableWidth = constraints.maxWidth - 32; // padding
           final calculatedCellSize = (availableWidth - (cellSpacing * 6)) / 7;
           // Clamp cell size to reasonable bounds
-          final cellSize = calculatedCellSize.clamp(16.0, 50.0);
+          final cellSize = calculatedCellSize.clamp(16.0, 70.0);
           final totalGridWidth = (cellSize * 7) + (cellSpacing * 6);
 
           return _buildCalendarGrid(
@@ -718,8 +837,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       ),
     );
   }
-
-  // ... (The rest of the helper methods: _showDayDetails, _buildDetailSection, etc. remain exactly the same as before to preserve logic) ...
 
   void _showDayDetails(
     BuildContext context,
