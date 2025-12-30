@@ -8,6 +8,7 @@ import '../dialogs/login_register_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/profile_dialog.dart';
 import '../dialogs/manage_files_dialog.dart';
+import '../profile/subscription_section.dart';
 import 'conversation_list.dart';
 
 /// Left navigation panel - equivalent to left-panel/index.tsx
@@ -119,12 +120,15 @@ class _LeftPanelState extends State<LeftPanel> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Center(
-                          child: Text(
-                            'T',
-                            style: TextStyle(
+                          child: Image.asset(
+                            'assets/images/favicon.png',
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.broken_image,
+                              size: 20,
                               color: Theme.of(context).primaryColor,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
                             ),
                           ),
                         ),
@@ -494,6 +498,87 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+Future<void> _showSubscriptionView(BuildContext context) async {
+  // Pre-fetch plans if needed, though SubscriptionSection initState also handles it.
+  // await context.read<SubscriptionProvider>().fetchPlans();
+
+  if (!context.mounted) return;
+
+  final width = MediaQuery.of(context).size.width;
+  final isDesktop = width > 600; // Breakpoint for desktop/tablet
+
+  if (isDesktop) {
+    // DESKTOP: Show as a Dialog
+    await showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
+          child: const _SubscriptionWrapper(
+            showCloseButton: true, // Add explicit close button for dialog
+          ),
+        ),
+      ),
+    );
+  } else {
+    // MOBILE: Show as Bottom Sheet with swipe-to-close
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // Allows full height
+      useSafeArea: true,
+      showDragHandle: true, // Adds the small grey handle indicator
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9, // Opens at 90% height
+        minChildSize: 0.5,     // Can be dragged down to 50%
+        maxChildSize: 1.0,     // Can be dragged up to full screen
+        expand: false,         // Respects content size
+        builder: (_, scrollController) => _SubscriptionWrapper(
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+}
+
+/// Wrapper to handle scroll controller injection for the bottom sheet
+class _SubscriptionWrapper extends StatelessWidget {
+  final ScrollController? scrollController;
+  final bool showCloseButton;
+
+  const _SubscriptionWrapper({
+    this.scrollController,
+    this.showCloseButton = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        if (showCloseButton)
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ),
+        Expanded(
+          // Pass the scroll controller to SubscriptionSection
+          // You need to update SubscriptionSection to accept it
+          child: SubscriptionSection(scrollController: scrollController),
+        ),
+      ],
+    );
+  }
+}
+
 class _SubscriptionInfo extends StatelessWidget {
   final bool isPanelVisible;
   final bool isMobile;
@@ -516,8 +601,8 @@ class _SubscriptionInfo extends StatelessWidget {
     final stats = subscriptionProvider.stats;
 
     if (stats == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8.0),
         child: Center(
           child: SizedBox(
             height: 24,
@@ -555,7 +640,7 @@ class _SubscriptionInfo extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                role.toUpperCase(),
+                (role == 'user'.toLowerCase()) ? 'free'.toUpperCase() : role.toUpperCase(),
                 style: TextStyle(
                   fontSize: isMobile ? 12 : 11,
                   fontWeight: FontWeight.w700,
@@ -564,30 +649,9 @@ class _SubscriptionInfo extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            if (isPanelVisible)
-              Expanded(
-                child: Text(
-                  'Subscription',
-                  style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
-                ),
-              ),
             if (role.toLowerCase() == 'user')
               TextButton(
-                onPressed: () async {
-                  // open profile / plans dialog
-                  await subscriptionProvider.fetchPlans();
-                  // show simple dialog
-                  showDialog(
-                    context: context,
-                    builder: (_) => AlertDialog(
-                      title: const Text('Upgrade'),
-                      content: const Text('Open subscription plans in Profile.'),
-                      actions: [
-                        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-                      ],
-                    ),
-                  );
-                },
+                onPressed: () => _showSubscriptionView(context),
                 child: const Text('Upgrade'),
               ),
           ],

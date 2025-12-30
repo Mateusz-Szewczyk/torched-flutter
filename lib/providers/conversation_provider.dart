@@ -416,6 +416,23 @@ class ConversationProvider extends ChangeNotifier {
             _isStreaming = false;
             _streamingText = '';
             break;
+          case ChatStreamEventType.titleUpdate:
+            if (event.title != null) {
+              // 1. Update the local list state
+              final index = _conversations.indexWhere((c) => c.id == currentConversationId);
+              if (index != -1) {
+                final old = _conversations[index];
+                _conversations[index] = Conversation(
+                  id: old.id,
+                  title: event.title!,
+                  createdAt: old.createdAt,
+                  updatedAt: old.updatedAt,
+                  messages: old.messages,
+                );
+                notifyListeners();
+              }
+            }
+          break;
         }
         notifyListeners();
       }

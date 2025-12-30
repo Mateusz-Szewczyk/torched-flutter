@@ -7,7 +7,7 @@ import '../../services/subscription_service.dart';
 /// Subscription management section for profile dialog
 /// Shows current plan and allows upgrade to Pro/Expert
 class SubscriptionSection extends StatefulWidget {
-  const SubscriptionSection({super.key});
+  const SubscriptionSection({super.key, ScrollController? scrollController});
 
   @override
   State<SubscriptionSection> createState() => _SubscriptionSectionState();

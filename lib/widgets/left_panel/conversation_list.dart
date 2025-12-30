@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -429,7 +431,7 @@ class _SwipeableConversationItem extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
+                    child: TypewriterText(
                       conversation.title,
                       style: TextStyle(
                         fontSize: 13,
@@ -438,8 +440,7 @@ class _SwipeableConversationItem extends StatelessWidget {
                             ? colorScheme.onSurface
                             : colorScheme.onSurfaceVariant,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      duration: const Duration(milliseconds: 60),
                     ),
                   ),
                   // Subtle swipe hint
@@ -489,3 +490,74 @@ class _SwipeableConversationItem extends StatelessWidget {
   }
 }
 
+class TypewriterText extends StatefulWidget {
+  final String text;
+  final TextStyle? style;
+  final Duration duration;
+
+  const TypewriterText(
+    this.text, {
+    super.key,
+    this.style,
+    this.duration = const Duration(milliseconds: 30), // Speed per character
+  });
+
+  @override
+  State<TypewriterText> createState() => _TypewriterTextState();
+}
+
+class _TypewriterTextState extends State<TypewriterText> {
+  String _displayedText = "";
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    // On initial load, show full text immediately (don't animate existing history)
+    _displayedText = widget.text;
+  }
+
+  @override
+  void didUpdateWidget(TypewriterText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Only animate if the text has actually changed
+    if (oldWidget.text != widget.text) {
+      _startAnimation();
+    }
+  }
+
+  void _startAnimation() {
+    _timer?.cancel();
+    _displayedText = ""; // Optional: Clear old text instantly before typing new
+    int currentIndex = 0;
+
+    _timer = Timer.periodic(widget.duration, (timer) {
+      if (currentIndex < widget.text.length) {
+        setState(() {
+          // Add one character at a time
+          currentIndex++;
+          _displayedText = widget.text.substring(0, currentIndex);
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _displayedText,
+      style: widget.style,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}

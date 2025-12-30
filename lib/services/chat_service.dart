@@ -157,18 +157,7 @@ class ChatService {
     final storageService = StorageService();
     final token = await storageService.getToken();
 
-    // Debug: Log token status
-    if (kDebugMode) {
-      debugPrint('[ChatService] Token available: ${token != null}');
-      if (token != null) {
-        debugPrint('[ChatService] Token length: ${token.length}');
-        debugPrint('[ChatService] Token prefix: ${token.length > 20 ? token.substring(0, 20) : token}...');
-      }
-    }
-
-    // Check if token is available before making request
     if (token == null || token.isEmpty) {
-      debugPrint('[ChatService] ERROR: No token available for streaming request');
       yield ChatStreamEvent.error('Not authenticated. Please log in again.');
       return;
     }
@@ -186,29 +175,17 @@ class ChatService {
       'selected_tools': selectedTools,
     });
 
-    if (kDebugMode) {
-      debugPrint('[ChatService] Sending query to: $uri');
-      debugPrint('[ChatService] Headers: ${request.headers}');
-    }
-
     try {
       final client = http.Client();
       final streamedResponse = await client.send(request);
 
       if (streamedResponse.statusCode != 200) {
-        // Read error body for more details
-        final errorBody = await streamedResponse.stream.bytesToString();
-        if (kDebugMode) {
-          debugPrint('[ChatService] Error response: $errorBody');
-        }
-
         String errorMessage = 'HTTP error: ${streamedResponse.statusCode}';
         try {
+          final errorBody = await streamedResponse.stream.bytesToString();
           final errorJson = jsonDecode(errorBody) as Map<String, dynamic>;
           errorMessage = errorJson['detail'] as String? ?? errorMessage;
-        } catch (_) {
-          // Use default error message
-        }
+        } catch (_) {}
 
         yield ChatStreamEvent.error(errorMessage);
         client.close();
@@ -251,12 +228,23 @@ class ChatService {
                   break;
 
                 case 'action':
-                  yield ChatStreamEvent.action(
-                    actionType: jsonData['action_type'] as String? ?? '',
-                    actionId: jsonData['id'] as int? ?? 0,
-                    actionName: jsonData['name'] as String? ?? '',
-                    actionCount: jsonData['count'] as int? ?? 0,
-                  );
+                  // Check specifically for conversation title update
+                  final actionType = jsonData['action_type'] as String? ?? '';
+
+                  if (actionType == 'set_conversation_title') {
+                    // It's a title update event
+                    yield ChatStreamEvent.titleUpdate(
+                      jsonData['name'] as String? ?? 'New Conversation',
+                    );
+                  } else {
+                    // It's a standard tool action (flashcards/exams)
+                    yield ChatStreamEvent.action(
+                      actionType: actionType,
+                      actionId: jsonData['id'] as int? ?? 0,
+                      actionName: jsonData['name'] as String? ?? '',
+                      actionCount: jsonData['count'] as int? ?? 0,
+                    );
+                  }
                   break;
 
                 case 'done':
@@ -270,7 +258,7 @@ class ChatService {
                   return;
 
                 default:
-                  // Fallback: handle old format with 'chunk' key
+                  // Handle legacy formats or unknown types
                   if (jsonData.containsKey('chunk')) {
                     final chunkText = jsonData['chunk'] as String? ?? '';
                     final isDone = jsonData['done'] as bool? ?? false;
@@ -287,7 +275,6 @@ class ChatService {
                   }
               }
             } catch (e) {
-              // Skip malformed JSON, continue parsing
               debugPrint('SSE parse error: $e');
             }
           }
@@ -304,7 +291,14 @@ class ChatService {
 }
 
 /// Event types for chat streaming
-enum ChatStreamEventType { chunk, step, action, error, done }
+enum ChatStreamEventType {
+  chunk,
+  step,
+  action,
+  titleUpdate, // Added new type
+  error,
+  done
+}
 
 class ChatStreamEvent {
   final ChatStreamEventType type;
@@ -320,6 +314,9 @@ class ChatStreamEvent {
   final String? actionName;  // Name of the created set
   final int? actionCount;    // Number of items (flashcards/questions)
 
+  // Title update field
+  final String? title;
+
   ChatStreamEvent._({
     required this.type,
     this.chunk,
@@ -331,6 +328,7 @@ class ChatStreamEvent {
     this.actionId,
     this.actionName,
     this.actionCount,
+    this.title,
   });
 
   factory ChatStreamEvent.chunk(String chunk, bool isDone) {
@@ -361,6 +359,14 @@ class ChatStreamEvent {
       actionId: actionId,
       actionName: actionName,
       actionCount: actionCount,
+    );
+  }
+
+  // New factory for title updates
+  factory ChatStreamEvent.titleUpdate(String title) {
+    return ChatStreamEvent._(
+      type: ChatStreamEventType.titleUpdate,
+      title: title,
     );
   }
 

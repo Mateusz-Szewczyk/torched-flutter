@@ -1,5 +1,4 @@
 import 'package:hive/hive.dart';
-
 part 'cached_conversation.g.dart';
 
 /// Cached conversation model for Hive storage
