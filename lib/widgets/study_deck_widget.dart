@@ -18,14 +18,14 @@ class FlashcardRating {
   });
 
   Map<String, dynamic> toJson() => {
-    'flashcard_id': flashcardId,
-    'rating': rating,
-    'answered_at': answeredAt,
-  };
+        'flashcard_id': flashcardId,
+        'rating': rating,
+        'answered_at': answeredAt,
+      };
 }
 
 /// Study deck widget - Mobile-first flashcard study experience
-/// Features: swipe gestures, 3D flip cards, clean focus-oriented UI
+/// Optimized for Desktop to prevent full-width stretching
 class StudyDeckWidget extends StatefulWidget {
   final Deck deck;
   final int? studySessionId;
@@ -76,6 +76,9 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
   int _easyCount = 0;
   int _goodCount = 0;
   int _hardCount = 0;
+
+  // UI Constant for Desktop constraint
+  static const double _kMaxCardWidth = 600.0;
 
   @override
   void initState() {
@@ -163,6 +166,7 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
   }
 
   void _animateSwipeOut(int direction, VoidCallback onComplete) {
+    // Note: We still use full screen width for flight logic to ensure it leaves the view
     final screenWidth = MediaQuery.of(context).size.width;
     final targetX = direction * screenWidth * 1.5;
 
@@ -193,8 +197,10 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
 
     final currentCard = _cardsQueue[_currentIndex];
 
-    if (rating == 0) _hardCount++;
-    else if (rating == 3) _goodCount++;
+    if (rating == 0)
+      _hardCount++;
+    else if (rating == 3)
+      _goodCount++;
     else if (rating == 5) _easyCount++;
 
     _localRatings.add(FlashcardRating(
@@ -248,7 +254,9 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
   Future<void> _handleSave() async {
     if (_localRatings.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No progress to save yet'), duration: Duration(seconds: 2)),
+        const SnackBar(
+            content: Text('No progress to save yet'),
+            duration: Duration(seconds: 2)),
       );
       return;
     }
@@ -270,7 +278,8 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text('Failed to save: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -286,19 +295,24 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
       context: context,
       showDragHandle: true,
       backgroundColor: cs.surface,
+      constraints: const BoxConstraints(maxWidth: 600), // constrain sheet too
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Current Progress', style: Theme.of(context).textTheme.titleMedium),
+            Text('Current Progress',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _StatChip(label: 'Easy', count: _easyCount, color: Colors.green),
-                _StatChip(label: 'Good', count: _goodCount, color: Colors.orange),
-                _StatChip(label: 'Hard', count: _hardCount, color: Colors.red),
+                _StatChip(
+                    label: 'Easy', count: _easyCount, color: Colors.green),
+                _StatChip(
+                    label: 'Good', count: _goodCount, color: Colors.orange),
+                _StatChip(
+                    label: 'Hard', count: _hardCount, color: Colors.red),
               ],
             ),
           ],
@@ -312,73 +326,88 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
-    if (_cardsQueue.isEmpty) {
-      // Check if no cards were available from the start (next review scheduled)
-      if (_initialTotalCards == 0) {
-        return _buildNoCardsAvailable(context, l10n, cs, isMobile);
-      }
-      // Otherwise, session is complete (user studied all cards)
-      return _buildSessionComplete(context, l10n, cs, isMobile);
-    }
-
-    final currentCard = _cardsQueue[_currentIndex];
-    final progress = _initialTotalCards > 0
-        ? ((_initialTotalCards - _cardsQueue.length) / _initialTotalCards)
-        : 0.0;
-
+    // Use a constraint wrapper for desktop
     return Scaffold(
       backgroundColor: cs.surface,
       body: SafeArea(
-        child: Column(
-          children: [
-            _MinimalStudyAppBar(
-              deckName: widget.deck.name,
-              progress: progress,
-              currentIndex: _initialTotalCards - _cardsQueue.length,
-              total: _initialTotalCards,
-              onClose: widget.onExit,
-              onShowStats: _showStatsBottomSheet,
-              onSave: _handleSave,
-              isSaving: _isSubmitting,
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Center(
-                  child: GestureDetector(
-                    onTap: _handleFlip,
-                    onPanStart: _isFlipped ? _onPanStart : null,
-                    onPanUpdate: _isFlipped ? _onPanUpdate : null,
-                    onPanEnd: _isFlipped ? _onPanEnd : null,
-                    child: Transform.translate(
-                      offset: Offset(_dragX, _dragY),
-                      child: Transform.rotate(
-                        angle: _dragX * 0.0005,
-                        child: _buildCleanFlipCard(currentCard, cs, theme, isMobile),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: _kMaxCardWidth),
+            // Optional: visual distinction on desktop
+            decoration: !isMobile
+                ? BoxDecoration(
+                    color: cs.surface,
+                    border: Border.symmetric(
+                      vertical: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
+                    ),
+                  )
+                : null,
+            child: Column(
+              children: [
+                if (_cardsQueue.isEmpty)
+                  Expanded(
+                    child: _initialTotalCards == 0
+                        ? _buildNoCardsAvailable(context, l10n, cs, isMobile)
+                        : _buildSessionComplete(context, l10n, cs, isMobile),
+                  )
+                else ...[
+                  _MinimalStudyAppBar(
+                    deckName: widget.deck.name,
+                    progress: _initialTotalCards > 0
+                        ? ((_initialTotalCards - _cardsQueue.length) /
+                            _initialTotalCards)
+                        : 0.0,
+                    currentIndex: _initialTotalCards - _cardsQueue.length,
+                    total: _initialTotalCards,
+                    onClose: widget.onExit,
+                    onShowStats: _showStatsBottomSheet,
+                    onSave: _handleSave,
+                    isSaving: _isSubmitting,
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: _handleFlip,
+                          onPanStart: _isFlipped ? _onPanStart : null,
+                          onPanUpdate: _isFlipped ? _onPanUpdate : null,
+                          onPanEnd: _isFlipped ? _onPanEnd : null,
+                          child: Transform.translate(
+                            offset: Offset(_dragX, _dragY),
+                            child: Transform.rotate(
+                              angle: _dragX * 0.0005,
+                              child: _buildCleanFlipCard(
+                                  _cardsQueue[_currentIndex], cs, theme, isMobile),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
+                  _BottomActionsBar(
+                    isFlipped: _isFlipped,
+                    onFlip: _handleFlip,
+                    onHard: () => _handleRating(0),
+                    onGood: () => _handleRating(3),
+                    onEasy: () => _handleRating(5),
+                    l10n: l10n,
+                    cs: cs,
+                  ),
+                ],
+              ],
             ),
-            _BottomActionsBar(
-              isFlipped: _isFlipped,
-              onFlip: _handleFlip,
-              onHard: () => _handleRating(0),
-              onGood: () => _handleRating(3),
-              onEasy: () => _handleRating(5),
-              l10n: l10n,
-              cs: cs,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildCleanFlipCard(Flashcard card, ColorScheme cs, ThemeData theme, bool isMobile) {
+  Widget _buildCleanFlipCard(
+      Flashcard card, ColorScheme cs, ThemeData theme, bool isMobile) {
     return AnimatedBuilder(
       animation: _flipAnimation,
       builder: (context, child) {
@@ -400,7 +429,7 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
                 )
               : Transform(
                   alignment: Alignment.center,
-                  transform: Matrix4.identity()..rotateY(pi), // Naprawa lustrzanego odbicia
+                  transform: Matrix4.identity()..rotateY(pi),
                   child: _buildCardFace(
                     content: card.answer,
                     label: 'ANSWER',
@@ -423,11 +452,21 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
   }) {
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(minHeight: isMobile ? 320 : 400),
+      // Adaptive height: taller on mobile to fill space, fixed reasonable height on desktop
+      constraints: BoxConstraints(
+          minHeight: isMobile ? 320 : 400,
+          maxHeight: isMobile ? double.infinity : 600),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest.withOpacity(0.5),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
       ),
       child: Material(
         color: Colors.transparent,
@@ -436,7 +475,8 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: cs.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(20),
@@ -444,10 +484,9 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
                 child: Text(
                   label,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2
-                  ),
+                      color: cs.primary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2),
                 ),
               ),
               Expanded(
@@ -457,18 +496,17 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
                       content,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        color: cs.onSurface,
-                        fontWeight: FontWeight.w500,
-                        height: 1.4
-                      ),
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4),
                     ),
                   ),
                 ),
               ),
               Text(
-                label == 'QUESTION' ? 'Tap to reveal' : 'Rate your answer',
-                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)
-              ),
+                  label == 'QUESTION' ? 'Tap to reveal' : 'Rate your answer',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant)),
             ],
           ),
         ),
@@ -476,52 +514,63 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     );
   }
 
-  Widget _buildSessionComplete(BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
+  Widget _buildSessionComplete(
+      BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
     final total = _easyCount + _goodCount + _hardCount;
-    final accuracy = total > 0 ? ((_easyCount + _goodCount) / total * 100).round() : 0;
+    final accuracy =
+        total > 0 ? ((_easyCount + _goodCount) / total * 100).round() : 0;
 
-    return Scaffold(
-      backgroundColor: cs.surface,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle_outline, size: 80, color: cs.primary),
-              const SizedBox(height: 24),
-              Text('Session Complete!', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('You reviewed $_initialTotalCards cards with $accuracy% accuracy.', textAlign: TextAlign.center),
-              const SizedBox(height: 40),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _StatChip(label: 'Easy', count: _easyCount, color: Colors.green),
-                  _StatChip(label: 'Good', count: _goodCount, color: Colors.orange),
-                  _StatChip(label: 'Hard', count: _hardCount, color: Colors.red),
-                ],
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle_outline, size: 80, color: cs.primary),
+            const SizedBox(height: 24),
+            Text('Session Complete!',
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('You reviewed $_initialTotalCards cards with $accuracy% accuracy.',
+                textAlign: TextAlign.center),
+            const SizedBox(height: 40),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _StatChip(
+                    label: 'Easy', count: _easyCount, color: Colors.green),
+                _StatChip(
+                    label: 'Good', count: _goodCount, color: Colors.orange),
+                _StatChip(
+                    label: 'Hard', count: _hardCount, color: Colors.red),
+              ],
+            ),
+            const SizedBox(height: 48),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: FilledButton(
+                onPressed: _isSubmitting ? null : _handleFinish,
+                child: _isSubmitting
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Save & Exit'),
               ),
-              const SizedBox(height: 48),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  onPressed: _isSubmitting ? null : _handleFinish,
-                  child: _isSubmitting ? const CircularProgressIndicator(color: Colors.white) : const Text('Save & Exit'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextButton(onPressed: widget.onExit, child: const Text('Discard Session')),
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+                onPressed: widget.onExit,
+                child: const Text('Discard Session')),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildNoCardsAvailable(BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
-    // Format next session date nicely
+  Widget _buildNoCardsAvailable(
+      BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
     String nextSessionText = 'N/A';
     if (widget.nextSessionDate != null) {
       try {
@@ -530,11 +579,14 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
         final difference = nextDate.difference(now);
 
         if (difference.inDays > 0) {
-          nextSessionText = 'in ${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
+          nextSessionText =
+              'in ${difference.inDays} day${difference.inDays > 1 ? 's' : ''}';
         } else if (difference.inHours > 0) {
-          nextSessionText = 'in ${difference.inHours} hour${difference.inHours > 1 ? 's' : ''}';
+          nextSessionText =
+              'in ${difference.inHours} hour${difference.inHours > 1 ? 's' : ''}';
         } else if (difference.inMinutes > 0) {
-          nextSessionText = 'in ${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''}';
+          nextSessionText =
+              'in ${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''}';
         } else {
           nextSessionText = 'now';
         }
@@ -543,109 +595,98 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
       }
     }
 
-    return Scaffold(
-      backgroundColor: cs.surface,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Success icon
-                Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: cs.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.calendar_today_rounded, size: 48, color: cs.primary),
-                ),
-                const SizedBox(height: 32),
-
-                // Title
-                Text(
-                  'All Caught Up! 🎉',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.calendar_today_rounded,
+                  size: 48, color: cs.primary),
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'All Caught Up! 🎉',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-
-                // Description
-                Text(
-                  'You\'ve completed all scheduled reviews for this deck.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'You\'ve completed all scheduled reviews for this deck.',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-
-                // Next review card
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.access_time, size: 20, color: cs.onSurfaceVariant),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Next review: $nextSessionText',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cs.outlineVariant.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 20, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Next review: $nextSessionText',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
-                      ),
-                    ],
                   ),
-                ),
-                const SizedBox(height: 48),
-
-                // Review Hard Cards button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoadingHardCards ? null : _handleReviewHardCards,
-                    icon: _isLoadingHardCards
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
-                          )
-                        : const Icon(Icons.replay_rounded),
-                    label: Text(_isLoadingHardCards ? 'Loading...' : 'Review Hard Cards'),
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      side: BorderSide(color: cs.primary),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Back button
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: FilledButton(
-                    onPressed: widget.onExit,
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    child: const Text('Back to Decks'),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 48),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: _isLoadingHardCards ? null : _handleReviewHardCards,
+                icon: _isLoadingHardCards
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: cs.primary),
+                      )
+                    : const Icon(Icons.replay_rounded),
+                label: Text(
+                    _isLoadingHardCards ? 'Loading...' : 'Review Hard Cards'),
+                style: OutlinedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  side: BorderSide(color: cs.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: FilledButton(
+                onPressed: widget.onExit,
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('Back to Decks'),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -658,8 +699,8 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
       final success = await widget.provider.retakeHardCards();
 
       if (success && mounted) {
-        // Reload with new cards from provider
         final newCards = widget.provider.availableCards;
+        // ignore: unused_local_variable
         final newSessionId = widget.provider.studySessionId;
 
         if (newCards.isNotEmpty) {
@@ -744,20 +785,25 @@ class _MinimalStudyAppBar extends StatelessWidget {
         children: [
           Row(
             children: [
-              // Left side: Deck name and progress counter
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(deckName, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text('$currentIndex / $total cards', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                      Text(deckName,
+                          style: Theme.of(context).textTheme.titleSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      Text('$currentIndex / $total cards',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
                     ],
                   ),
                 ),
               ),
-              // Right side: Stats, Save, Close buttons
               IconButton(
                 onPressed: onShowStats,
                 icon: const Icon(Icons.bar_chart_rounded),
@@ -769,7 +815,8 @@ class _MinimalStudyAppBar extends StatelessWidget {
                     ? SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: cs.primary),
                       )
                     : const Icon(Icons.save_outlined),
                 tooltip: 'Save Progress',
@@ -785,7 +832,10 @@ class _MinimalStudyAppBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: LinearProgressIndicator(value: progress, minHeight: 4, backgroundColor: cs.surfaceContainerHighest),
+              child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  backgroundColor: cs.surfaceContainerHighest),
             ),
           ),
         ],
@@ -819,7 +869,8 @@ class _BottomActionsBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.3))),
+        border: Border(
+            top: BorderSide(color: cs.outlineVariant.withOpacity(0.3))),
       ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),
@@ -827,11 +878,19 @@ class _BottomActionsBar extends StatelessWidget {
             ? Row(
                 key: const ValueKey('rating'),
                 children: [
-                  Expanded(child: _RatingChipButton(label: 'Hard', color: Colors.red, onTap: onHard)),
+                  Expanded(
+                      child: _RatingChipButton(
+                          label: 'Hard', color: Colors.red, onTap: onHard)),
                   const SizedBox(width: 12),
-                  Expanded(child: _RatingChipButton(label: 'Good', color: Colors.orange, onTap: onGood)),
+                  Expanded(
+                      child: _RatingChipButton(
+                          label: 'Good',
+                          color: Colors.orange,
+                          onTap: onGood)),
                   const SizedBox(width: 12),
-                  Expanded(child: _RatingChipButton(label: 'Easy', color: Colors.green, onTap: onEasy)),
+                  Expanded(
+                      child: _RatingChipButton(
+                          label: 'Easy', color: Colors.green, onTap: onEasy)),
                 ],
               )
             : SizedBox(
@@ -840,8 +899,12 @@ class _BottomActionsBar extends StatelessWidget {
                 height: 56,
                 child: FilledButton(
                   onPressed: onFlip,
-                  style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                  child: const Text('Show Answer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16))),
+                  child: const Text('Show Answer',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),
               ),
       ),
@@ -854,7 +917,8 @@ class _RatingChipButton extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _RatingChipButton({required this.label, required this.color, required this.onTap});
+  const _RatingChipButton(
+      {required this.label, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -867,7 +931,8 @@ class _RatingChipButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 16),
           alignment: Alignment.center,
-          child: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+          child: Text(label,
+              style: TextStyle(color: color, fontWeight: FontWeight.bold)),
         ),
       ),
     );
@@ -879,14 +944,23 @@ class _StatChip extends StatelessWidget {
   final int count;
   final Color color;
 
-  const _StatChip({required this.label, required this.count, required this.color});
+  const _StatChip(
+      {required this.label, required this.count, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text('$count', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: color, fontWeight: FontWeight.bold)),
-        Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color.withOpacity(0.7))),
+        Text('$count',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(color: color, fontWeight: FontWeight.bold)),
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: color.withOpacity(0.7))),
       ],
     );
   }

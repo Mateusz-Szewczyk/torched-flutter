@@ -686,4 +686,10 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get errorLoadingData => 'Błąd ładowania danych';
+
+  @override
+  String get incorrect => 'Incorrect';
+
+  @override
+  String get time => 'Time';
 }

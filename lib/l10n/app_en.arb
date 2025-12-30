@@ -235,5 +235,7 @@
   "less": "Less",
   "more": "More",
   "scheduled": "Scheduled",
-  "errorLoadingData": "Error loading data"
+  "errorLoadingData": "Error loading data",
+  "incorrect": "Incorrect",
+  "time": "Time"
 }

@@ -20,6 +20,9 @@ class _ExamsScreenState extends State<ExamsScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
+  // Desktop constraint
+  static const double _kMaxContentWidth = 1000.0;
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +52,23 @@ class _ExamsScreenState extends State<ExamsScreen> {
         }
 
         // Main content
-        return _buildMainContent(context, provider);
+        return Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          body: Center(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
+              child: _buildMainContent(context, provider),
+            ),
+          ),
+          // Keep FAB for mobile convenience
+          floatingActionButton: provider.examInfos.isNotEmpty
+              ? FloatingActionButton(
+                  onPressed: () => _showCreateExamDialog(context, provider),
+                  child: const Icon(Icons.add),
+                  tooltip: AppLocalizations.of(context)?.createExam ?? 'Create Exam',
+                )
+              : null,
+        );
       },
     );
   }
@@ -69,88 +88,113 @@ class _ExamsScreenState extends State<ExamsScreen> {
       return _buildErrorState(context, provider, l10n, colorScheme);
     }
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: provider.fetchExamInfos,
-        child: CustomScrollView(
-          slivers: [
-            // Header
+    return RefreshIndicator(
+      onRefresh: provider.fetchExamInfos,
+      child: CustomScrollView(
+        slivers: [
+          // Header
+          SliverToBoxAdapter(
+            child: _buildHeaderAndActions(context, provider, l10n, colorScheme),
+          ),
+
+          // Empty state or content
+          if (provider.examInfos.isEmpty)
+            SliverFillRemaining(
+              child: _buildEmptyState(context, provider, l10n, colorScheme),
+            )
+          else ...[
+            // Search and filter bar
             SliverToBoxAdapter(
-              child: _buildHeader(context, l10n, colorScheme),
+              child: _buildSearchAndFilterBar(context, provider, l10n, colorScheme),
             ),
 
-            // Empty state or content
-            if (provider.examInfos.isEmpty)
-              SliverFillRemaining(
-                child: _buildEmptyState(context, provider, l10n, colorScheme),
-              )
-            else ...[
-              // Search and filter bar
-              SliverToBoxAdapter(
-                child: _buildSearchAndFilterBar(context, provider, l10n, colorScheme),
-              ),
-
-              // Exam grid
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 400,
-                    childAspectRatio: MediaQuery.of(context).size.width > 600
-                        ? 1.5
-                        : 1.3,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final examInfo = provider.filteredExamInfos[index];
-                      return _ExamCard(
-                        examInfo: examInfo,
-                        onStudy: () => _handleStudy(context, provider, examInfo),
-                        onEdit: () => _showEditExamDialog(context, provider, examInfo),
-                        onDelete: () => _showDeleteConfirmation(context, provider, examInfo),
-                        onShare: () => _handleShare(context, provider, examInfo),
-                        onRemoveShared: () => _handleRemoveShared(context, provider, examInfo),
-                      );
-                    },
-                    childCount: provider.filteredExamInfos.length,
-                  ),
+            // Exam grid
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 450,
+                  childAspectRatio: MediaQuery.of(context).size.width > 600
+                      ? 1.6
+                      : 1.4,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final examInfo = provider.filteredExamInfos[index];
+                    return _ExamCard(
+                      examInfo: examInfo,
+                      onStudy: () => _handleStudy(context, provider, examInfo),
+                      onEdit: () => _showEditExamDialog(context, provider, examInfo),
+                      onDelete: () => _showDeleteConfirmation(context, provider, examInfo),
+                      onShare: () => _handleShare(context, provider, examInfo),
+                      onRemoveShared: () => _handleRemoveShared(context, provider, examInfo),
+                    );
+                  },
+                  childCount: provider.filteredExamInfos.length,
                 ),
               ),
-            ],
+            ),
+
+            // Bottom padding for FAB
+            const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
-        ),
+        ],
       ),
-      floatingActionButton: provider.examInfos.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () => _showCreateExamDialog(context, provider),
-              icon: const Icon(Icons.add),
-              label: Text(l10n?.createExam ?? 'Create Exam'),
-            )
-          : null,
     );
   }
 
-  Widget _buildHeader(BuildContext context, AppLocalizations? l10n, ColorScheme colorScheme) {
+  Widget _buildHeaderAndActions(BuildContext context, ExamsProvider provider,
+      AppLocalizations? l10n, ColorScheme colorScheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             l10n?.tests ?? 'Tests',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
           ),
           const SizedBox(height: 8),
           Text(
             l10n?.testsDescription ?? 'Create and take practice exams to test your knowledge',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 24),
+
+          // Action Bar
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _showCreateExamDialog(context, provider),
+                  icon: const Icon(Icons.add),
+                  label: Text(l10n?.createExam ?? 'Create Exam'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _showAddByCodeDialog(context, provider),
+                  icon: const Icon(Icons.download_rounded),
+                  label: Text(l10n?.addByCode ?? 'Add by Code'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _showManageSharesDialog(context, provider),
+                  icon: const Icon(Icons.people_outline),
+                  label: Text(l10n?.manageShares ?? 'Shared'),
+                ),
+              ],
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -158,19 +202,17 @@ class _ExamsScreenState extends State<ExamsScreen> {
   }
 
   Widget _buildLoadingState(ColorScheme colorScheme) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: colorScheme.primary),
-            const SizedBox(height: 16),
-            Text(
-              'Loading exams...',
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(color: colorScheme.primary),
+          const SizedBox(height: 16),
+          Text(
+            'Loading exams...',
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
       ),
     );
   }
@@ -181,38 +223,36 @@ class _ExamsScreenState extends State<ExamsScreen> {
     AppLocalizations? l10n,
     ColorScheme colorScheme,
   ) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-              const SizedBox(height: 16),
-              Text(
-                l10n?.error ?? 'Error',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: colorScheme.error,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                provider.error ?? l10n?.errorOccurred ?? 'An error occurred',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
-              FilledButton.icon(
-                onPressed: () {
-                  provider.clearError();
-                  provider.fetchExamInfos();
-                },
-                icon: const Icon(Icons.refresh),
-                label: Text(l10n?.try_again ?? 'Try Again'),
-              ),
-            ],
-          ),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: colorScheme.error),
+            const SizedBox(height: 16),
+            Text(
+              l10n?.error ?? 'Error',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: colorScheme.error,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              provider.error ?? l10n?.errorOccurred ?? 'An error occurred',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: () {
+                provider.clearError();
+                provider.fetchExamInfos();
+              },
+              icon: const Icon(Icons.refresh),
+              label: Text(l10n?.try_again ?? 'Try Again'),
+            ),
+          ],
         ),
       ),
     );
@@ -231,47 +271,27 @@ class _ExamsScreenState extends State<ExamsScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 96,
-              height: 96,
+              width: 120,
+              height: 120,
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.5),
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.quiz_outlined,
-                size: 48,
-                color: colorScheme.primary,
-              ),
+              child: Icon(Icons.quiz_outlined, size: 48, color: colorScheme.primary),
             ),
             const SizedBox(height: 24),
             Text(
               l10n?.welcomeTests ?? 'Welcome to Tests',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
-              l10n?.getStartedCreateTest ?? 'Create your first exam or add one using a share code',
+              l10n?.getStartedCreateTest ??
+                  'Create your first exam or add one using a share code',
               textAlign: TextAlign.center,
               style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _showCreateExamDialog(context, provider),
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n?.createExam ?? 'Create Exam'),
-                ),
-                const SizedBox(width: 16),
-                OutlinedButton.icon(
-                  onPressed: () => _showAddByCodeDialog(context, provider),
-                  icon: const Icon(Icons.download),
-                  label: Text(l10n?.addByCode ?? 'Add by Code'),
-                ),
-              ],
             ),
           ],
         ),
@@ -286,68 +306,63 @@ class _ExamsScreenState extends State<ExamsScreen> {
     ColorScheme colorScheme,
   ) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          // Search bar
-          TextField(
-            controller: _searchController,
-            focusNode: _searchFocusNode,
-            decoration: InputDecoration(
-              hintText: l10n?.searchExams ?? 'Search exams...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        provider.setSearchQuery('');
-                      },
-                    )
-                  : null,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  decoration: InputDecoration(
+                    hintText: l10n?.searchExams ?? 'Search exams...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              provider.setSearchQuery('');
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  onChanged: provider.setSearchQuery,
+                ),
               ),
-              filled: true,
-              fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-            ),
-            onChanged: provider.setSearchQuery,
-          ),
-          const SizedBox(height: 12),
-
-          // Filter and action buttons
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _SortDropdown(
+              const SizedBox(width: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  border: Border.all(color: colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _SortDropdown(
                   sortBy: provider.sortBy,
                   onChanged: provider.setSortBy,
                 ),
-                const SizedBox(width: 8),
-                IconButton.outlined(
-                  onPressed: provider.toggleSortDirection,
-                  icon: Icon(
-                    provider.sortDirection == SortDirection.asc
-                        ? Icons.arrow_upward
-                        : Icons.arrow_downward,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                onPressed: provider.toggleSortDirection,
+                icon: Icon(
+                  provider.sortDirection == SortDirection.asc
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _showAddByCodeDialog(context, provider),
-                  icon: const Icon(Icons.download, size: 18),
-                  label: Text(l10n?.addByCode ?? 'Add by Code'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _showManageSharesDialog(context, provider),
-                  icon: const Icon(Icons.people, size: 18),
-                  label: Text(l10n?.manageShares ?? 'Manage Shares'),
-                ),
-              ],
-            ),
+                tooltip: provider.sortDirection == SortDirection.asc
+                    ? 'Ascending'
+                    : 'Descending',
+              ),
+            ],
           ),
         ],
       ),
@@ -385,6 +400,7 @@ class _ExamsScreenState extends State<ExamsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Share code copied: $shareCode'),
+          behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
             label: 'Copy',
             onPressed: () {
@@ -548,7 +564,10 @@ class _ExamsScreenState extends State<ExamsScreen> {
       final success = await provider.deleteExam(examInfo.id);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n?.examDeleted ?? 'Exam deleted')),
+          SnackBar(
+            content: Text(l10n?.examDeleted ?? 'Exam deleted'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     }
@@ -599,6 +618,11 @@ class _ExamCard extends StatelessWidget {
     final isShared = examInfo.accessType == 'shared' || examInfo.isOwn == false;
 
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onStudy,
@@ -609,6 +633,7 @@ class _ExamCard extends StatelessWidget {
             children: [
               // Header
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Column(
@@ -619,50 +644,25 @@ class _ExamCard extends StatelessWidget {
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.quiz,
-                              size: 14,
-                              color: colorScheme.primary,
+                        if (examInfo.description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            examInfo.description,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${examInfo.questionCount} ${l10n?.questions ?? 'questions'}',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            if (isShared) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondaryContainer,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  l10n?.shared ?? 'Shared',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: colorScheme.onSecondaryContainer,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
+                    icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
                     onSelected: (value) {
                       switch (value) {
                         case 'edit':
@@ -722,7 +722,7 @@ class _ExamCard extends StatelessWidget {
                               Icon(Icons.remove_circle, size: 18, color: colorScheme.error),
                               const SizedBox(width: 8),
                               Text(
-                                l10n?.removeFromLibrary ?? 'Remove from library',
+                                l10n?.removeFromLibrary ?? 'Remove',
                                 style: TextStyle(color: colorScheme.error),
                               ),
                             ],
@@ -732,25 +732,35 @@ class _ExamCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
 
-              // Description
-              if (examInfo.description.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Expanded(
-                  child: Text(
-                    examInfo.description,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+              // Badges
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _Badge(
+                    icon: Icons.quiz,
+                    label: '${examInfo.questionCount}',
+                    color: colorScheme.secondary,
+                    bgColor: colorScheme.secondaryContainer,
+                    textColor: colorScheme.onSecondaryContainer,
                   ),
-                ),
-              ] else
-                const Spacer(),
+                  if (isShared)
+                    _Badge(
+                      icon: Icons.people,
+                      label: l10n?.shared ?? 'Shared',
+                      color: colorScheme.tertiary,
+                      bgColor: colorScheme.tertiaryContainer,
+                      textColor: colorScheme.onTertiaryContainer,
+                    ),
+                ],
+              ),
+
+              const Spacer(),
+              const Divider(height: 24),
 
               // Footer
-              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -759,8 +769,8 @@ class _ExamCard extends StatelessWidget {
                     icon: const Icon(Icons.play_arrow, size: 18),
                     label: Text(l10n?.startExam ?? 'Start'),
                     style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      visualDensity: VisualDensity.compact,
                     ),
                   ),
                 ],
@@ -768,6 +778,48 @@ class _ExamCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bgColor;
+  final Color textColor;
+
+  const _Badge({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bgColor,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -790,51 +842,31 @@ class _SortDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
-    return PopupMenuButton<ExamSortOption>(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.sort, size: 18),
-            const SizedBox(width: 8),
-            Text(_getSortLabel(sortBy, l10n)),
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_drop_down, size: 18),
-          ],
-        ),
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<ExamSortOption>(
+        value: sortBy,
+        icon: const Icon(Icons.arrow_drop_down),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        borderRadius: BorderRadius.circular(12),
+        items: [
+          DropdownMenuItem(
+            value: ExamSortOption.name,
+            child: Text(l10n?.name ?? 'Name'),
+          ),
+          DropdownMenuItem(
+            value: ExamSortOption.questions,
+            child: Text(l10n?.questions ?? 'Questions'),
+          ),
+          DropdownMenuItem(
+            value: ExamSortOption.recent,
+            child: Text(l10n?.recent ?? 'Recent'),
+          ),
+        ],
+        onChanged: (v) {
+          if (v != null) onChanged(v);
+        },
       ),
-      onSelected: onChanged,
-      itemBuilder: (context) => [
-        PopupMenuItem(
-          value: ExamSortOption.name,
-          child: Text(l10n?.name ?? 'Name'),
-        ),
-        PopupMenuItem(
-          value: ExamSortOption.questions,
-          child: Text(l10n?.questions ?? 'Questions'),
-        ),
-        PopupMenuItem(
-          value: ExamSortOption.recent,
-          child: Text(l10n?.recent ?? 'Recent'),
-        ),
-      ],
     );
-  }
-
-  String _getSortLabel(ExamSortOption option, AppLocalizations? l10n) {
-    switch (option) {
-      case ExamSortOption.name:
-        return l10n?.name ?? 'Name';
-      case ExamSortOption.questions:
-        return l10n?.questions ?? 'Questions';
-      case ExamSortOption.recent:
-        return l10n?.recent ?? 'Recent';
-    }
   }
 }
 
@@ -947,14 +979,14 @@ class _EditExamDialogState extends State<_EditExamDialog> {
     final l10n = AppLocalizations.of(context);
 
     return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 700, maxHeight: 800),
+        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: Row(
                 children: [
                   Text(
@@ -976,7 +1008,7 @@ class _EditExamDialogState extends State<_EditExamDialog> {
             // Content
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(24),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -987,6 +1019,7 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                         decoration: InputDecoration(
                           labelText: l10n?.examName ?? 'Exam Name',
                           border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.title),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
@@ -996,33 +1029,31 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
-
                       TextFormField(
                         controller: _descriptionController,
                         decoration: InputDecoration(
                           labelText: l10n?.description ?? 'Description (optional)',
                           border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.description),
                         ),
                         maxLines: 2,
                       ),
-                      const SizedBox(height: 24),
-
+                      const SizedBox(height: 32),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             l10n?.questions ?? 'Questions',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const Spacer(),
-                          TextButton.icon(
+                          FilledButton.tonalIcon(
                             onPressed: _addQuestion,
                             icon: const Icon(Icons.add),
                             label: Text(l10n?.addQuestion ?? 'Add Question'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-
+                      const SizedBox(height: 16),
                       ...List.generate(_questions.length, (index) {
                         return _QuestionInputWidget(
                           key: ValueKey(index),
@@ -1039,9 +1070,8 @@ class _EditExamDialogState extends State<_EditExamDialog> {
             ),
 
             // Footer
-            const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(24),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -1049,14 +1079,14 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                     onPressed: () => Navigator.pop(context),
                     child: Text(l10n?.cancel ?? 'Cancel'),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 16),
                   FilledButton(
                     onPressed: _isSaving ? null : _save,
                     child: _isSaving
                         ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : Text(l10n?.save ?? 'Save'),
                   ),
@@ -1120,87 +1150,106 @@ class _QuestionInputWidgetState extends State<_QuestionInputWidget> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
+    final cs = Theme.of(context).colorScheme;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withOpacity(0.5),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
               children: [
                 Text(
                   '${l10n?.question ?? 'Question'} ${widget.index}',
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
                 ),
                 const Spacer(),
                 if (widget.canDelete)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: widget.onDelete,
-                    color: colorScheme.error,
+                  InkWell(
+                    onTap: widget.onDelete,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Icon(Icons.close, size: 20, color: cs.error),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
-            TextFormField(
-              initialValue: widget.input.text,
-              decoration: InputDecoration(
-                labelText: l10n?.questionText ?? 'Question text',
-                border: const OutlineInputBorder(),
-              ),
-              maxLines: 2,
-              onChanged: (value) => widget.input.text = value,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n?.answers ?? 'Answers',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 8),
-            ...widget.input.answers.asMap().entries.map((entry) {
-              final answerIndex = entry.key;
-              final answer = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Radio<int>(
-                      value: answerIndex,
-                      groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
-                      onChanged: (value) {
-                        setState(() {
-                          for (var a in widget.input.answers) {
-                            a.isCorrect = false;
-                          }
-                          if (value != null) {
-                            widget.input.answers[value].isCorrect = true;
-                          }
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: answer.text,
-                        decoration: InputDecoration(
-                          hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  initialValue: widget.input.text,
+                  decoration: InputDecoration(
+                    labelText: l10n?.questionText ?? 'Question text',
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: cs.surface,
+                  ),
+                  maxLines: 2,
+                  onChanged: (value) => widget.input.text = value,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  l10n?.answers ?? 'Answers (Select correct one)',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                ...widget.input.answers.asMap().entries.map((entry) {
+                  final answerIndex = entry.key;
+                  final answer = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Radio<int>(
+                          value: answerIndex,
+                          groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
+                          onChanged: (value) {
+                            setState(() {
+                              for (var a in widget.input.answers) {
+                                a.isCorrect = false;
+                              }
+                              if (value != null) {
+                                widget.input.answers[value].isCorrect = true;
+                              }
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: TextFormField(
+                            initialValue: answer.text,
+                            decoration: InputDecoration(
+                              hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
+                              border: const OutlineInputBorder(),
+                              filled: true,
+                              fillColor: cs.surface,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            onChanged: (value) => answer.text = value,
                           ),
                         ),
-                        onChanged: (value) => answer.text = value,
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1249,6 +1298,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                 labelText: l10n?.shareCode ?? 'Share Code',
                 hintText: 'XXXXXXXXXXXX',
                 border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.key),
               ),
               textCapitalization: TextCapitalization.characters,
               maxLength: 12,
@@ -1273,14 +1323,18 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                 if (info == null) return const SizedBox.shrink();
 
                 return Card(
+                  elevation: 0,
+                  color: colorScheme.surfaceContainerHighest,
                   child: Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           info.name,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -1295,15 +1349,17 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                           ),
                         ],
                         if (info.alreadyAdded == true) ...[
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 12),
                           Row(
                             children: [
                               Icon(Icons.check_circle,
                                   size: 16, color: colorScheme.primary),
                               const SizedBox(width: 4),
-                              Text(
-                                l10n?.alreadyAdded ?? 'Already in your library',
-                                style: TextStyle(color: colorScheme.primary),
+                              Expanded(
+                                child: Text(
+                                  l10n?.alreadyAdded ?? 'Already in your library',
+                                  style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ],
                           ),
@@ -1380,38 +1436,52 @@ class _ManageSharesDialog extends StatelessWidget {
           builder: (context, _) {
             if (provider.mySharedCodes.isEmpty) {
               return Center(
-                child: Text(
-                  l10n?.noSharedExams ?? 'No shared exams yet',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.share_outlined,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.outlineVariant),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n?.noSharedExams ?? 'No shared exams yet',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
 
-            return ListView.builder(
+            return ListView.separated(
               itemCount: provider.mySharedCodes.length,
+              separatorBuilder: (c, i) => const Divider(),
               itemBuilder: (context, index) {
                 final code = provider.mySharedCodes[index];
                 return ListTile(
-                  title: Text(code.contentName),
-                  subtitle: Text('${code.itemCount} questions • ${code.accessCount} uses'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(code.contentName, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text('${code.itemCount} questions • ${code.accessCount} users'),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.copy),
+                      IconButton.filledTonal(
+                        icon: const Icon(Icons.copy, size: 18),
                         onPressed: () {
                           Clipboard.setData(ClipboardData(text: code.shareCode));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Code copied: ${code.shareCode}'),
+                              behavior: SnackBarBehavior.floating,
                             ),
                           );
                         },
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
+                      const SizedBox(width: 8),
+                      IconButton.outlined(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        color: Theme.of(context).colorScheme.error,
                         onPressed: () async {
                           await provider.deactivateShareCode(code.shareCode);
                         },
@@ -1425,7 +1495,7 @@ class _ManageSharesDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        FilledButton(
+        TextButton(
           onPressed: () => Navigator.pop(context),
           child: Text(l10n?.close ?? 'Close'),
         ),
@@ -1433,4 +1503,3 @@ class _ManageSharesDialog extends StatelessWidget {
     );
   }
 }
-

@@ -688,4 +688,10 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get errorLoadingData => 'Error loading data';
+
+  @override
+  String get incorrect => 'Incorrect';
+
+  @override
+  String get time => 'Time';
 }
