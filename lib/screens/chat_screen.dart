@@ -487,11 +487,11 @@ class _ChatScreenState extends State<ChatScreen> {
         margin: const EdgeInsets.only(bottom: 32, left: 16, right: 16),
         // The main Pill
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHigh.withOpacity(0.4), // Slightly distinct from bg
+          color: colorScheme.surfaceContainerHigh.withOpacity(0.9),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.8),
               blurRadius: 20,
               spreadRadius: 0,
               offset: const Offset(0, 4),

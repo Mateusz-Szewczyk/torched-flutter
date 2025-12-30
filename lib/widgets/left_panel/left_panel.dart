@@ -628,44 +628,52 @@ class _SubscriptionInfo extends StatelessWidget {
     final decksProgress = _calcProgress(usage?['decks'] as num?, limits?['max_decks'] as num?);
     final questionsProgress = _calcProgress(usage?['questions_period'] as num?, limits?['max_questions_period'] as num?);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                (role == 'user'.toLowerCase()) ? 'free'.toUpperCase() : role.toUpperCase(),
-                style: TextStyle(
-                  fontSize: isMobile ? 12 : 11,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).primaryColor,
-                ),
+ return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              (role == 'user'.toLowerCase()) ? 'free'.toUpperCase() : role.toUpperCase(),
+              style: TextStyle(
+                fontSize: isMobile ? 12 : 11,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).primaryColor,
               ),
             ),
-            const SizedBox(width: 8),
-            if (role.toLowerCase() == 'user')
-              TextButton(
-                onPressed: () => _showSubscriptionView(context),
-                child: const Text('Upgrade'),
+          ),
+          // Uses Spacer to push the Upgrade button to the far right
+          const Spacer(),
+          if (role.toLowerCase() == 'user')
+            TextButton(
+              onPressed: () => _showSubscriptionView(context),
+              style: TextButton.styleFrom(
+                // Adds the custom border color
+                side: const BorderSide(color: Color(0xFFed8838)),
+                // Optional: sets the text color to match the border (remove if you prefer default theme color)
+                foregroundColor: const Color(0xFFed8838),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (isPanelVisible) ...[
-          _buildUsageRow(context, 'Files', usage?['files']?.toString() ?? '0', limits?['max_files']),
-          const SizedBox(height: 6),
-          _buildUsageRow(context, 'Decks', usage?['decks']?.toString() ?? '0', limits?['max_decks']),
-          const SizedBox(height: 6),
-          _buildUsageRow(context, 'Questions (period)', usage?['questions_period']?.toString() ?? '0', limits?['max_questions_period']),
+              child: const Text('Upgrade'),
+            ),
         ],
+      ),
+      const SizedBox(height: 8),
+      if (isPanelVisible) ...[
+        _buildUsageRow(context, 'Files', usage?['files']?.toString() ?? '0', limits?['max_files']),
+        const SizedBox(height: 6),
+        _buildUsageRow(context, 'Decks', usage?['decks']?.toString() ?? '0', limits?['max_decks']),
+        const SizedBox(height: 6),
+        _buildUsageRow(context, 'Questions (period)', usage?['questions_period']?.toString() ?? '0', limits?['max_questions_period']),
       ],
-    );
+    ],
+  );
   }
 
   Widget _buildUsageRow(BuildContext context, String label, String usedText, dynamic limit) {
