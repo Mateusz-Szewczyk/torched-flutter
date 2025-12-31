@@ -71,8 +71,7 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     });
   }
 
-  List<ExamQuestion> _selectRandomQuestions(
-      List<ExamQuestion> all, int count) {
+  List<ExamQuestion> _selectRandomQuestions(List<ExamQuestion> all, int count) {
     final shuffled = List<ExamQuestion>.from(all)..shuffle(Random());
     return shuffled.take(count).toList();
   }
@@ -198,27 +197,34 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // This wrapper ensures that whatever step we are in, the background matches
+    final bool isDesktop = MediaQuery.of(context).size.width > _kMaxContentWidth;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
-            // On desktop, add a subtle border/shadow to separate from background
-            decoration: MediaQuery.of(context).size.width > _kMaxContentWidth
-                ? BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  )
-                : null,
-            child: _buildContent(context),
+          // Allows scrolling on small screens, but centers content on large ones
+          child: SingleChildScrollView(
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
+              margin: const EdgeInsets.symmetric(vertical: 24),
+              // On desktop, add a subtle border/shadow to separate from background
+              decoration: isDesktop
+                  ? BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    )
+                  : null,
+              clipBehavior: isDesktop ? Clip.antiAlias : Clip.none,
+              child: _buildContent(context),
+            ),
           ),
         ),
       ),
@@ -245,32 +251,29 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
 
     if (totalQuestions == 0) {
       return Column(
+        mainAxisSize: MainAxisSize.min, // Shrink to fit
         children: [
           _buildAppBar(context, title: widget.exam.name),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.quiz_outlined,
-                        size: 64, color: colorScheme.surfaceContainerHighest),
-                    const SizedBox(height: 24),
-                    Text(
-                      l10n?.examHasNoQuestions ?? 'This exam has no questions.',
-                      style: theme.textTheme.titleMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    FilledButton.icon(
-                      onPressed: widget.onExit,
-                      icon: const Icon(Icons.arrow_back),
-                      label: Text(l10n?.backToExams ?? 'Back to Exams'),
-                    ),
-                  ],
+          Padding(
+            padding: const EdgeInsets.all(48),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.quiz_outlined,
+                    size: 64, color: colorScheme.surfaceContainerHighest),
+                const SizedBox(height: 24),
+                Text(
+                  l10n?.examHasNoQuestions ?? 'This exam has no questions.',
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
                 ),
-              ),
+                const SizedBox(height: 24),
+                FilledButton.icon(
+                  onPressed: widget.onExit,
+                  icon: const Icon(Icons.arrow_back),
+                  label: Text(l10n?.backToExams ?? 'Back to Exams'),
+                ),
+              ],
             ),
           ),
         ],
@@ -286,115 +289,111 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     final sliderDivisions = max(1, maxQuestions - 1);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _buildAppBar(context, title: widget.exam.name),
-        Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n?.selectNumberOfQuestions ?? 'Select Number of Questions',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
+
+              // Stats Cards
+              Row(
                 children: [
-                  Text(
-                    l10n?.selectNumberOfQuestions ??
-                        'Select Number of Questions',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Stats Cards
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInfoCard(
-                          context,
-                          '$_numQuestions',
-                          l10n?.questions ?? 'Questions',
-                          Icons.question_answer_outlined,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildInfoCard(
-                          context,
-                          '~${(_numQuestions * 0.7).ceil()}m',
-                          l10n?.estimatedTime ?? 'Est. Time',
-                          Icons.timer_outlined,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Slider Control
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(16),
-                      border:
-                          Border.all(color: colorScheme.outlineVariant, width: 0.5),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('1', style: theme.textTheme.bodyMedium),
-                            Text(
-                              '$_numQuestions',
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.primary),
-                            ),
-                            Text('$maxQuestions',
-                                style: theme.textTheme.bodyMedium),
-                          ],
-                        ),
-                        SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 8,
-                            thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 12),
-                            overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 24),
-                          ),
-                          child: Slider(
-                            value: _numQuestions.toDouble(),
-                            min: 1,
-                            max: maxQuestions.toDouble(),
-                            divisions: sliderDivisions,
-                            label: _numQuestions.toString(),
-                            onChanged: (value) {
-                              setState(() {
-                                _numQuestions = value.round();
-                              });
-                            },
-                          ),
-                        ),
-                      ],
+                  Expanded(
+                    child: _buildInfoCard(
+                      context,
+                      '$_numQuestions',
+                      l10n?.questions ?? 'Questions',
+                      Icons.question_answer_outlined,
                     ),
                   ),
-                  const SizedBox(height: 40),
-
-                  FilledButton.icon(
-                    onPressed: _startExam,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                    label: Text(l10n?.startExam ?? 'Start Exam'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      textStyle: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildInfoCard(
+                      context,
+                      '~${(_numQuestions * 0.7).ceil()}m',
+                      l10n?.estimatedTime ?? 'Est. Time',
+                      Icons.timer_outlined,
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 40),
+
+              // Slider Control
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(16),
+                  border:
+                      Border.all(color: colorScheme.outlineVariant, width: 0.5),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('1', style: theme.textTheme.bodyMedium),
+                        Text(
+                          '$_numQuestions',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary),
+                        ),
+                        Text('$maxQuestions',
+                            style: theme.textTheme.bodyMedium),
+                      ],
+                    ),
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 8,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 12),
+                        overlayShape:
+                            const RoundSliderOverlayShape(overlayRadius: 24),
+                      ),
+                      child: Slider(
+                        value: _numQuestions.toDouble(),
+                        min: 1,
+                        max: maxQuestions.toDouble(),
+                        divisions: sliderDivisions,
+                        label: _numQuestions.toString(),
+                        onChanged: (value) {
+                          setState(() {
+                            _numQuestions = value.round();
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 40),
+
+              FilledButton.icon(
+                onPressed: _startExam,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(l10n?.startExam ?? 'Start Exam'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -447,56 +446,44 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     final progress = total > 0 ? (_currentQuestionIndex + 1) / total : 0.0;
 
     return Column(
+      mainAxisSize: MainAxisSize.min, // Important for centering
       children: [
         _buildExamAppBar(context, total, progress),
-        Expanded(
-          child: total == 0
-              ? const SizedBox.shrink()
-              : Column(
-                  children: [
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 100),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Question ${_currentQuestionIndex + 1}',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              currentQuestion!.text,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w500,
-                                height: 1.3,
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-                            ...currentQuestion.answers
-                                .asMap()
-                                .entries
-                                .map((entry) {
-                              return _buildAnswerOption(
-                                entry.key,
-                                entry.value,
-                                selectedAnswerId,
-                                isAnswered,
-                                colorScheme,
-                              );
-                            }),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
+        if (total > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Question ${_currentQuestionIndex + 1}',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-        ),
-        _buildBottomBar(
-            context, l10n, isAnswered, total, colorScheme),
+                const SizedBox(height: 8),
+                Text(
+                  currentQuestion!.text,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ...currentQuestion.answers.asMap().entries.map((entry) {
+                  return _buildAnswerOption(
+                    entry.key,
+                    entry.value,
+                    selectedAnswerId,
+                    isAnswered,
+                    colorScheme,
+                  );
+                }),
+              ],
+            ),
+          ),
+        _buildBottomBar(context, l10n, isAnswered, total, colorScheme),
       ],
     );
   }
@@ -583,7 +570,8 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
                     answer.text,
                     style: TextStyle(
                       color: textColor,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.normal,
                       fontSize: 16,
                     ),
                   ),
@@ -610,143 +598,144 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     final isPassing = scorePercentage >= 70;
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         _buildAppBar(context, title: l10n?.examComplete ?? 'Exam Complete'),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: isPassing
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isPassing ? Icons.emoji_events_rounded : Icons.school_rounded,
-                    size: 64,
-                    color: isPassing ? Colors.green : Colors.orange,
-                  ),
+        Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: isPassing
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.orange.withOpacity(0.1),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  isPassing
-                      ? l10n?.congratulationsPassed ?? 'Passed!'
-                      : l10n?.keepPracticing ?? 'Keep Learning!',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Icon(
+                  isPassing ? Icons.emoji_events_rounded : Icons.school_rounded,
+                  size: 64,
+                  color: isPassing ? Colors.green : Colors.orange,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'You scored $scorePercentage%',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                isPassing
+                    ? l10n?.congratulationsPassed ?? 'Passed!'
+                    : l10n?.keepPracticing ?? 'Keep Learning!',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 32),
-
-                // Main Score Card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildResultStat(
-                        context,
-                        '$_score',
-                        l10n?.correct ?? 'Correct',
-                        Colors.green,
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: colorScheme.outlineVariant,
-                      ),
-                      _buildResultStat(
-                        context,
-                        '${totalQuestions - _score}',
-                        l10n?.incorrect ?? 'Wrong',
-                        Colors.red,
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: colorScheme.outlineVariant,
-                      ),
-                      _buildResultStat(
-                        context,
-                        _elapsedTime,
-                        l10n?.time ?? 'Time',
-                        colorScheme.primary,
-                      ),
-                    ],
-                  ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You scored $scorePercentage%',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: 32),
+              ),
+              const SizedBox(height: 32),
 
-                if (_isSubmitting)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                else if (_resultSubmitted)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check, size: 16, color: Colors.green),
-                        const SizedBox(width: 8),
-                        Text(l10n?.resultsSaved ?? 'Results saved',
-                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  )
-                else if (_submitError != null)
-                  Text(_submitError!, style: const TextStyle(color: Colors.red)),
-
-                const SizedBox(height: 40),
-
-                Row(
+              // Main Score Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _restartExam,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: Text(l10n?.tryAgain ?? 'Try Again'),
-                      ),
+                    _buildResultStat(
+                      context,
+                      '$_score',
+                      l10n?.correct ?? 'Correct',
+                      Colors.green,
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: widget.onExit,
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: Text(l10n?.backToExams ?? 'Exit'),
-                      ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: colorScheme.outlineVariant,
+                    ),
+                    _buildResultStat(
+                      context,
+                      '${totalQuestions - _score}',
+                      l10n?.incorrect ?? 'Wrong',
+                      Colors.red,
+                    ),
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: colorScheme.outlineVariant,
+                    ),
+                    _buildResultStat(
+                      context,
+                      _elapsedTime,
+                      l10n?.time ?? 'Time',
+                      colorScheme.primary,
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 32),
+
+              if (_isSubmitting)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (_resultSubmitted)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check, size: 16, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(l10n?.resultsSaved ?? 'Results saved',
+                          style: const TextStyle(
+                              color: Colors.green, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                )
+              else if (_submitError != null)
+                Text(_submitError!, style: const TextStyle(color: Colors.red)),
+
+              const SizedBox(height: 40),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _restartExam,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(l10n?.tryAgain ?? 'Try Again'),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: widget.onExit,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(l10n?.backToExams ?? 'Exit'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ],
@@ -825,8 +814,7 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
                       Text(widget.exam.name,
                           style: Theme.of(context).textTheme.titleSmall,
                           overflow: TextOverflow.ellipsis),
-                      Text(
-                          '${_currentQuestionIndex + 1} of $total',
+                      Text('${_currentQuestionIndex + 1} of $total',
                           style: TextStyle(
                               color: cs.onSurfaceVariant, fontSize: 12)),
                     ],
@@ -847,7 +835,9 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
                           style: TextStyle(
                               color: cs.onSurface,
                               fontWeight: FontWeight.w600,
-                              fontFeatures: const [FontFeature.tabularFigures()])),
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ])),
                     ],
                   ),
                 ),
