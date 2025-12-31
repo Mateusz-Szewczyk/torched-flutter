@@ -25,7 +25,7 @@ class FlashcardRating {
 }
 
 /// Study deck widget - Mobile-first flashcard study experience
-/// Optimized for Desktop to prevent full-width stretching
+/// Optimized for Desktop with centered navigation and actions
 class StudyDeckWidget extends StatefulWidget {
   final Deck deck;
   final int? studySessionId;
@@ -77,8 +77,9 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
   int _goodCount = 0;
   int _hardCount = 0;
 
-  // UI Constant for Desktop constraint
+  // UI Constants for Desktop constraints
   static const double _kMaxCardWidth = 600.0;
+  static const double _kMaxHeaderWidth = 800.0;
 
   @override
   void initState() {
@@ -329,75 +330,91 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
 
-    // Use a constraint wrapper for desktop
     return Scaffold(
       backgroundColor: cs.surface,
       body: SafeArea(
+        // Center vertically
         child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: _kMaxCardWidth),
-            // Optional: visual distinction on desktop
-            decoration: !isMobile
-                ? BoxDecoration(
-                    color: cs.surface,
-                    border: Border.symmetric(
-                      vertical: BorderSide(color: cs.outlineVariant.withOpacity(0.2)),
-                    ),
-                  )
-                : null,
+          // SingleChildScrollView prevents overflow on very short screens
+          child: SingleChildScrollView(
             child: Column(
+              mainAxisSize: MainAxisSize.min, // Shrink wrap the column height
               children: [
-                if (_cardsQueue.isEmpty)
-                  Expanded(
-                    child: _initialTotalCards == 0
-                        ? _buildNoCardsAvailable(context, l10n, cs, isMobile)
-                        : _buildSessionComplete(context, l10n, cs, isMobile),
-                  )
-                else ...[
-                  _MinimalStudyAppBar(
-                    deckName: widget.deck.name,
-                    progress: _initialTotalCards > 0
-                        ? ((_initialTotalCards - _cardsQueue.length) /
-                            _initialTotalCards)
-                        : 0.0,
-                    currentIndex: _initialTotalCards - _cardsQueue.length,
-                    total: _initialTotalCards,
-                    onClose: widget.onExit,
-                    onShowStats: _showStatsBottomSheet,
-                    onSave: _handleSave,
-                    isSaving: _isSubmitting,
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Center(
-                        child: GestureDetector(
-                          onTap: _handleFlip,
-                          onPanStart: _isFlipped ? _onPanStart : null,
-                          onPanUpdate: _isFlipped ? _onPanUpdate : null,
-                          onPanEnd: _isFlipped ? _onPanEnd : null,
-                          child: Transform.translate(
-                            offset: Offset(_dragX, _dragY),
-                            child: Transform.rotate(
-                              angle: _dragX * 0.0005,
-                              child: _buildCleanFlipCard(
-                                  _cardsQueue[_currentIndex], cs, theme, isMobile),
-                            ),
-                          ),
-                        ),
+                // 1. Top Section (Centered Header)
+                if (_cardsQueue.isNotEmpty)
+                  Center(
+                    child: Container(
+                      constraints:
+                          const BoxConstraints(maxWidth: _kMaxHeaderWidth),
+                      child: _MinimalStudyAppBar(
+                        deckName: widget.deck.name,
+                        progress: _initialTotalCards > 0
+                            ? ((_initialTotalCards - _cardsQueue.length) /
+                                _initialTotalCards)
+                            : 0.0,
+                        currentIndex: _initialTotalCards - _cardsQueue.length,
+                        total: _initialTotalCards,
+                        onClose: widget.onExit,
+                        onShowStats: _showStatsBottomSheet,
+                        onSave: _handleSave,
+                        isSaving: _isSubmitting,
                       ),
                     ),
                   ),
-                  _BottomActionsBar(
-                    isFlipped: _isFlipped,
-                    onFlip: _handleFlip,
-                    onHard: () => _handleRating(0),
-                    onGood: () => _handleRating(3),
-                    onEasy: () => _handleRating(5),
-                    l10n: l10n,
-                    cs: cs,
+
+                // 2. Middle Section (Centered Card)
+                // Removed Expanded so it doesn't push header/footer away
+                Center(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: _kMaxCardWidth),
+                    child: _cardsQueue.isEmpty
+                        ? (_initialTotalCards == 0
+                            ? _buildNoCardsAvailable(
+                                context, l10n, cs, isMobile)
+                            : _buildSessionComplete(
+                                context, l10n, cs, isMobile))
+                        : Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Center(
+                              child: GestureDetector(
+                                onTap: _handleFlip,
+                                onPanStart: _isFlipped ? _onPanStart : null,
+                                onPanUpdate: _isFlipped ? _onPanUpdate : null,
+                                onPanEnd: _isFlipped ? _onPanEnd : null,
+                                child: Transform.translate(
+                                  offset: Offset(_dragX, _dragY),
+                                  child: Transform.rotate(
+                                    angle: _dragX * 0.0005,
+                                    child: _buildCleanFlipCard(
+                                        _cardsQueue[_currentIndex],
+                                        cs,
+                                        theme,
+                                        isMobile),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
-                ],
+                ),
+
+                // 3. Bottom Section (Centered Actions)
+                if (_cardsQueue.isNotEmpty)
+                  Center(
+                    child: Container(
+                      constraints:
+                          const BoxConstraints(maxWidth: _kMaxCardWidth),
+                      child: _BottomActionsBar(
+                        isFlipped: _isFlipped,
+                        onFlip: _handleFlip,
+                        onHard: () => _handleRating(0),
+                        onGood: () => _handleRating(3),
+                        onEasy: () => _handleRating(5),
+                        l10n: l10n,
+                        cs: cs,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -514,8 +531,8 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
     );
   }
 
-  Widget _buildSessionComplete(
-      BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
+  Widget _buildSessionComplete(BuildContext context, AppLocalizations? l10n,
+      ColorScheme cs, bool isMobile) {
     final total = _easyCount + _goodCount + _hardCount;
     final accuracy =
         total > 0 ? ((_easyCount + _goodCount) / total * 100).round() : 0;
@@ -534,7 +551,8 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
                     .headlineMedium
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text('You reviewed $_initialTotalCards cards with $accuracy% accuracy.',
+            Text(
+                'You reviewed $_initialTotalCards cards with $accuracy% accuracy.',
                 textAlign: TextAlign.center),
             const SizedBox(height: 40),
             Row(
@@ -544,8 +562,7 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
                     label: 'Easy', count: _easyCount, color: Colors.green),
                 _StatChip(
                     label: 'Good', count: _goodCount, color: Colors.orange),
-                _StatChip(
-                    label: 'Hard', count: _hardCount, color: Colors.red),
+                _StatChip(label: 'Hard', count: _hardCount, color: Colors.red),
               ],
             ),
             const SizedBox(height: 48),
@@ -561,16 +578,15 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
             ),
             const SizedBox(height: 16),
             TextButton(
-                onPressed: widget.onExit,
-                child: const Text('Discard Session')),
+                onPressed: widget.onExit, child: const Text('Discard Session')),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNoCardsAvailable(
-      BuildContext context, AppLocalizations? l10n, ColorScheme cs, bool isMobile) {
+  Widget _buildNoCardsAvailable(BuildContext context, AppLocalizations? l10n,
+      ColorScheme cs, bool isMobile) {
     String nextSessionText = 'N/A';
     if (widget.nextSessionDate != null) {
       try {
@@ -869,8 +885,9 @@ class _BottomActionsBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border(
-            top: BorderSide(color: cs.outlineVariant.withOpacity(0.3))),
+        // Removed border for cleaner centered look
+        // border: Border(
+        //     top: BorderSide(color: cs.outlineVariant.withOpacity(0.3))),
       ),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 200),

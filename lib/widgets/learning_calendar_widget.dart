@@ -393,7 +393,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                isDesktop ? 'Activity' : 'Contribution Activity',
+                'Activity',
                 style: TextStyle(
                   fontSize: isDesktop ? 13 : (isMobile ? 14 : 15),
                   fontWeight: FontWeight.w600,
@@ -754,7 +754,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           int overdueCount = 0;
 
           // Calculate overdue count
-          if ((isPast || isToday) && scheduledDay != null && scheduledDay.count > 0) {
+          if ((isPast) && scheduledDay != null && scheduledDay.count > 0) {
             final completedCount = historyDay?.count ?? 0;
             if (completedCount < scheduledDay.count) {
               overdueCount = scheduledDay.count - completedCount;
@@ -762,7 +762,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
             }
           }
 
-          if (isPast || isToday) {
+          if (isPast) {
             final hasCompleted = historyDay != null && historyDay.count > 0;
 
             if (hasCompleted && isOverdue) {

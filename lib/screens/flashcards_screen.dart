@@ -70,7 +70,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               ? FloatingActionButton(
                   onPressed: () => _showCreateDeckDialog(context, provider),
                   child: const Icon(Icons.add),
-                  tooltip: AppLocalizations.of(context)?.createDeck ?? 'Create Deck',
+                  tooltip:
+                      AppLocalizations.of(context)?.createDeck ?? 'Create Deck',
                 )
               : null,
         );
@@ -110,8 +111,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           else ...[
             // Search and filter bar
             SliverToBoxAdapter(
-              child:
-                  _buildSearchAndFilterBar(context, provider, l10n, colorScheme),
+              child: _buildSearchAndFilterBar(
+                  context, provider, l10n, colorScheme),
             ),
 
             // Deck grid
@@ -119,7 +120,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               padding: const EdgeInsets.all(16),
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 450, // Slightly wider for better breathing room
+                  maxCrossAxisExtent:
+                      450, // Slightly wider for better breathing room
                   childAspectRatio: MediaQuery.of(context).size.width > 600
                       ? 1.6
                       : 1.4,
@@ -188,7 +190,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                   icon: const Icon(Icons.add),
                   label: Text(l10n?.createDeck ?? 'Create Deck'),
                   style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -287,7 +290,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                 color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.style_outlined, size: 48, color: colorScheme.primary),
+              child: Icon(Icons.style_outlined,
+                  size: 48, color: colorScheme.primary),
             ),
             const SizedBox(height: 24),
             Text(
@@ -342,7 +346,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
                       borderSide: BorderSide.none,
                     ),
                     filled: true,
-                    fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    fillColor:
+                        colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                   ),
                   onChanged: provider.setSearchQuery,
@@ -456,7 +461,8 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     }
   }
 
-  void _showCreateDeckDialog(BuildContext context, FlashcardsProvider provider) {
+  void _showCreateDeckDialog(
+      BuildContext context, FlashcardsProvider provider) {
     showDialog(
       context: context,
       builder: (context) => _EditDeckDialog(
@@ -663,8 +669,8 @@ class _DeckCardState extends State<_DeckCard> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final isShared =
-        widget.deckInfo.accessType == 'shared' || widget.deckInfo.isOwn == false;
+    final isShared = widget.deckInfo.accessType == 'shared' ||
+        widget.deckInfo.isOwn == false;
 
     return Card(
       elevation: 0,
@@ -712,7 +718,8 @@ class _DeckCardState extends State<_DeckCard> {
                     ),
                   ),
                   PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
+                    icon: Icon(Icons.more_vert,
+                        color: colorScheme.onSurfaceVariant),
                     onSelected: (value) {
                       switch (value) {
                         case 'edit':
@@ -787,6 +794,7 @@ class _DeckCardState extends State<_DeckCard> {
               const SizedBox(height: 12),
 
               // Badges Row
+              // IMPORTANT: Compact display logic for overdue/due items
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -806,14 +814,41 @@ class _DeckCardState extends State<_DeckCard> {
                       bgColor: colorScheme.tertiaryContainer,
                       textColor: colorScheme.onTertiaryContainer,
                     ),
-                  if (_overdueStats != null && _overdueStats!.overdueCards > 0)
-                    _Badge(
-                      icon: Icons.warning_amber_rounded,
-                      label: '${_overdueStats!.overdueCards} due',
-                      color: colorScheme.error,
-                      bgColor: colorScheme.errorContainer,
-                      textColor: colorScheme.onErrorContainer,
-                    ),
+
+                  // Show statistics if available
+                  if (_overdueStats != null) ...[
+                    // 1. URGENT: Overdue cards (High Priority - Red)
+                    if (_overdueStats!.overdueCards > 0)
+                      _Badge(
+                        icon: Icons.warning_rounded,
+                        label: '${_overdueStats!.overdueCards} overdue',
+                        color: colorScheme.error,
+                        bgColor: colorScheme.errorContainer,
+                        textColor: colorScheme.onErrorContainer,
+                      ),
+
+                    // 2. ACTIONABLE: Due Today (Normal Priority - Tertiary)
+                    if (_overdueStats!.dueToday > 0)
+                      _Badge(
+                        icon: Icons.calendar_today_rounded,
+                        label: '${_overdueStats!.dueToday} due',
+                        color: colorScheme.tertiary,
+                        bgColor: colorScheme.tertiaryContainer,
+                        textColor: colorScheme.onTertiaryContainer,
+                      ),
+
+                    // 3. SUCCESS: All Caught Up (Green)
+                    if (_overdueStats!.overdueCards == 0 &&
+                        _overdueStats!.dueToday == 0 &&
+                        widget.deckInfo.flashcardCount > 0)
+                      _Badge(
+                        icon: Icons.check_circle_outline_rounded,
+                        label: 'All caught up',
+                        color: Colors.green,
+                        bgColor: Colors.green.withOpacity(0.1),
+                        textColor: Colors.green.shade800,
+                      ),
+                  ],
                 ],
               ),
 

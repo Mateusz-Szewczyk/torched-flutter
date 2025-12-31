@@ -107,7 +107,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                                     // 2. Top Section: Goal (Left) + Actions (Right)
                                     _TopSection(
                                       flashcardsDone: extendedSummary.flashcardsToday,
-                                      flashcardsGoal: 10,
+                                      flashcardsGoal: extendedSummary.cardsDueToday,
                                       onFlashcardsTap: () => context.go('/flashcards'),
                                       onTestsTap: () => context.go('/tests'),
                                       isMobile: isMobile,
