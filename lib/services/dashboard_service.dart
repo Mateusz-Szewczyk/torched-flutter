@@ -166,7 +166,9 @@ class CalendarStats {
   final int currentStreak;
   final int longestStreak;
   final bool isActiveToday;
-  final int cardsDueToday;
+  final int cardsDueToday;  // Cards scheduled specifically for today
+  final int overdueCards;  // Cards that are past due (before today)
+  final int cardsToReviewToday;  // Total actionable cards (overdue + due today)
   final int totalFlashcardsYear;
   final bool hasStudiedToday;
   final List<DeckCount> decksDueToday;
@@ -178,19 +180,28 @@ class CalendarStats {
     required this.longestStreak,
     required this.isActiveToday,
     required this.cardsDueToday,
+    this.overdueCards = 0,
+    this.cardsToReviewToday = 0,
     this.totalFlashcardsYear = 0,
     this.hasStudiedToday = false,
     this.decksDueToday = const [],
   });
 
   factory CalendarStats.fromJson(Map<String, dynamic> json) {
+    final cardsDueToday = json['cards_due_today'] as int? ?? 0;
+    final overdueCards = json['overdue_cards'] as int? ?? 0;
+    // Use cards_to_review_today if available, otherwise calculate from sum
+    final cardsToReview = json['cards_to_review_today'] as int? ?? (cardsDueToday + overdueCards);
+
     return CalendarStats(
       maxCount: json['max_count'] as int? ?? 0,
       totalDaysStudied: json['total_days_studied'] as int? ?? 0,
       currentStreak: json['current_streak'] as int? ?? 0,
       longestStreak: json['longest_streak'] as int? ?? 0,
       isActiveToday: json['is_active_today'] as bool? ?? false,
-      cardsDueToday: json['cards_due_today'] as int? ?? 0,
+      cardsDueToday: cardsDueToday,
+      overdueCards: overdueCards,
+      cardsToReviewToday: cardsToReview,
       totalFlashcardsYear: json['total_flashcards_year'] as int? ?? 0,
       hasStudiedToday: json['has_studied_today'] as bool? ?? false,
       decksDueToday: (json['decks_due_today'] as List<dynamic>?)
