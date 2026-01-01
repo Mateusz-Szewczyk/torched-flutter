@@ -565,9 +565,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  /// Builds the text field.
-  ///
-  /// [isDesktop] enables "Enter to send" logic.
+  /// Builds the text field with height limit and scrolling.
   Widget _buildTextField(
     AppLocalizations? l10n,
     ColorScheme colorScheme,
@@ -577,15 +575,19 @@ class _ChatScreenState extends State<ChatScreen> {
     final textField = TextField(
       controller: _messageController,
       focusNode: _inputFocusNode,
-      maxLines: null,
-      textInputAction: TextInputAction.newline,
+      // Key changes for textarea behavior:
+      minLines: 1,
+      maxLines: 8, // Stops expanding after 6 lines, enables scrolling
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.newline, // Allows Enter to create new line on mobile
+      scrollPhysics: const ClampingScrollPhysics(), // Solid scroll feel
       style: TextStyle(
         fontSize: 16,
         height: 1.4,
         color: colorScheme.onSurface,
       ),
       decoration: InputDecoration(
-        filled: false, // Ensure transparent background so it blends with the pill
+        filled: false,
         hintText: l10n?.type_message ?? 'Message...',
         hintStyle: TextStyle(
           color: colorScheme.onSurfaceVariant.withOpacity(0.85),
@@ -594,14 +596,15 @@ class _ChatScreenState extends State<ChatScreen> {
         enabledBorder: InputBorder.none,
         focusedBorder: InputBorder.none,
         isDense: true,
+        // Padding adjustment to align with buttons
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 0,
-          vertical: 14,
+          vertical: 10,
         ),
       ),
     );
 
-    // If Desktop, wrap with shortcut listener to handle Enter key
+    // Desktop: Enter sends, Shift+Enter new line
     if (isDesktop) {
       return CallbackShortcuts(
         bindings: {
