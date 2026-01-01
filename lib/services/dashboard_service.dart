@@ -92,6 +92,7 @@ class DashboardService {
 class CalendarData {
   final Map<String, CalendarDay> history;
   final Map<String, CalendarDay> scheduled;
+  final Map<String, CalendarDay> overdue; // Added overdue map
   final CalendarStats stats;
   final CalendarRange range;
   final String? generatedAt;
@@ -99,6 +100,7 @@ class CalendarData {
   CalendarData({
     required this.history,
     required this.scheduled,
+    required this.overdue, // Added overdue map
     required this.stats,
     required this.range,
     this.generatedAt,
@@ -112,6 +114,9 @@ class CalendarData {
       scheduled: (json['scheduled'] as Map<String, dynamic>?)?.map(
         (key, value) => MapEntry(key, CalendarDay.fromJson(value as Map<String, dynamic>)),
       ) ?? {},
+      overdue: (json['overdue'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, CalendarDay.fromJson(value as Map<String, dynamic>)),
+      ) ?? {}, // Added overdue parsing
       stats: CalendarStats.fromJson(json['stats'] as Map<String, dynamic>? ?? {}),
       range: CalendarRange.fromJson(json['range'] as Map<String, dynamic>? ?? {}),
       generatedAt: json['generated_at'] as String?,

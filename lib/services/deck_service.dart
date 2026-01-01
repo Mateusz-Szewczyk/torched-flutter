@@ -112,7 +112,7 @@ class DeckService {
   /// Delete deck
   Future<bool> deleteDeck(int deckId) async {
     try {
-      final response = await _api.ragDelete('/decks/$deckId/');
+      final response = await _api.ragDelete('/decks/$deckId');
       return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       rethrow;

@@ -34,7 +34,7 @@ class _CalendarCell extends StatefulWidget {
   final ColorScheme colorScheme;
   /// Tooltip message for desktop hover (e.g., "5 contributions on Dec 29")
   final String? tooltipMessage;
-  /// If true, shows split color (half green, half red) for mixed completed/overdue
+  /// If true, shows split color (half green, half red/blue) for mixed states
   final bool isSplit;
   final Color? splitColor;
 
@@ -64,7 +64,6 @@ class _CalendarCellState extends State<_CalendarCell> {
         ? Colors.black54
         : Colors.white70;
 
-    // Adjust font size based on cell size for readability
     final fontSize = widget.cellSize < 20 ? widget.cellSize * 0.5 : widget.cellSize * 0.38;
 
     Widget cellWidget = MouseRegion(
@@ -85,7 +84,7 @@ class _CalendarCellState extends State<_CalendarCell> {
                   )
                 : _isHovered
                     ? Border.all(
-                        color: widget.colorScheme.onSurface.withAlpha(76),
+                        color: widget.colorScheme.onSurface.withOpacity(0.3),
                         width: 1,
                       )
                     : null,
@@ -98,7 +97,7 @@ class _CalendarCellState extends State<_CalendarCell> {
                 if (widget.isSplit && widget.splitColor != null)
                   Row(
                     children: [
-                      // Left half - completed (green)
+                      // Left half (Primary color - usually history/completed)
                       Expanded(
                         child: Container(
                           color: _isHovered
@@ -106,7 +105,7 @@ class _CalendarCellState extends State<_CalendarCell> {
                               : widget.backgroundColor,
                         ),
                       ),
-                      // Right half - overdue (red)
+                      // Right half (Secondary color - usually overdue/scheduled)
                       Expanded(
                         child: Container(
                           color: _isHovered
@@ -133,6 +132,13 @@ class _CalendarCellState extends State<_CalendarCell> {
                         fontWeight: FontWeight.w600,
                         color: textColor,
                         height: 1,
+                        shadows: [
+                          Shadow(
+                            blurRadius: 2,
+                            color: Colors.black.withOpacity(0.3),
+                            offset: const Offset(0, 0),
+                          )
+                        ],
                       ),
                     ),
                   ),
@@ -143,7 +149,6 @@ class _CalendarCellState extends State<_CalendarCell> {
       ),
     );
 
-    // Wrap with Tooltip for desktop (if tooltipMessage is provided)
     if (widget.tooltipMessage != null && widget.tooltipMessage!.isNotEmpty) {
       cellWidget = Tooltip(
         message: widget.tooltipMessage!,
@@ -154,7 +159,7 @@ class _CalendarCellState extends State<_CalendarCell> {
           borderRadius: BorderRadius.circular(6),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(25),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -242,6 +247,11 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     }
   }
 
+  // Helper to remove time component for accurate date comparison
+  DateTime _stripTime(DateTime date) {
+    return DateTime(date.year, date.month, date.day);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -250,11 +260,8 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     final isSmallMobile = screenWidth < 380;
     final isDesktop = screenWidth >= 900;
 
-    // On desktop, constrain the calendar width for better readability
-    // Even when expandToFill is true, we cap at a reasonable max width
     final double? maxCalendarWidth;
     if (widget.expandToFill) {
-      // Cap at reasonable width even when filling - prevents overly wide calendars
       maxCalendarWidth = isDesktop ? 900.0 : double.infinity;
     } else {
       maxCalendarWidth = isDesktop ? 420.0 : (isMobile ? double.infinity : 460.0);
@@ -269,24 +276,20 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           horizontal: isMobile ? 0 : (isDesktop ? 0 : 8),
           vertical: 8,
         ),
-        // GitHub style: Cleaner container, less elevation
         decoration: BoxDecoration(
           color: colorScheme.surface,
           borderRadius: BorderRadius.circular(8),
           border: widget.expandToFill
-              ? null // No border when embedded in a container
+              ? null
               : Border.all(
-                  color: colorScheme.outlineVariant.withAlpha(102),
+                  color: colorScheme.outlineVariant.withOpacity(0.4),
                 ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
             _buildHeader(context, colorScheme, isMobile, isSmallMobile, isDesktop),
-
-            // Content - wrap with side navigation if enabled
             if (_isLoading)
               _buildLoadingState(colorScheme)
             else if (_error != null)
@@ -295,8 +298,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               widget.sideNavigationButtons && isDesktop
                   ? _buildCalendarWithSideNav(context, colorScheme, isMobile, isSmallMobile)
                   : _buildCalendarContent(context, colorScheme, isMobile, isSmallMobile),
-
-            // Legend
             if (_calendarData != null && !_isLoading)
               _buildLegend(context, colorScheme, isMobile),
           ],
@@ -320,7 +321,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left navigation button
           Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(buttonSize / 2),
@@ -339,17 +339,11 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               ),
             ),
           ),
-
           const SizedBox(width: 24),
-
-          // Calendar content
           Expanded(
             child: _buildCalendarContent(context, colorScheme, isMobile, isSmallMobile),
           ),
-
           const SizedBox(width: 24),
-
-          // Right navigation button
           Material(
             color: Colors.transparent,
             borderRadius: BorderRadius.circular(buttonSize / 2),
@@ -376,16 +370,13 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme, bool isMobile, bool isSmallMobile, bool isDesktop) {
     final monthName = _getMonthName(_currentMonth.month);
     final scheduledCount = _getScheduledCountForMonth();
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    // Don't show navigation buttons in header if they're on the sides
     final showNavButtons = !widget.sideNavigationButtons || !isDesktop;
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 12 : (isDesktop ? 12 : 16)),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.transparent,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
       ),
       child: Column(
         children: [
@@ -413,13 +404,11 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
           SizedBox(height: isMobile ? 12 : (isDesktop ? 8 : 12)),
 
-          // Month navigation - only show if not using side navigation
           if (showNavButtons)
             Row(
               mainAxisAlignment: isDesktop ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
               children: [
                 _buildNavButton(Icons.chevron_left, _previousMonth, colorScheme, isDesktop: isDesktop),
-
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: isDesktop ? 16 : 0),
                   child: Column(
@@ -437,7 +426,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                       if (scheduledCount > 0)
                         Text(
                           '$scheduledCount scheduled',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 10,
                             color: Colors.blueAccent,
                             fontWeight: FontWeight.w500,
@@ -446,12 +435,10 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                     ],
                   ),
                 ),
-
                 _buildNavButton(Icons.chevron_right, _nextMonth, colorScheme, isDesktop: isDesktop),
               ],
             )
           else
-            // Show just the month name when side nav is active
             Column(
               children: [
                 Text(
@@ -467,7 +454,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                 if (scheduledCount > 0)
                   Text(
                     '$scheduledCount scheduled',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 11,
                       color: Colors.blueAccent,
                       fontWeight: FontWeight.w500,
@@ -547,30 +534,34 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday;
 
-    final today = DateTime.now();
+    // Use current time from calendar data if available, else local time
+    DateTime today;
+    try {
+      if (_calendarData?.generatedAt != null) {
+        today = _stripTime(DateTime.parse(_calendarData!.generatedAt!));
+      } else {
+        today = _stripTime(DateTime.now());
+      }
+    } catch (_) {
+      today = _stripTime(DateTime.now());
+    }
 
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 900;
     final isTablet = screenWidth >= 600 && screenWidth < 900;
 
-    // GitHub style: cell spacing
     const double cellSpacing = 3.0;
-
-    // Day labels - shorter on desktop for compact look
     final dayLabels = isDesktop
         ? ['M', 'T', 'W', 'T', 'F', 'S', 'S']
         : isSmallMobile
             ? ['M', 'T', 'W', 'T', 'F', 'S', 'S']
             : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
-    // Use LayoutBuilder to get available width when expandToFill is enabled
     if (widget.expandToFill) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          // Calculate cell size based on available width
-          final availableWidth = constraints.maxWidth - 32; // padding
+          final availableWidth = constraints.maxWidth - 32;
           final calculatedCellSize = (availableWidth - (cellSpacing * 6)) / 7;
-          // Clamp cell size to reasonable bounds
           final cellSize = calculatedCellSize.clamp(16.0, 70.0);
           final totalGridWidth = (cellSize * 7) + (cellSpacing * 6);
 
@@ -592,7 +583,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       );
     }
 
-    // Default fixed cell sizes when not expanding
     final double cellSize;
     if (isDesktop) {
       cellSize = 16.0;
@@ -645,7 +635,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Weekday headers - tightly packed
             SizedBox(
               width: totalGridWidth,
               child: Row(
@@ -662,7 +651,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                       style: TextStyle(
                         fontSize: isDesktop && !widget.expandToFill ? 8 : (cellSize * 0.35).clamp(8.0, 12.0),
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurfaceVariant.withAlpha(179),
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.7),
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -671,8 +660,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               ),
             ),
             SizedBox(height: cellSpacing + 2),
-
-            // Calendar grid - centered and constrained
             ..._buildCalendarRows(
               context,
               colorScheme,
@@ -695,7 +682,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     ColorScheme colorScheme,
     int firstWeekday,
     int daysInMonth,
-    DateTime today,
+    DateTime today, // Normalized today
     double cellSize,
     double cellSpacing,
     bool isSmallMobile,
@@ -708,7 +695,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     final totalCells = (firstWeekday - 1) + daysInMonth;
     final numWeeks = (totalCells / 7).ceil();
 
-    // Empty cell color
     final emptyColor = Theme.of(context).brightness == Brightness.dark
         ? const Color(0xFF161B22)
         : const Color(0xFFEBEDF0);
@@ -720,14 +706,13 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         final isLast = day == 6;
 
         if (week == 0 && currentWeekday < firstWeekday) {
-          // Empty cell before month starts
           cells.add(
             Container(
               width: cellSize,
               height: cellSize,
               margin: EdgeInsets.only(right: isLast ? 0 : cellSpacing),
               decoration: BoxDecoration(
-                color: emptyColor.withAlpha(76),
+                color: emptyColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -737,103 +722,102 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           final date = DateTime(_currentMonth.year, _currentMonth.month, currentDay);
           final dateString = _formatDateString(date);
 
+          // Get Data
           final historyDay = _calendarData?.history[dateString];
           final scheduledDay = _calendarData?.scheduled[dateString];
+          final overdueDay = _calendarData?.overdue[dateString];
 
-          final isToday = date.year == today.year &&
-                          date.month == today.month &&
-                          date.day == today.day;
-          final isPast = date.isBefore(DateTime(today.year, today.month, today.day));
+          // Normalized Comparisons
+          final isToday = date.isAtSameMomentAs(today);
+          final isPast = date.isBefore(today);
           final isFuture = date.isAfter(today);
 
-          // Determine background color and overdue status
-          Color backgroundColor;
+          // Check data presence
+          final hasCompleted = historyDay != null && historyDay.count > 0;
+          final hasScheduled = scheduledDay != null && scheduledDay.count > 0;
+          // IMPORTANT: Overdue cards are now grouped under "today" in the `overdue` map by the backend.
+          final hasOverdue = overdueDay != null && overdueDay.count > 0;
+
+          // Visual State
+          Color backgroundColor = emptyColor;
           Color? splitColor;
           bool isSplit = false;
-          bool isOverdue = false;
-          int overdueCount = 0;
 
-          // Calculate overdue count
-          if ((isPast) && scheduledDay != null && scheduledDay.count > 0) {
-            final completedCount = historyDay?.count ?? 0;
-            if (completedCount < scheduledDay.count) {
-              overdueCount = scheduledDay.count - completedCount;
-              isOverdue = true;
-            }
-          }
-
+          // 1. PAST: Only history matters (overdue is moved to today)
           if (isPast) {
-            final hasCompleted = historyDay != null && historyDay.count > 0;
-
-            if (hasCompleted && isOverdue) {
-              // Mixed state: some completed, some overdue - show split
-              isSplit = true;
-              final intensity = _getIntensityLevel(historyDay.count);
+            if (hasCompleted) {
+              final intensity = _getIntensityLevel(historyDay!.count);
               backgroundColor = _getGitHubGreenColor(intensity);
-
-              // Overdue color based on severity
-              final daysOverdue = today.difference(date).inDays;
-              if (daysOverdue > 7) {
-                splitColor = Colors.red.shade700;
-              } else if (daysOverdue >= 3) {
-                splitColor = Colors.orange.shade600;
-              } else {
-                splitColor = Colors.amber.shade500;
-              }
-            } else if (isOverdue) {
-              // Only overdue, no completed
-              final daysOverdue = today.difference(date).inDays;
-              if (daysOverdue > 7) {
-                backgroundColor = Colors.red.shade700;
-              } else if (daysOverdue >= 3) {
-                backgroundColor = Colors.orange.shade600;
-              } else {
-                backgroundColor = Colors.amber.shade500;
-              }
-            } else if (hasCompleted) {
-              // All completed, nothing overdue
-              final intensity = _getIntensityLevel(historyDay.count);
-              backgroundColor = _getGitHubGreenColor(intensity);
-            } else if (isToday && scheduledDay != null && scheduledDay.count > 0) {
-              // Today with scheduled cards - use blue
-              backgroundColor = _getGitHubBlueColor(1);
-            } else {
-              backgroundColor = emptyColor;
             }
-          } else {
-            // Future date
-            if (scheduledDay != null && scheduledDay.count > 0) {
-              final intensity = _getIntensityLevel(scheduledDay.count);
-              backgroundColor = _getGitHubBlueColor(intensity);
-            } else {
-              backgroundColor = emptyColor;
+          }
+          // 2. TODAY: Can have Completed, Overdue, and Scheduled
+          else if (isToday) {
+            // Priority: Overdue > Scheduled > Completed
+            // If we have mixed states, we try to show a split.
+
+            if (hasOverdue && hasCompleted) {
+              // Split: Green (History) + Red (Overdue)
+              isSplit = true;
+              final intensity = _getIntensityLevel(historyDay!.count);
+              backgroundColor = _getGitHubGreenColor(intensity);
+              splitColor = Colors.red.shade700;
+            } else if (hasOverdue) {
+              // Only Overdue
+              backgroundColor = Colors.red.shade700;
+            } else if (hasScheduled && hasCompleted) {
+              // Split: Green (History) + Blue (Due Today)
+              isSplit = true;
+              final intensity = _getIntensityLevel(historyDay!.count);
+              backgroundColor = _getGitHubGreenColor(intensity);
+              splitColor = _getGitHubBlueColor(_getIntensityLevel(scheduledDay!.count));
+            } else if (hasScheduled) {
+              // Only Scheduled (Due Today)
+              backgroundColor = _getGitHubBlueColor(_getIntensityLevel(scheduledDay!.count));
+            } else if (hasCompleted) {
+              // Only Completed
+              final intensity = _getIntensityLevel(historyDay!.count);
+              backgroundColor = _getGitHubGreenColor(intensity);
+            }
+          }
+          // 3. FUTURE: Only Scheduled matters
+          else if (isFuture) {
+            if (hasScheduled) {
+              backgroundColor = _getGitHubBlueColor(_getIntensityLevel(scheduledDay!.count));
             }
           }
 
+          // Tooltip logic
+          String? tooltipMessage;
+          final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          final monthName = monthNames[date.month - 1];
           final dayNum = currentDay;
 
-          // Build tooltip message
-          String? tooltipMessage;
-          final monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          final monthName = monthNames[date.month - 1];
+          if (isToday) {
+            final completed = hasCompleted ? historyDay!.count : 0;
+            final overdue = hasOverdue ? overdueDay!.count : 0;
+            final due = hasScheduled ? scheduledDay!.count : 0;
 
-          if (isPast || isToday) {
-            if (isOverdue && historyDay != null && historyDay.count > 0) {
-              // Mixed: completed + overdue
-              tooltipMessage = '✓ ${historyDay.count} done, ⚠️ $overdueCount overdue on $monthName $dayNum';
-            } else if (isOverdue) {
-              // Only overdue
-              tooltipMessage = '⚠️ $overdueCount overdue flashcard${overdueCount > 1 ? 's' : ''} on $monthName $dayNum';
-            } else if (historyDay != null && historyDay.count > 0) {
-              // All completed
-              tooltipMessage = '${historyDay.count} flashcard${historyDay.count > 1 ? 's' : ''} on $monthName $dayNum';
+            if (overdue > 0) {
+              tooltipMessage = '⚠️ $overdue overdue';
+              if (due > 0) tooltipMessage += ', $due due today';
+              if (completed > 0) tooltipMessage += ', $completed done';
+            } else if (due > 0) {
+              tooltipMessage = '🔵 $due due today';
+              if (completed > 0) tooltipMessage += ', $completed done';
+            } else if (completed > 0) {
+              tooltipMessage = '✓ $completed completed today';
+            } else {
+              tooltipMessage = 'No activity today';
+            }
+          } else if (isPast) {
+            if (hasCompleted) {
+              tooltipMessage = '✓ ${historyDay!.count} completed on $monthName $dayNum';
             } else {
               tooltipMessage = 'No activity on $monthName $dayNum';
             }
           } else if (isFuture) {
-            if (scheduledDay != null && scheduledDay.count > 0) {
-              tooltipMessage = '${scheduledDay.count} scheduled for $monthName $dayNum';
+            if (hasScheduled) {
+              tooltipMessage = '📅 ${scheduledDay!.count} scheduled for $monthName $dayNum';
             } else {
               tooltipMessage = 'No sessions scheduled';
             }
@@ -856,25 +840,23 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                   dateString,
                   historyDay,
                   scheduledDay,
+                  overdueDay, // Pass overdue data
                   isPast,
                   isFuture,
                   isToday,
-                  isOverdue,
-                  overdueCount,
                 ),
               ),
             ),
           );
           currentDay++;
         } else {
-          // Empty cell after month ends
           cells.add(
             Container(
               width: cellSize,
               height: cellSize,
               margin: EdgeInsets.only(right: isLast ? 0 : cellSpacing),
               decoration: BoxDecoration(
-                color: emptyColor.withAlpha(76),
+                color: emptyColor.withOpacity(0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -901,36 +883,34 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   }
 
   int _getIntensityLevel(int count) {
-    final maxCount = _calendarData?.stats.maxCount ?? 1;
-    if (maxCount == 0) return 0;
-    final ratio = count / maxCount;
-    if (ratio <= 0) return 0;
-    if (ratio <= 0.25) return 1;
-    if (ratio <= 0.5) return 2;
-    if (ratio <= 0.75) return 3;
+    final maxCount = _calendarData?.stats.maxCount ?? 40;
+    if (count <= 0) return 0;
+
+    final ratio = count / (maxCount > 0 ? maxCount : 1);
+    if (ratio <= 0.1) return 1;
+    if (ratio <= 0.3) return 2;
+    if (ratio <= 0.6) return 3;
     return 4;
   }
 
-  // Official GitHub contribution graph colors
   Color _getGitHubGreenColor(int level) {
     switch (level) {
-      case 0: return const Color(0xFFEBEDF0); // Empty (Light mode ref)
-      case 1: return const Color(0xFF9BE9A8); // Lightest green
-      case 2: return const Color(0xFF40C463); // Light green
-      case 3: return const Color(0xFF30A14E); // Medium green
-      case 4: return const Color(0xFF216E39); // Darkest green
+      case 0: return const Color(0xFFEBEDF0);
+      case 1: return const Color(0xFF9BE9A8);
+      case 2: return const Color(0xFF40C463);
+      case 3: return const Color(0xFF30A14E);
+      case 4: return const Color(0xFF216E39);
       default: return const Color(0xFFEBEDF0);
     }
   }
 
-  // Flat blue palette for scheduled items (matches flat style of green)
   Color _getGitHubBlueColor(int level) {
     switch (level) {
       case 0: return const Color(0xFFEBEDF0);
-      case 1: return const Color(0xFFCAE8FF);
-      case 2: return const Color(0xFF79C0FF);
-      case 3: return const Color(0xFF1F6FEB);
-      case 4: return const Color(0xFF0A3069);
+      case 1: return const Color(0xFFD1E6FF);
+      case 2: return const Color(0xFF8EC3FF);
+      case 3: return const Color(0xFF3B93FF);
+      case 4: return const Color(0xFF0D65D6);
       default: return const Color(0xFFEBEDF0);
     }
   }
@@ -949,7 +929,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         runSpacing: 8,
         alignment: WrapAlignment.end,
         children: [
-          // Activity level legend
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -970,8 +949,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               Text('More', style: TextStyle(fontSize: fontSize, color: colorScheme.onSurfaceVariant)),
             ],
           ),
-
-          // Scheduled legend
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -979,7 +956,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                 width: cellSizeLegend,
                 height: cellSizeLegend,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1F6FEB),
+                  color: const Color(0xFF3B93FF),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -987,8 +964,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               Text('Scheduled', style: TextStyle(fontSize: fontSize, color: colorScheme.onSurfaceVariant)),
             ],
           ),
-
-          // Overdue legend
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1014,14 +989,17 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     String dateString,
     CalendarDay? historyDay,
     CalendarDay? scheduledDay,
+    CalendarDay? overdueDay,
     bool isPast,
     bool isFuture,
     bool isToday,
-    bool isOverdue,
-    int overdueCount,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final isMobile = MediaQuery.of(context).size.width < 600;
+
+    final hasOverdue = overdueDay != null && overdueDay.count > 0;
+    final hasScheduled = scheduledDay != null && scheduledDay.count > 0;
+    final hasHistory = historyDay != null && historyDay.count > 0;
 
     showModalBottomSheet(
       context: context,
@@ -1056,18 +1034,18 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isOverdue
-                          ? Colors.red.withAlpha(26)
+                      color: hasOverdue
+                          ? Colors.red.withOpacity(0.1)
                           : (isPast
-                              ? const Color(0xFF216E39).withAlpha(26)
-                              : Colors.blue.withAlpha(26)),
+                              ? const Color(0xFF216E39).withOpacity(0.1)
+                              : Colors.blue.withOpacity(0.1)),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      isOverdue
+                      hasOverdue
                           ? Icons.warning_amber_rounded
                           : (isPast ? Icons.history : (isToday ? Icons.today : Icons.event)),
-                      color: isOverdue
+                      color: hasOverdue
                           ? Colors.red.shade700
                           : (isPast ? const Color(0xFF216E39) : Colors.blue),
                       size: 24,
@@ -1098,12 +1076,12 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               ),
               const SizedBox(height: 20),
 
-              // Completed flashcards section
-              if ((isPast || isToday) && historyDay != null && historyDay.count > 0) ...[
+              // Completed Section
+              if (hasHistory) ...[
                 _buildDetailSection(
                   context,
-                  'Flashcards studied',
-                  '${historyDay.count}',
+                  'Studied',
+                  '${historyDay!.count}',
                   Icons.check_circle,
                   const Color(0xFF216E39),
                 ),
@@ -1112,45 +1090,26 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                 const SizedBox(height: 16),
               ],
 
-              // Overdue flashcards section
-              if (isOverdue && overdueCount > 0) ...[
+              // Overdue Section (Only shows if Today)
+              if (isToday && hasOverdue) ...[
                 _buildDetailSection(
                   context,
-                  'Overdue reviews',
-                  '$overdueCount',
+                  'Overdue',
+                  '${overdueDay!.count}',
                   Icons.warning_amber_rounded,
                   Colors.red.shade700,
                 ),
                 const SizedBox(height: 8),
-                // Show which decks have overdue cards
-                if (scheduledDay != null)
-                  ...scheduledDay.decks.map((deck) {
-                    // Try to find how many were completed from this deck
-                    final completedFromDeck = historyDay?.decks
-                        .firstWhere((d) => d.name == deck.name, orElse: () => DeckCount(name: deck.name, count: 0))
-                        .count ?? 0;
-                    final overdueDeckCount = deck.count - completedFromDeck;
-
-                    if (overdueDeckCount > 0) {
-                      return _buildDeckRow(
-                        context,
-                        DeckCount(name: deck.name, count: overdueDeckCount),
-                        colorScheme,
-                        false,
-                        true, // isOverdue
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  }),
+                ...overdueDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, true)),
                 const SizedBox(height: 16),
               ],
 
-              // Scheduled (future) section
-              if ((isFuture || (isToday && !isOverdue)) && scheduledDay != null && scheduledDay.count > 0) ...[
+              // Scheduled Section
+              if (hasScheduled && (isToday || isFuture)) ...[
                 _buildDetailSection(
                   context,
-                  'Scheduled reviews',
-                  '${scheduledDay.count}',
+                  isToday ? 'Due Today' : 'Scheduled',
+                  '${scheduledDay!.count}',
                   Icons.schedule,
                   Colors.blue,
                 ),
@@ -1159,14 +1118,11 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               ],
 
               // No activity message
-              if ((isPast || isToday) &&
-                  (historyDay == null || historyDay.count == 0) &&
-                  !isOverdue &&
-                  (scheduledDay == null || scheduledDay.count == 0))
+              if (!hasHistory && !hasOverdue && !hasScheduled)
                 Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20),
-                    child: Text('No activity this day', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+                    child: Text('No activity', style: TextStyle(color: colorScheme.onSurfaceVariant)),
                   ),
                 ),
             ],
@@ -1180,9 +1136,9 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withAlpha(26),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha(76)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -1232,7 +1188,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
             ),
           ),
           Text(
-            '${deck.count} card${deck.count > 1 ? 's' : ''}',
+            '${deck.count}',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
