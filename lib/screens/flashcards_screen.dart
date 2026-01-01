@@ -1398,13 +1398,13 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${info.itemCount} cards • by ${info.creatorName}',
+                          '${info.itemCount} cards${info.creatorName != null ? ' • by ${info.creatorName}' : ''}',
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
-                        if (info.description.isNotEmpty) ...[
+                        if (info.description != null && info.description!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text(
-                            info.description,
+                            info.description!,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],

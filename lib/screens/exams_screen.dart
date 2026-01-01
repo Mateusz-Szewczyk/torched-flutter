@@ -1363,13 +1363,13 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${info.itemCount} questions • by ${info.creatorName}',
+                          '${info.itemCount} questions • by ${info.creatorName ?? 'Unknown'}',
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
-                        if (info.description.isNotEmpty) ...[
+                        if (info.description != null && info.description!.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           Text(
-                            info.description,
+                            info.description!,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -1389,7 +1389,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                             ],
                           ),
                         ],
-                        if (info.isOwnDeck == true) ...[
+                        if (info.isOwnExam == true) ...[
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -1429,9 +1429,9 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
             final isInvalid = _codeController.text.length != 12;
 
             final isAlreadyAdded = info?.alreadyAdded ?? false;
-            final isOwnDeck = info?.isOwnDeck ?? false;
+            final isOwnExam = info?.isOwnExam ?? false;
 
-            final shouldDisable = _isAdding || isInvalid || isAlreadyAdded || isOwnDeck || info == null;
+            final shouldDisable = _isAdding || isInvalid || isAlreadyAdded || isOwnExam || info == null;
 
             return FilledButton(
               onPressed: shouldDisable

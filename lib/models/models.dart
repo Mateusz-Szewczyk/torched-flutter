@@ -172,19 +172,50 @@ class ShareCodeInfo with _$ShareCodeInfo {
   const factory ShareCodeInfo({
     @JsonKey(name: 'content_id') required int contentId,
     required String name,
-    required String description,
-    @JsonKey(name: 'creator_name') required String creatorName,
+    String? description,
+    @JsonKey(name: 'creator_id') int? creatorId,
+    @JsonKey(name: 'creator_name') String? creatorName,
     @JsonKey(name: 'created_at') required String createdAt,
     @JsonKey(name: 'access_count') required int accessCount,
-    @JsonKey(name: 'item_count') required int itemCount,
-    @JsonKey(name: 'content_type') required String contentType,
+    required int itemCount,
+    @JsonKey(name: 'content_type') String? contentType,
     @JsonKey(name: 'already_added') bool? alreadyAdded,
     @JsonKey(name: 'is_own_deck') bool? isOwnDeck,
     @JsonKey(name: 'is_own_exam') bool? isOwnExam,
   }) = _ShareCodeInfo;
 
-  factory ShareCodeInfo.fromJson(Map<String, dynamic> json) =>
-      _$ShareCodeInfoFromJson(json);
+  /// Custom fromJson to handle both deck and exam responses
+  factory ShareCodeInfo.fromJson(Map<String, dynamic> json) {
+    // Handle both deck and exam naming conventions
+    final String name = json['deck_name'] as String? ??
+                        json['exam_name'] as String? ??
+                        json['name'] as String? ??
+                        'Unknown';
+
+    final String? description = json['deck_description'] as String? ??
+                                json['exam_description'] as String? ??
+                                json['description'] as String?;
+
+    final int itemCount = (json['flashcard_count'] as num?)?.toInt() ??
+                          (json['question_count'] as num?)?.toInt() ??
+                          (json['item_count'] as num?)?.toInt() ??
+                          0;
+
+    return ShareCodeInfo(
+      contentId: (json['content_id'] as num).toInt(),
+      name: name,
+      description: description,
+      creatorId: (json['creator_id'] as num?)?.toInt(),
+      creatorName: json['creator_name'] as String?,
+      createdAt: json['created_at'] as String,
+      accessCount: (json['access_count'] as num).toInt(),
+      itemCount: itemCount,
+      contentType: json['content_type'] as String?,
+      alreadyAdded: json['already_added'] as bool?,
+      isOwnDeck: json['is_own_deck'] as bool?,
+      isOwnExam: json['is_own_exam'] as bool?,
+    );
+  }
 }
 
 @freezed
