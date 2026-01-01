@@ -647,7 +647,9 @@ class _DeckCardState extends State<_DeckCard> {
   Future<void> _loadOverdueStats() async {
     setState(() => _isLoadingStats = true);
     try {
+      debugPrint('[DeckCard] Loading overdue stats for deck ID: ${widget.deckInfo.id}, name: ${widget.deckInfo.name}');
       final stats = await DeckService().getOverdueStats(widget.deckInfo.id);
+      debugPrint('[DeckCard] Stats loaded for deck ${widget.deckInfo.id}: totalCards=${stats?.totalCards}, dueToday=${stats?.dueToday}, overdue=${stats?.overdueCards}');
       if (mounted) {
         setState(() {
           _overdueStats = stats;
@@ -655,7 +657,7 @@ class _DeckCardState extends State<_DeckCard> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading overdue stats: $e');
+      debugPrint('[DeckCard] Error loading overdue stats for deck ${widget.deckInfo.id}: $e');
       if (mounted) {
         setState(() => _isLoadingStats = false);
       }
@@ -811,10 +813,20 @@ class _DeckCardState extends State<_DeckCard> {
                       bgColor: colorScheme.tertiaryContainer,
                       textColor: colorScheme.onTertiaryContainer,
                     ),
+                  // Show cards due today (scheduled for today)
+                  if (_overdueStats != null && _overdueStats!.dueToday > 0)
+                    _Badge(
+                      icon: Icons.today_rounded,
+                      label: '${_overdueStats!.dueToday} today',
+                      color: colorScheme.primary,
+                      bgColor: colorScheme.primaryContainer,
+                      textColor: colorScheme.onPrimaryContainer,
+                    ),
+                  // Show overdue cards (past their review date)
                   if (_overdueStats != null && _overdueStats!.overdueCards > 0)
                     _Badge(
                       icon: Icons.warning_amber_rounded,
-                      label: '${_overdueStats!.overdueCards} due',
+                      label: '${_overdueStats!.overdueCards} overdue',
                       color: colorScheme.error,
                       bgColor: colorScheme.errorContainer,
                       textColor: colorScheme.onErrorContainer,

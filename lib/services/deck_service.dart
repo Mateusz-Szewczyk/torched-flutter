@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import 'api_service.dart';
 
@@ -225,18 +226,22 @@ class DeckService {
       final now = DateTime.now();
       final cacheEntry = _overdueCache[deckId];
       if (cacheEntry != null && now.difference(cacheEntry.fetchedAt) < _overdueTtl) {
+        debugPrint('[DeckService] Using cached overdue stats for deck $deckId');
         return cacheEntry.stats;
       }
 
       // If a request for the same deck is already in-flight, return that future
       if (_overdueInFlight.containsKey(deckId)) {
+        debugPrint('[DeckService] Request in-flight for deck $deckId');
         return _overdueInFlight[deckId];
       }
 
+      debugPrint('[DeckService] Fetching overdue stats for deck $deckId');
       final future = _api.ragGet<Map<String, dynamic>>(
         '/study_sessions/overdue_stats',
         queryParameters: {'deck_id': deckId},
       ).then((response) {
+        debugPrint('[DeckService] Response for deck $deckId: status=${response.statusCode}, data=${response.data}');
         if (response.statusCode == 200 && response.data != null) {
           final stats = OverdueStats.fromJson(response.data!);
           // store in cache
@@ -245,6 +250,7 @@ class DeckService {
         }
         return null;
       }).catchError((e) {
+        debugPrint('[DeckService] Error fetching overdue stats for deck $deckId: $e');
         // swallow and return null; callers should handle null
         return null;
       }).whenComplete(() {
