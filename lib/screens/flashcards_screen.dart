@@ -792,7 +792,6 @@ class _DeckCardState extends State<_DeckCard> {
               const SizedBox(height: 12),
 
               // Badges Row
-              // IMPORTANT: Compact display logic for overdue/due items
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -812,41 +811,14 @@ class _DeckCardState extends State<_DeckCard> {
                       bgColor: colorScheme.tertiaryContainer,
                       textColor: colorScheme.onTertiaryContainer,
                     ),
-
-                  // Show statistics if available
-                  if (_overdueStats != null) ...[
-                    // 1. URGENT: Overdue cards (High Priority - Red)
-                    if (_overdueStats!.overdueCards > 0)
-                      _Badge(
-                        icon: Icons.warning_rounded,
-                        label: '${_overdueStats!.overdueCards} overdue',
-                        color: colorScheme.error,
-                        bgColor: colorScheme.errorContainer,
-                        textColor: colorScheme.onErrorContainer,
-                      ),
-
-                    // 2. ACTIONABLE: Due Today (Normal Priority - Tertiary)
-                    if (_overdueStats!.dueToday > 0)
-                      _Badge(
-                        icon: Icons.calendar_today_rounded,
-                        label: '${_overdueStats!.dueToday} due',
-                        color: colorScheme.tertiary,
-                        bgColor: colorScheme.tertiaryContainer,
-                        textColor: colorScheme.onTertiaryContainer,
-                      ),
-
-                    // 3. SUCCESS: All Caught Up (Green)
-                    if (_overdueStats!.overdueCards == 0 &&
-                        _overdueStats!.dueToday == 0 &&
-                        widget.deckInfo.flashcardCount > 0)
-                      _Badge(
-                        icon: Icons.check_circle_outline_rounded,
-                        label: 'All caught up',
-                        color: Colors.green,
-                        bgColor: Colors.green.withOpacity(0.1),
-                        textColor: Colors.green.shade800,
-                      ),
-                  ],
+                  if (_overdueStats != null && _overdueStats!.overdueCards > 0)
+                    _Badge(
+                      icon: Icons.warning_amber_rounded,
+                      label: '${_overdueStats!.overdueCards} due',
+                      color: colorScheme.error,
+                      bgColor: colorScheme.errorContainer,
+                      textColor: colorScheme.onErrorContainer,
+                    ),
                 ],
               ),
 
@@ -1316,7 +1288,7 @@ class _FlashcardInputWidget extends StatelessWidget {
 }
 
 // ============================================================================
-// ADD BY CODE DIALOG (FIXED)
+// ADD BY CODE DIALOG
 // ============================================================================
 
 class _AddByCodeDialog extends StatefulWidget {
@@ -1335,7 +1307,6 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
   @override
   void dispose() {
     _codeController.dispose();
-    // Ensure we clear previous info when dialog closes
     widget.provider.clearShareCodeInfo();
     super.dispose();
   }
@@ -1384,7 +1355,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
 
                 final info = provider.shareCodeInfo;
 
-                // Show Error Card if code is invalid (12 chars entered but no info found)
+                // Handle 404 / Invalid Code state
                 if (info == null && _codeController.text.length == 12 && !provider.isShareCodeLoading) {
                   return Card(
                     elevation: 0,
@@ -1412,7 +1383,6 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
 
                 if (info == null) return const SizedBox.shrink();
 
-                // Show valid deck info card
                 return Card(
                   elevation: 0,
                   color: colorScheme.surfaceContainerHighest,
@@ -1438,7 +1408,6 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
-                        // Show warning if already added
                         if (info.alreadyAdded == true) ...[
                           const SizedBox(height: 12),
                           Row(
@@ -1457,7 +1426,6 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                             ],
                           ),
                         ],
-                        // Show warning if own deck
                         if (info.isOwnDeck == true) ...[
                           const SizedBox(height: 12),
                           Row(
@@ -1487,6 +1455,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
       actions: [
         TextButton(
           onPressed: () {
+            provider.clearShareCodeInfo();
             Navigator.pop(context);
           },
           child: Text(l10n?.cancel ?? 'Cancel'),
@@ -1497,12 +1466,10 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
             // Determine if button should be disabled
             final info = provider.shareCodeInfo;
             final isInvalid = _codeController.text.length != 12;
-
-            // Handle nullable booleans with ?? false
             final isAlreadyAdded = info?.alreadyAdded ?? false;
             final isOwnDeck = info?.isOwnDeck ?? false;
 
-            // Logic: Disable if loading, invalid length, info is missing (404),
+            // Logic: Disable if loading, invalid length, or if we got no info back (404)
             // OR if the deck is already added or owned by the user.
             final shouldDisable = _isAdding || isInvalid || info == null || isAlreadyAdded || isOwnDeck;
 
