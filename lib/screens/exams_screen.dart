@@ -1026,7 +1026,6 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
-
                       TextFormField(
                         controller: _descriptionController,
                         decoration: InputDecoration(
@@ -1036,24 +1035,22 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                         ),
                         maxLines: 2,
                       ),
-                      const SizedBox(height: 24),
-
+                      const SizedBox(height: 32),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             l10n?.questions ?? 'Questions',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          const Spacer(),
-                          TextButton.icon(
+                          FilledButton.tonalIcon(
                             onPressed: _addQuestion,
                             icon: const Icon(Icons.add),
                             label: Text(l10n?.addQuestion ?? 'Add Question'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-
+                      const SizedBox(height: 16),
                       ...List.generate(_questions.length, (index) {
                         return _QuestionInputWidget(
                           key: ValueKey(index),
@@ -1152,94 +1149,104 @@ class _QuestionInputWidgetState extends State<_QuestionInputWidget> {
     final l10n = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
 
-    return Card(
-      elevation: 0,
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest.withOpacity(0.5),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
               children: [
                 Text(
                   '${l10n?.question ?? 'Question'} ${widget.index}',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
                 ),
                 const Spacer(),
                 if (widget.canDelete)
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: widget.onDelete,
-                    color: cs.error,
+                  InkWell(
+                    onTap: widget.onDelete,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Icon(Icons.close, size: 20, color: cs.error),
                   ),
               ],
             ),
-            const SizedBox(height: 8),
-            TextFormField(
-              initialValue: widget.input.text,
-              decoration: InputDecoration(
-                labelText: l10n?.questionText ?? 'Question text',
-                border: const OutlineInputBorder(),
-                filled: true,
-                fillColor: cs.surfaceContainerLowest,
-              ),
-              maxLines: 2,
-              onChanged: (value) => widget.input.text = value,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              l10n?.answers ?? 'Answers',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: 8),
-            ...widget.input.answers.asMap().entries.map((entry) {
-              final answerIndex = entry.key;
-              final answer = entry.value;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Radio<int>(
-                      value: answerIndex,
-                      groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
-                      onChanged: (value) {
-                        setState(() {
-                          for (var a in widget.input.answers) {
-                            a.isCorrect = false;
-                          }
-                          if (value != null) {
-                            widget.input.answers[value].isCorrect = true;
-                          }
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: answer.text,
-                        decoration: InputDecoration(
-                          hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          filled: true,
-                          fillColor: cs.surfaceContainerLowest,
-                        ),
-                        onChanged: (value) => answer.text = value,
-                      ),
-                    ),
-                  ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextFormField(
+                  initialValue: widget.input.text,
+                  decoration: InputDecoration(
+                    labelText: l10n?.questionText ?? 'Question text',
+                    border: const OutlineInputBorder(),
+                    filled: true,
+                    fillColor: cs.surface,
+                  ),
+                  maxLines: 2,
+                  onChanged: (value) => widget.input.text = value,
                 ),
-              );
-            }),
-          ],
-        ),
+                const SizedBox(height: 16),
+                Text(
+                  l10n?.answers ?? 'Answers (Select correct one)',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                ...widget.input.answers.asMap().entries.map((entry) {
+                  final answerIndex = entry.key;
+                  final answer = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Radio<int>(
+                          value: answerIndex,
+                          groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
+                          onChanged: (value) {
+                            setState(() {
+                              for (var a in widget.input.answers) {
+                                a.isCorrect = false;
+                              }
+                              if (value != null) {
+                                widget.input.answers[value].isCorrect = true;
+                              }
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: TextFormField(
+                            initialValue: answer.text,
+                            decoration: InputDecoration(
+                              hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
+                              border: const OutlineInputBorder(),
+                              filled: true,
+                              fillColor: cs.surface,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            onChanged: (value) => answer.text = value,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1420,8 +1427,10 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
           builder: (context, _) {
             final info = provider.shareCodeInfo;
             final isInvalid = _codeController.text.length != 12;
+
             final isAlreadyAdded = info?.alreadyAdded ?? false;
             final isOwnDeck = info?.isOwnDeck ?? false;
+
             final shouldDisable = _isAdding || isInvalid || isAlreadyAdded || isOwnDeck || info == null;
 
             return FilledButton(
