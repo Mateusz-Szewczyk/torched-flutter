@@ -310,19 +310,29 @@ class DeckService {
       }
       return null;
     } catch (e) {
+      // 404 is a valid "not found" state, return null instead of throwing
+      // so the UI can show "Invalid code" instead of crashing
+      if (e.toString().contains('404')) {
+        return null;
+      }
       rethrow;
     }
   }
 
   /// Add deck by share code
-  Future<bool> addDeckByCode(String code) async {
+  /// Returns the full API response map so UI can display specific success/error messages
+  Future<Map<String, dynamic>> addDeckByCode(String code) async {
     try {
       final response = await _api.ragPost<Map<String, dynamic>>(
         '/decks/add-by-code',
         data: {'code': code.trim().toUpperCase()},
       );
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data!;
+      }
+
+      throw Exception('Failed to add deck: ${response.statusMessage}');
     } catch (e) {
       rethrow;
     }
@@ -499,4 +509,3 @@ class _OverdueCacheEntry {
   final DateTime fetchedAt;
   _OverdueCacheEntry({required this.stats, required this.fetchedAt});
 }
-

@@ -1355,7 +1355,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
 
                 final info = provider.shareCodeInfo;
 
-                // Show Error Card if code is invalid (12 chars entered but no info found)
+                // Handle 404 / Invalid Code state
                 if (info == null && _codeController.text.length == 12 && !provider.isShareCodeLoading) {
                   return Card(
                     elevation: 0,
@@ -1383,6 +1383,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
 
                 if (info == null) return const SizedBox.shrink();
 
+                // Show valid deck info card
                 return Card(
                   elevation: 0,
                   color: colorScheme.surfaceContainerHighest,
@@ -1464,10 +1465,12 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
           builder: (context, _) {
             final info = provider.shareCodeInfo;
             final isInvalid = _codeController.text.length != 12;
+
+            // Fix: Handle nullable booleans with ?? false
             final isAlreadyAdded = info?.alreadyAdded ?? false;
             final isOwnDeck = info?.isOwnDeck ?? false;
 
-            // Disable if loading, invalid length, or if we got no info back (404)
+            // Logic: Disable if loading, invalid format, already added, own deck, or info is missing (404)
             final shouldDisable = _isAdding || isInvalid || isAlreadyAdded || isOwnDeck || info == null;
 
             return FilledButton(
@@ -1512,8 +1515,8 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                     )
                   : Text(l10n?.add ?? 'Add'),
             );
-          }
-        ),
+          },
+        )
       ],
     );
   }

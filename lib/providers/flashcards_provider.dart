@@ -380,15 +380,16 @@ class FlashcardsProvider extends ChangeNotifier {
     }
   }
 
-  /// Add deck by share code
+/// Add deck by share code
   Future<bool> addDeckByCode(String code) async {
     try {
-      final success = await _deckService.addDeckByCode(code);
-      if (success) {
-        _shareCodeInfo = null;
-        await fetchDeckInfos();
-      }
-      return success;
+      // This returns a Map<String, dynamic>, but we just need to know it didn't throw
+      await _deckService.addDeckByCode(code);
+
+      // If execution reaches here, it was successful
+      _shareCodeInfo = null;
+      await fetchDeckInfos();
+      return true;
     } catch (e) {
       _error = e.toString();
       notifyListeners();

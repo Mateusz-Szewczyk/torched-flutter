@@ -262,7 +262,8 @@ class ExamsProvider extends ChangeNotifier {
       _shareCodeInfo = await _examService.getShareCodeInfo(code);
     } catch (e) {
       _shareCodeInfo = null;
-      _error = e.toString();
+      // Don't set error string here, let the UI handle the null info state
+      // This prevents flash of error message while typing
     } finally {
       _isShareCodeLoading = false;
       notifyListeners();
@@ -278,13 +279,13 @@ class ExamsProvider extends ChangeNotifier {
   /// Add exam by code
   Future<bool> addExamByCode(String code) async {
     try {
-      final success = await _examService.addExamByCode(code);
+      // Service call returns Map<String, dynamic>, but we just need success/fail via exception
+      await _examService.addExamByCode(code);
 
-      if (success) {
-        await fetchExamInfos();
-        clearShareCodeInfo();
-      }
-      return success;
+      // If we reach here, it was successful
+      await fetchExamInfos();
+      clearShareCodeInfo();
+      return true;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -362,4 +363,3 @@ class ExamsProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

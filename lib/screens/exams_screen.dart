@@ -564,10 +564,7 @@ class _ExamsScreenState extends State<ExamsScreen> {
       final success = await provider.deleteExam(examInfo.id);
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n?.examDeleted ?? 'Exam deleted'),
-            behavior: SnackBarBehavior.floating,
-          ),
+          SnackBar(content: Text(l10n?.examDeleted ?? 'Exam deleted')),
         );
       }
     }
@@ -1029,6 +1026,7 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                         },
                       ),
                       const SizedBox(height: 16),
+
                       TextFormField(
                         controller: _descriptionController,
                         decoration: InputDecoration(
@@ -1038,22 +1036,24 @@ class _EditExamDialogState extends State<_EditExamDialog> {
                         ),
                         maxLines: 2,
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
+
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
                             l10n?.questions ?? 'Questions',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
-                          FilledButton.tonalIcon(
+                          const Spacer(),
+                          TextButton.icon(
                             onPressed: _addQuestion,
                             icon: const Icon(Icons.add),
                             label: Text(l10n?.addQuestion ?? 'Add Question'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 8),
+
                       ...List.generate(_questions.length, (index) {
                         return _QuestionInputWidget(
                           key: ValueKey(index),
@@ -1152,104 +1152,94 @@ class _QuestionInputWidgetState extends State<_QuestionInputWidget> {
     final l10n = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
 
-    return Container(
+    return Card(
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: cs.outlineVariant),
       ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
                 Text(
                   '${l10n?.question ?? 'Question'} ${widget.index}',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 if (widget.canDelete)
-                  InkWell(
-                    onTap: widget.onDelete,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Icon(Icons.close, size: 20, color: cs.error),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: widget.onDelete,
+                    color: cs.error,
                   ),
               ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  initialValue: widget.input.text,
-                  decoration: InputDecoration(
-                    labelText: l10n?.questionText ?? 'Question text',
-                    border: const OutlineInputBorder(),
-                    filled: true,
-                    fillColor: cs.surface,
-                  ),
-                  maxLines: 2,
-                  onChanged: (value) => widget.input.text = value,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  l10n?.answers ?? 'Answers (Select correct one)',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 8),
-                ...widget.input.answers.asMap().entries.map((entry) {
-                  final answerIndex = entry.key;
-                  final answer = entry.value;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      children: [
-                        Radio<int>(
-                          value: answerIndex,
-                          groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
-                          onChanged: (value) {
-                            setState(() {
-                              for (var a in widget.input.answers) {
-                                a.isCorrect = false;
-                              }
-                              if (value != null) {
-                                widget.input.answers[value].isCorrect = true;
-                              }
-                            });
-                          },
-                        ),
-                        Expanded(
-                          child: TextFormField(
-                            initialValue: answer.text,
-                            decoration: InputDecoration(
-                              hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
-                              border: const OutlineInputBorder(),
-                              filled: true,
-                              fillColor: cs.surface,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                            ),
-                            onChanged: (value) => answer.text = value,
-                          ),
-                        ),
-                      ],
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: widget.input.text,
+              decoration: InputDecoration(
+                labelText: l10n?.questionText ?? 'Question text',
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor: cs.surfaceContainerLowest,
+              ),
+              maxLines: 2,
+              onChanged: (value) => widget.input.text = value,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n?.answers ?? 'Answers',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            ...widget.input.answers.asMap().entries.map((entry) {
+              final answerIndex = entry.key;
+              final answer = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    Radio<int>(
+                      value: answerIndex,
+                      groupValue: widget.input.answers.indexWhere((a) => a.isCorrect),
+                      onChanged: (value) {
+                        setState(() {
+                          for (var a in widget.input.answers) {
+                            a.isCorrect = false;
+                          }
+                          if (value != null) {
+                            widget.input.answers[value].isCorrect = true;
+                          }
+                        });
+                      },
                     ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        ],
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: answer.text,
+                        decoration: InputDecoration(
+                          hintText: '${l10n?.answer ?? 'Answer'} ${String.fromCharCode(65 + answerIndex)}',
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          filled: true,
+                          fillColor: cs.surfaceContainerLowest,
+                        ),
+                        onChanged: (value) => answer.text = value,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }
@@ -1275,6 +1265,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
   @override
   void dispose() {
     _codeController.dispose();
+    widget.provider.clearShareCodeInfo();
     super.dispose();
   }
 
@@ -1320,6 +1311,33 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                 }
 
                 final info = provider.shareCodeInfo;
+
+                // Handle 404 / Invalid Code state
+                if (info == null && _codeController.text.length == 12 && !provider.isShareCodeLoading) {
+                  return Card(
+                    elevation: 0,
+                    color: colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Invalid or expired code',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
                 if (info == null) return const SizedBox.shrink();
 
                 return Card(
@@ -1364,6 +1382,22 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                             ],
                           ),
                         ],
+                        if (info.isOwnDeck == true) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 16, color: colorScheme.secondary),
+                              const SizedBox(width: 4),
+                              const Expanded(
+                                child: Text(
+                                  'This is your own exam',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1381,32 +1415,58 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
           },
           child: Text(l10n?.cancel ?? 'Cancel'),
         ),
-        FilledButton(
-          onPressed: _isAdding || _codeController.text.length != 12
-              ? null
-              : () async {
-                  setState(() => _isAdding = true);
-                  final success = await provider.addExamByCode(
-                    _codeController.text.trim(),
-                  );
-                  setState(() => _isAdding = false);
-                  if (success && mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n?.examAddedSuccessfully ??
-                            'Exam added successfully'),
-                      ),
-                    );
-                  }
-                },
-          child: _isAdding
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(l10n?.add ?? 'Add'),
+        ListenableBuilder(
+          listenable: provider,
+          builder: (context, _) {
+            final info = provider.shareCodeInfo;
+            final isInvalid = _codeController.text.length != 12;
+            final isAlreadyAdded = info?.alreadyAdded ?? false;
+            final isOwnDeck = info?.isOwnDeck ?? false;
+            final shouldDisable = _isAdding || isInvalid || isAlreadyAdded || isOwnDeck || info == null;
+
+            return FilledButton(
+              onPressed: shouldDisable
+                  ? null
+                  : () async {
+                      setState(() => _isAdding = true);
+                      provider.clearError();
+
+                      final success = await provider.addExamByCode(
+                        _codeController.text.trim().toUpperCase(),
+                      );
+
+                      if (!mounted) return;
+                      setState(() => _isAdding = false);
+
+                      if (success) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n?.examAddedSuccessfully ??
+                                'Exam added successfully'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.error ?? 'Failed to add exam'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: colorScheme.error,
+                          ),
+                        );
+                      }
+                    },
+              child: _isAdding
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n?.add ?? 'Add'),
+            );
+          }
         ),
       ],
     );
