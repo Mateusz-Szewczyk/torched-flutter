@@ -353,7 +353,19 @@ class DeckService {
 
       if (response.statusCode == 200 && response.data != null) {
         return response.data!
-            .map((json) => MySharedCode.fromJson(json as Map<String, dynamic>))
+            .map((json) {
+              final map = json as Map<String, dynamic>;
+              // Normalize deck-specific fields to generic format
+              return MySharedCode.fromJson({
+                'share_code': map['share_code'],
+                'content_type': 'deck',
+                'content_id': map['content_id'],
+                'content_name': map['deck_name'] ?? map['content_name'] ?? 'Unknown',
+                'item_count': map['flashcard_count'] ?? map['item_count'] ?? 0,
+                'created_at': map['created_at'] ?? '',
+                'access_count': map['access_count'] ?? 0,
+              });
+            })
             .toList();
       }
       return [];

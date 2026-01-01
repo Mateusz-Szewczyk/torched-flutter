@@ -1546,87 +1546,377 @@ class _ManageSharesDialog extends StatelessWidget {
 
   const _ManageSharesDialog({required this.provider});
 
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inDays == 0) {
+        return 'Today';
+      } else if (diff.inDays == 1) {
+        return 'Yesterday';
+      } else if (diff.inDays < 7) {
+        return '${diff.inDays} days ago';
+      } else if (diff.inDays < 30) {
+        return '${(diff.inDays / 7).floor()} weeks ago';
+      } else {
+        return '${date.day}/${date.month}/${date.year}';
+      }
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDesktop = MediaQuery.of(context).size.width > 600;
 
-    return AlertDialog(
-      title: Text(l10n?.manageShares ?? 'Manage Shared Decks'),
-      content: SizedBox(
-        width: 500,
-        height: 400,
-        child: ListenableBuilder(
-          listenable: provider,
-          builder: (context, _) {
-            if (provider.mySharedCodes.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.share_outlined,
-                        size: 48,
-                        color: Theme.of(context).colorScheme.outlineVariant),
-                    const SizedBox(height: 16),
-                    Text(
-                      l10n?.noSharedDecks ?? 'No shared decks yet',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+    return Dialog(
+      backgroundColor: colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(isDesktop ? 24 : 16),
+      ),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isDesktop ? 100 : 16,
+        vertical: isDesktop ? 40 : 24,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isDesktop ? 600 : double.infinity,
+          maxHeight: MediaQuery.of(context).size.height * (isDesktop ? 0.7 : 0.85),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withOpacity(0.3),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  ],
-                ),
-              );
-            }
+                    child: Icon(Icons.share_rounded, color: colorScheme.primary),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n?.manageShares ?? 'Manage Shared Decks',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Share codes you created',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
 
-            return ListView.separated(
-              itemCount: provider.mySharedCodes.length,
-              separatorBuilder: (c, i) => const Divider(),
-              itemBuilder: (context, index) {
-                final code = provider.mySharedCodes[index];
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(code.contentName,
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(
-                      '${code.itemCount} cards • ${code.accessCount} users'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton.filledTonal(
-                        icon: const Icon(Icons.copy, size: 18),
-                        onPressed: () {
-                          Clipboard.setData(
-                              ClipboardData(text: code.shareCode));
+            // Content
+            Flexible(
+              child: ListenableBuilder(
+                listenable: provider,
+                builder: (context, _) {
+                  if (provider.mySharedCodes.isEmpty) {
+                    return _buildEmptyState(context, colorScheme, l10n);
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: provider.mySharedCodes.length,
+                    itemBuilder: (context, index) {
+                      final code = provider.mySharedCodes[index];
+                      return _ShareCodeCard(
+                        code: code,
+                        contentTypeLabel: 'cards',
+                        onCopy: () {
+                          Clipboard.setData(ClipboardData(text: code.shareCode));
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('Code copied: ${code.shareCode}'),
+                              content: Row(
+                                children: [
+                                  Icon(Icons.check_circle, color: colorScheme.onPrimary, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text('Copied: ${code.shareCode}')),
+                                ],
+                              ),
                               behavior: SnackBarBehavior.floating,
+                              backgroundColor: colorScheme.primary,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           );
                         },
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.outlined(
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        color: Theme.of(context).colorScheme.error,
-                        onPressed: () async {
-                          await provider.deactivateShareCode(code.shareCode);
+                        onDelete: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Deactivate Share Code?'),
+                              content: Text(
+                                'This will prevent others from using code "${code.shareCode}" to add this deck. '
+                                'Users who already added it will keep their copy.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context, false),
+                                  child: const Text('Cancel'),
+                                ),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: colorScheme.error,
+                                  ),
+                                  onPressed: () => Navigator.pop(context, true),
+                                  child: const Text('Deactivate'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) {
+                            await provider.deactivateShareCode(code.shareCode);
+                          }
                         },
+                        formatDate: _formatDate,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, ColorScheme colorScheme, AppLocalizations? l10n) {
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.share_outlined,
+              size: 48,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            l10n?.noSharedDecks ?? 'No shared decks yet',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Share a deck to generate a code that others can use to add it to their library.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reusable share code card widget
+class _ShareCodeCard extends StatefulWidget {
+  final MySharedCode code;
+  final String contentTypeLabel; // 'cards' or 'questions'
+  final VoidCallback onCopy;
+  final VoidCallback onDelete;
+  final String Function(String) formatDate;
+
+  const _ShareCodeCard({
+    required this.code,
+    required this.contentTypeLabel,
+    required this.onCopy,
+    required this.onDelete,
+    required this.formatDate,
+  });
+
+  @override
+  State<_ShareCodeCard> createState() => _ShareCodeCardState();
+}
+
+class _ShareCodeCardState extends State<_ShareCodeCard> {
+  bool _isDeleting = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title and item count row
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.code.contentName,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            widget.contentTypeLabel == 'cards'
+                                ? Icons.style_rounded
+                                : Icons.quiz_rounded,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.code.itemCount} ${widget.contentTypeLabel}',
+                            style: TextStyle(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                );
-              },
-            );
-          },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Share code display
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.key, size: 20, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SelectableText(
+                      widget.code.shareCode,
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    icon: const Icon(Icons.copy_rounded, size: 20),
+                    onPressed: widget.onCopy,
+                    tooltip: 'Copy code',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Stats and actions row
+            Row(
+              children: [
+                // Created date
+                Icon(Icons.schedule, size: 16, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(
+                  widget.formatDate(widget.code.createdAt),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Access count
+                Icon(Icons.people_outline, size: 16, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(
+                  '${widget.code.accessCount} ${widget.code.accessCount == 1 ? 'user' : 'users'}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+
+                const Spacer(),
+
+                // Delete button
+                TextButton.icon(
+                  onPressed: _isDeleting ? null : () async {
+                    setState(() => _isDeleting = true);
+                    await Future(() => widget.onDelete());
+                    if (mounted) setState(() => _isDeleting = false);
+                  },
+                  icon: _isDeleting
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.error,
+                          ),
+                        )
+                      : Icon(Icons.delete_outline, size: 18, color: colorScheme.error),
+                  label: Text(
+                    'Deactivate',
+                    style: TextStyle(color: colorScheme.error),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n?.close ?? 'Close'),
-        ),
-      ],
     );
   }
 }
