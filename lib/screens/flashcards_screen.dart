@@ -65,7 +65,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               child: _buildMainContent(context, provider),
             ),
           ),
-          // Keep FAB for mobile convenience, but functionality is also in header now
+          // Keep FAB for mobile convenience
           floatingActionButton: provider.deckInfos.isNotEmpty
               ? FloatingActionButton(
                   onPressed: () => _showCreateDeckDialog(context, provider),
@@ -81,8 +81,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   Widget _buildMainContent(BuildContext context, FlashcardsProvider provider) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     // Loading state
     if (provider.isLoading && provider.deckInfos.isEmpty) {
@@ -120,8 +119,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
               padding: const EdgeInsets.all(16),
               sliver: SliverGrid(
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent:
-                      450, // Slightly wider for better breathing room
+                  maxCrossAxisExtent: 450,
                   childAspectRatio: MediaQuery.of(context).size.width > 600
                       ? 1.6
                       : 1.4,
@@ -180,7 +178,7 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Action Bar - Making "Add Deck" reachable here
+          // Action Bar
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -669,8 +667,8 @@ class _DeckCardState extends State<_DeckCard> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final isShared = widget.deckInfo.accessType == 'shared' ||
-        widget.deckInfo.isOwn == false;
+    final isShared =
+        widget.deckInfo.accessType == 'shared' || widget.deckInfo.isOwn == false;
 
     return Card(
       elevation: 0,
@@ -794,7 +792,6 @@ class _DeckCardState extends State<_DeckCard> {
               const SizedBox(height: 12),
 
               // Badges Row
-              // IMPORTANT: Compact display logic for overdue/due items
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -814,41 +811,14 @@ class _DeckCardState extends State<_DeckCard> {
                       bgColor: colorScheme.tertiaryContainer,
                       textColor: colorScheme.onTertiaryContainer,
                     ),
-
-                  // Show statistics if available
-                  if (_overdueStats != null) ...[
-                    // 1. URGENT: Overdue cards (High Priority - Red)
-                    if (_overdueStats!.overdueCards > 0)
-                      _Badge(
-                        icon: Icons.warning_rounded,
-                        label: '${_overdueStats!.overdueCards} overdue',
-                        color: colorScheme.error,
-                        bgColor: colorScheme.errorContainer,
-                        textColor: colorScheme.onErrorContainer,
-                      ),
-
-                    // 2. ACTIONABLE: Due Today (Normal Priority - Tertiary)
-                    if (_overdueStats!.dueToday > 0)
-                      _Badge(
-                        icon: Icons.calendar_today_rounded,
-                        label: '${_overdueStats!.dueToday} due',
-                        color: colorScheme.tertiary,
-                        bgColor: colorScheme.tertiaryContainer,
-                        textColor: colorScheme.onTertiaryContainer,
-                      ),
-
-                    // 3. SUCCESS: All Caught Up (Green)
-                    if (_overdueStats!.overdueCards == 0 &&
-                        _overdueStats!.dueToday == 0 &&
-                        widget.deckInfo.flashcardCount > 0)
-                      _Badge(
-                        icon: Icons.check_circle_outline_rounded,
-                        label: 'All caught up',
-                        color: Colors.green,
-                        bgColor: Colors.green.withOpacity(0.1),
-                        textColor: Colors.green.shade800,
-                      ),
-                  ],
+                  if (_overdueStats != null && _overdueStats!.overdueCards > 0)
+                    _Badge(
+                      icon: Icons.warning_amber_rounded,
+                      label: '${_overdueStats!.overdueCards} due',
+                      color: colorScheme.error,
+                      bgColor: colorScheme.errorContainer,
+                      textColor: colorScheme.onErrorContainer,
+                    ),
                 ],
               ),
 
@@ -1318,7 +1288,7 @@ class _FlashcardInputWidget extends StatelessWidget {
 }
 
 // ============================================================================
-// ADD BY CODE DIALOG
+// ADD BY CODE DIALOG (FIXED)
 // ============================================================================
 
 class _AddByCodeDialog extends StatefulWidget {
@@ -1337,6 +1307,7 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
   @override
   void dispose() {
     _codeController.dispose();
+    widget.provider.clearShareCodeInfo();
     super.dispose();
   }
 
@@ -1383,6 +1354,33 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                 }
 
                 final info = provider.shareCodeInfo;
+
+                // Show Error Card if code is invalid (12 chars entered but no info found)
+                if (info == null && _codeController.text.length == 12 && !provider.isShareCodeLoading) {
+                  return Card(
+                    elevation: 0,
+                    color: colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Invalid or expired code',
+                              style: TextStyle(
+                                color: colorScheme.onErrorContainer,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
                 if (info == null) return const SizedBox.shrink();
 
                 return Card(
@@ -1428,6 +1426,23 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
                             ],
                           ),
                         ],
+                        if (info.isOwnDeck == true) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 16, color: colorScheme.secondary),
+                              const SizedBox(width: 4),
+                              const Expanded(
+                                child: Text(
+                                  'This is your own deck',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1440,37 +1455,64 @@ class _AddByCodeDialogState extends State<_AddByCodeDialog> {
       actions: [
         TextButton(
           onPressed: () {
-            provider.clearShareCodeInfo();
             Navigator.pop(context);
           },
           child: Text(l10n?.cancel ?? 'Cancel'),
         ),
-        FilledButton(
-          onPressed: _isAdding || _codeController.text.length != 12
-              ? null
-              : () async {
-                  setState(() => _isAdding = true);
-                  final success = await provider.addDeckByCode(
-                    _codeController.text.trim(),
-                  );
-                  setState(() => _isAdding = false);
-                  if (success && mounted) {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(l10n?.deckAddedSuccessfully ??
-                            'Deck added successfully'),
-                      ),
-                    );
-                  }
-                },
-          child: _isAdding
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(l10n?.add ?? 'Add'),
+        ListenableBuilder(
+          listenable: provider,
+          builder: (context, _) {
+            final info = provider.shareCodeInfo;
+            final isInvalid = _codeController.text.length != 12;
+            final isAlreadyAdded = info?.alreadyAdded ?? false;
+            final isOwnDeck = info?.isOwnDeck ?? false;
+
+            // Disable if loading, invalid length, or if we got no info back (404)
+            final shouldDisable = _isAdding || isInvalid || isAlreadyAdded || isOwnDeck || info == null;
+
+            return FilledButton(
+              onPressed: shouldDisable
+                  ? null
+                  : () async {
+                      setState(() => _isAdding = true);
+                      provider.clearError();
+
+                      final success = await provider.addDeckByCode(
+                        _codeController.text.trim().toUpperCase(),
+                      );
+
+                      if (!mounted) return;
+                      setState(() => _isAdding = false);
+
+                      if (success) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(l10n?.deckAddedSuccessfully ??
+                                'Deck added successfully'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.error ?? 'Failed to add deck'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: colorScheme.error,
+                          ),
+                        );
+                      }
+                    },
+              child: _isAdding
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(l10n?.add ?? 'Add'),
+            );
+          }
         ),
       ],
     );
