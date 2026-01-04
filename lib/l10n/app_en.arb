@@ -297,5 +297,10 @@
   "systemCategories": "System Categories",
   "myCategories": "My Categories",
   "categoryRequired": "Please select a category",
-  "read": "Read"
+  "read": "Read",
+  "newConversation": "New Conversation",
+  "conversations": "Conversations",
+  "conversationCreated": "New conversation started",
+  "history": "History",
+  "newChat": "New"
 }

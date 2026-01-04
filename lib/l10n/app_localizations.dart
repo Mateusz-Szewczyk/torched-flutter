@@ -1735,6 +1735,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Read'**
   String get read;
+
+  /// No description provided for @newConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'New Conversation'**
+  String get newConversation;
+
+  /// No description provided for @conversations.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get conversations;
+
+  /// No description provided for @conversationCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'New conversation started'**
+  String get conversationCreated;
+
+  /// No description provided for @history.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get history;
+
+  /// No description provided for @newChat.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get newChat;
 }
 
 class _AppLocalizationsDelegate

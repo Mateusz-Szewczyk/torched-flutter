@@ -854,4 +854,19 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get read => 'Read';
+
+  @override
+  String get newConversation => 'New Conversation';
+
+  @override
+  String get conversations => 'Conversations';
+
+  @override
+  String get conversationCreated => 'New conversation started';
+
+  @override
+  String get history => 'History';
+
+  @override
+  String get newChat => 'New';
 }

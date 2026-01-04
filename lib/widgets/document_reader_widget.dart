@@ -4,9 +4,69 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:google_fonts/google_fonts.dart';
 // Ensure this import points to your actual file structure
 import '../services/workspace_service.dart';
 import '../services/storage_service.dart';
+
+// ==========================================
+// READER SETTINGS MODEL
+// ==========================================
+
+enum ReaderFontFamily { serif, sans, mono }
+
+class ReaderSettings {
+  final ReaderFontFamily fontFamily;
+  final double fontSize;
+  final double lineHeight;
+  final bool isFullWidth;
+
+  const ReaderSettings({
+    this.fontFamily = ReaderFontFamily.sans,
+    this.fontSize = 18.0,
+    this.lineHeight = 1.6,
+    this.isFullWidth = false,
+  });
+
+  ReaderSettings copyWith({
+    ReaderFontFamily? fontFamily,
+    double? fontSize,
+    double? lineHeight,
+    bool? isFullWidth,
+  }) {
+    return ReaderSettings(
+      fontFamily: fontFamily ?? this.fontFamily,
+      fontSize: fontSize ?? this.fontSize,
+      lineHeight: lineHeight ?? this.lineHeight,
+      isFullWidth: isFullWidth ?? this.isFullWidth,
+    );
+  }
+
+  /// Gets the TextStyle for the current font family
+  TextStyle getBaseTextStyle(BuildContext context) {
+    final baseStyle = TextStyle(
+      fontSize: fontSize,
+      height: lineHeight,
+      color: Theme.of(context).colorScheme.onSurface,
+    );
+
+    switch (fontFamily) {
+      case ReaderFontFamily.serif:
+        return GoogleFonts.merriweather(textStyle: baseStyle);
+      case ReaderFontFamily.sans:
+        return GoogleFonts.inter(textStyle: baseStyle);
+      case ReaderFontFamily.mono:
+        return GoogleFonts.jetBrainsMono(textStyle: baseStyle);
+    }
+  }
+
+  /// Gets the max width constraint for content
+  double getMaxWidth(double screenWidth) {
+    if (isFullWidth) return double.infinity;
+    // Optimal reading width: ~65-75 characters, roughly 800px
+    return 800.0;
+  }
+}
 
 // ==========================================
 // MAIN WIDGET
@@ -55,6 +115,9 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
 
   final Map<String, TextSpan> _cachedSpans = {};
   
+  // Reader appearance settings
+  ReaderSettings _readerSettings = const ReaderSettings();
+
   // Merged text for cross-section selection
   String _mergedText = '';
   List<_SectionRange> _sectionRanges = [];
@@ -1017,6 +1080,342 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     );
   }
 
+  /// Shows the appearance/typography menu for reader customization
+  void _showAppearanceMenu() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          final colorScheme = Theme.of(context).colorScheme;
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.text_fields,
+                        color: colorScheme.primary,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Reading Appearance',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Font Family Selection
+                  Text(
+                    'Font',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildFontFamilyOption(
+                          context,
+                          setModalState,
+                          ReaderFontFamily.serif,
+                          'Serif',
+                          GoogleFonts.merriweather(textStyle: const TextStyle(fontSize: 16)),
+                          isDark,
+                          colorScheme,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildFontFamilyOption(
+                          context,
+                          setModalState,
+                          ReaderFontFamily.sans,
+                          'Sans',
+                          GoogleFonts.inter(textStyle: const TextStyle(fontSize: 16)),
+                          isDark,
+                          colorScheme,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildFontFamilyOption(
+                          context,
+                          setModalState,
+                          ReaderFontFamily.mono,
+                          'Mono',
+                          GoogleFonts.jetBrainsMono(textStyle: const TextStyle(fontSize: 14)),
+                          isDark,
+                          colorScheme,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Font Size Control
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Text Size',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        '${_readerSettings.fontSize.toInt()}',
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      // Decrease button
+                      _buildFontSizeButton(
+                        context,
+                        setModalState,
+                        Icons.text_decrease,
+                        _readerSettings.fontSize > 12.0,
+                        () {
+                          final newSize = (_readerSettings.fontSize - 2).clamp(12.0, 32.0);
+                          setState(() {
+                            _readerSettings = _readerSettings.copyWith(fontSize: newSize);
+                            _cachedSpans.clear(); // Clear cache to force re-render
+                          });
+                          setModalState(() {});
+                        },
+                        colorScheme,
+                      ),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+                          ),
+                          child: Slider(
+                            value: _readerSettings.fontSize,
+                            min: 12.0,
+                            max: 32.0,
+                            divisions: 10,
+                            onChanged: (value) {
+                              setState(() {
+                                _readerSettings = _readerSettings.copyWith(fontSize: value);
+                                _cachedSpans.clear();
+                              });
+                              setModalState(() {});
+                            },
+                          ),
+                        ),
+                      ),
+                      // Increase button
+                      _buildFontSizeButton(
+                        context,
+                        setModalState,
+                        Icons.text_increase,
+                        _readerSettings.fontSize < 32.0,
+                        () {
+                          final newSize = (_readerSettings.fontSize + 2).clamp(12.0, 32.0);
+                          setState(() {
+                            _readerSettings = _readerSettings.copyWith(fontSize: newSize);
+                            _cachedSpans.clear();
+                          });
+                          setModalState(() {});
+                        },
+                        colorScheme,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Content Width Toggle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? colorScheme.surfaceContainerHigh
+                          : colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      leading: Icon(
+                        _readerSettings.isFullWidth ? Icons.width_full : Icons.width_normal,
+                        color: colorScheme.primary,
+                      ),
+                      title: const Text('Full Width'),
+                      subtitle: Text(
+                        _readerSettings.isFullWidth
+                            ? 'Content spans full width'
+                            : 'Optimized reading width (800px)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      trailing: Switch.adaptive(
+                        value: _readerSettings.isFullWidth,
+                        onChanged: (value) {
+                          setState(() {
+                            _readerSettings = _readerSettings.copyWith(isFullWidth: value);
+                          });
+                          setModalState(() {});
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Preview Text
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? colorScheme.surface
+                          : colorScheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Preview',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'The quick brown fox jumps over the lazy dog. 1234567890',
+                          style: _readerSettings.getBaseTextStyle(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFontFamilyOption(
+    BuildContext context,
+    StateSetter setModalState,
+    ReaderFontFamily family,
+    String label,
+    TextStyle sampleStyle,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
+    final isSelected = _readerSettings.fontFamily == family;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _readerSettings = _readerSettings.copyWith(fontFamily: family);
+          _cachedSpans.clear();
+        });
+        setModalState(() {});
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? colorScheme.primary.withValues(alpha: 0.2) : colorScheme.primaryContainer)
+              : (isDark ? colorScheme.surfaceContainerHigh : colorScheme.surfaceContainerLow),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(
+              'Aa',
+              style: sampleStyle.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFontSizeButton(
+    BuildContext context,
+    StateSetter setModalState,
+    IconData icon,
+    bool isEnabled,
+    VoidCallback onPressed,
+    ColorScheme colorScheme,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: isEnabled ? onPressed : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          child: Icon(
+            icon,
+            size: 24,
+            color: isEnabled
+                ? colorScheme.primary
+                : colorScheme.onSurface.withValues(alpha: 0.3),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
@@ -1073,6 +1472,12 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
                       }
                     });
                   },
+                ),
+                // Appearance settings (Typography menu)
+                IconButton(
+                  icon: const Icon(Icons.text_fields),
+                  tooltip: 'Reading appearance',
+                  onPressed: _showAppearanceMenu,
                 ),
                 // Page selector
                 IconButton(
@@ -1169,24 +1574,34 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
             ),
 
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: EdgeInsets.symmetric(
+                horizontal: _readerSettings.isFullWidth ? 16 : 24,
+                vertical: 32,
+              ),
               sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Single RichText containing all sections for seamless selection
-                    _buildAllSectionsText(context),
-                    // Loading indicator at the bottom
-                    if (_isLoadingMore)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                    // Bottom padding
-                    const SizedBox(height: 100),
-                  ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: _readerSettings.getMaxWidth(MediaQuery.of(context).size.width),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Single RichText containing all sections for seamless selection
+                        _buildAllSectionsText(context),
+                        // Loading indicator at the bottom
+                        if (_isLoadingMore)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                        // Bottom padding
+                        const SizedBox(height: 100),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1398,7 +1813,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     if (allSpans.isEmpty) {
       return Text(
         'No content loaded yet',
-        style: TextStyle(
+        style: _readerSettings.getBaseTextStyle(context).copyWith(
           color: colorScheme.onSurfaceVariant,
           fontStyle: FontStyle.italic,
         ),
@@ -1407,12 +1822,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
 
     return Text.rich(
       TextSpan(children: allSpans),
-      style: TextStyle(
-        fontSize: MediaQuery.of(context).size.width < 600 ? 15.0 : 18.0,
-        height: 1.6,
-        fontFamily: 'Roboto',
-        color: colorScheme.onSurface,
-      ),
+      style: _readerSettings.getBaseTextStyle(context),
       textAlign: TextAlign.left,
     );
   }
@@ -2784,7 +3194,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
         child: _buildTableWidget(context, table),
       );
     }
-    return null;;
+    return null;
   }
 
   /// Builds content spans with embedded math equations
@@ -2905,7 +3315,9 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     ColorScheme colorScheme,
   ) {
     final isBlock = mathType == 'block';
-    final fontSize = isBlock ? 18.0 : 16.0;
+    // Scale math font size with reader settings (+2 for better legibility)
+    final baseFontSize = _readerSettings.fontSize;
+    final fontSize = isBlock ? baseFontSize + 2 : baseFontSize;
 
     debugPrint('[MathWidget] Rendering LaTeX: $latex (type: $mathType)');
 

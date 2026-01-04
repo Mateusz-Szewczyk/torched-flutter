@@ -160,26 +160,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   // ===========================================================================
 
   Future<void> _createConversation() async {
-    try {
-      final newConversation = await _workspaceService.createWorkspaceConversation(
-        widget.workspaceId,
-      );
-      if (mounted) {
-        setState(() {
-          _conversations.insert(0, newConversation);
-          _currentConversation = newConversation;
-          _messages = [];
-          _currentSteps.clear();
-          _generatedActions.clear();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating conversation: $e')),
-        );
-      }
-    }
+    // Delegate to the new method with feedback
+    await _createNewConversationWithFeedback();
   }
 
   Future<void> _sendMessage() async {
@@ -222,16 +204,25 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       return WorkspaceMessage(id: -1, conversationId: _currentConversation!.id, sender: 'user', text: text, createdAt: '');
     });
 
-    // 3. Build workspace metadata for color-filtered context
+    // 3. Build workspace metadata for color-filtered context and LLM awareness
     Map<String, dynamic>? workspaceMetadata;
-    if (_selectedColors.isNotEmpty || _selectedDocumentId != null) {
-      workspaceMetadata = {
-        if (_selectedDocumentId != null) 'document_id': _selectedDocumentId,
-        if (_selectedColors.isNotEmpty) 'filter_colors': _selectedColors.toList(),
-        'workspace_id': widget.workspaceId,
-      };
-      debugPrint('[WorkspaceChat] Using workspace metadata: $workspaceMetadata');
-    }
+    // Always build metadata for workspace chat to include workspace info
+    final selectedDocument = _documents.firstWhere(
+      (d) => d.id == _selectedDocumentId,
+      orElse: () => WorkspaceDocumentBrief(id: '', title: '', categoryName: null, createdAt: ''),
+    );
+
+    workspaceMetadata = {
+      'workspace_id': widget.workspaceId,
+      if (_workspace?.name != null) 'workspace_name': _workspace!.name,
+      if (_workspace?.description != null && _workspace!.description!.isNotEmpty)
+        'workspace_description': _workspace!.description,
+      if (_selectedDocumentId != null) 'document_id': _selectedDocumentId,
+      if (_selectedDocumentId != null && selectedDocument.title.isNotEmpty)
+        'document_name': selectedDocument.title,
+      if (_selectedColors.isNotEmpty) 'filter_colors': _selectedColors.toList(),
+    };
+    debugPrint('[WorkspaceChat] Using workspace metadata: $workspaceMetadata');
 
     // 4. Stream Response with unified query endpoint
     try {
@@ -615,66 +606,92 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   Widget _buildFileTabsBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      height: 48,
+      height: 52,
+      margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.3))),
+        color: colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: ListView.builder(
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: _documents.length,
-        itemBuilder: (context, index) {
-          final doc = _documents[index];
-          final isSelected = doc.id == _selectedDocumentId;
-          return Padding(
-            padding: const EdgeInsets.only(top: 6, right: 4),
-            child: InkWell(
-              onTap: () => setState(() => _selectedDocumentId = doc.id),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: isSelected ? colorScheme.surfaceContainerHighest : Colors.transparent,
-                  border: isSelected ? Border(
-                    top: BorderSide(color: colorScheme.primary, width: 2),
-                    left: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.3)),
-                    right: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.3)),
-                  ) : null,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                ),
-                alignment: Alignment.center,
-                child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: _documents.map((doc) {
+            final isSelected = doc.id == _selectedDocumentId;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(_getFileIcon(doc.title), size: 16, color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant),
+                    Icon(
+                      _getFileIcon(doc.title),
+                      size: 14,
+                      color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      doc.title,
+                      doc.title.length > 25
+                          ? '${doc.title.substring(0, 22)}...'
+                          : doc.title,
                       style: TextStyle(
                         fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        color: isSelected ? colorScheme.onSurface : colorScheme.onSurfaceVariant
-                      )
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
+                selected: isSelected,
+                onSelected: (_) => setState(() => _selectedDocumentId = doc.id),
+                visualDensity: VisualDensity.compact,
+                selectedColor: colorScheme.primary,
+                labelStyle: TextStyle(
+                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                ),
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                showCheckmark: false,
               ),
-            ),
-          );
-        },
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 
   Widget _buildChatPanel(BuildContext context) {
-    return Column(
+    final isDesktop = MediaQuery.of(context).size.width >= kDesktopBreakpoint;
+
+    return Stack(
       children: [
-        _buildChatHeader(context),
-        const Divider(height: 1),
-        _buildColorFilters(context),
-        Expanded(
-          child: _messages.isEmpty && _streamingText.isEmpty
-              ? _buildChatEmptyState(context)
-              : _buildMessagesList(context),
+        // Main Chat Area
+        Positioned.fill(
+          child: Column(
+            children: [
+              _buildChatHeader(context),
+              const Divider(height: 1),
+              _buildColorFilters(context),
+              Expanded(
+                child: _messages.isEmpty && _streamingText.isEmpty
+                    ? _buildChatEmptyState(context)
+                    : _buildMessagesList(context),
+              ),
+              // Spacer to prevent content from being hidden behind the floating input
+              SizedBox(height: isDesktop ? 120 : 100),
+            ],
+          ),
         ),
+        // Input Area (Positioned for floating effect)
         _buildChatInput(context),
       ],
     );
@@ -692,7 +709,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
       controller: _chatScrollController,
       padding: EdgeInsets.only(
         left: 16, right: 16, top: 16,
-        bottom: isMobile ? 80 : 32 // Extra padding at bottom
+        bottom: isMobile ? 160 : 180 // Extra padding for floating input
       ),
       itemCount: totalCount,
       itemBuilder: (context, index) {
@@ -794,103 +811,136 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   Widget _buildChatInput(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context);
+    final isDesktop = MediaQuery.of(context).size.width >= kDesktopBreakpoint;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Selected Tools Chips
-            if (_selectedTools.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SizedBox(
-                  height: 30,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: _selectedTools.length,
-                    separatorBuilder: (_,__) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      return Chip(
-                        label: Text(_selectedTools.elementAt(index)),
-                        onDeleted: () => setState(() => _selectedTools.remove(_selectedTools.elementAt(index))),
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        labelStyle: const TextStyle(fontSize: 12),
-                        backgroundColor: colorScheme.surfaceContainerHighest,
-                        side: BorderSide.none,
-                      );
-                    },
+    if (isDesktop) {
+      return _buildDesktopChatInput(context, colorScheme, l10n);
+    }
+    return _buildMobileChatInput(context, colorScheme, l10n);
+  }
+
+  Widget _buildMobileChatInput(BuildContext context, ColorScheme colorScheme, AppLocalizations? l10n) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_selectedTools.isNotEmpty)
+                  _buildToolsChipsList(colorScheme),
+
+                // The main Pill
+                Container(
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withOpacity(0.5),
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _WorkspaceToolsButton(
+                          hasTools: _selectedTools.isNotEmpty,
+                          toolCount: _selectedTools.length,
+                          onPressed: () => _showToolsBottomSheet(context),
+                          colorScheme: colorScheme,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildChatTextField(l10n, colorScheme, false),
+                      ),
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _WorkspaceSendButton(
+                          isSending: _isSending,
+                          onPressed: _sendMessage,
+                          colorScheme: colorScheme,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
+  Widget _buildDesktopChatInput(BuildContext context, ColorScheme colorScheme, AppLocalizations? l10n) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: kMaxContentWidth),
+        margin: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHigh.withOpacity(0.85),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.75),
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(
+            color: colorScheme.outlineVariant.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_selectedTools.isNotEmpty)
+              _buildToolsChipsList(colorScheme),
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                // Tools Button
-                IconButton(
-                  onPressed: () => _showToolsBottomSheet(context),
-                  icon: Icon(
-                    Icons.add_circle_outline,
-                    color: _selectedTools.isNotEmpty ? colorScheme.primary : colorScheme.onSurfaceVariant
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: _WorkspaceToolsButton(
+                    hasTools: _selectedTools.isNotEmpty,
+                    toolCount: _selectedTools.length,
+                    onPressed: () => _showToolsBottomSheet(context),
+                    colorScheme: colorScheme,
                   ),
-                  tooltip: 'Add Tools',
                 ),
-                const SizedBox(width: 8),
-                // Text Field
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: colorScheme.outlineVariant.withOpacity(0.5)),
-                    ),
-                    child: TextField(
-                      controller: _messageController,
-                      focusNode: _inputFocusNode,
-                      minLines: 1,
-                      maxLines: 5,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                      decoration: InputDecoration(
-                        hintText: l10n?.type_message ?? 'Ask AI...',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        border: InputBorder.none,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
+                  child: _buildChatTextField(l10n, colorScheme, true),
                 ),
-                const SizedBox(width: 8),
-                // Send Button
-                GestureDetector(
-                  onTap: _isSending ? null : _sendMessage,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: _isSending ? colorScheme.surfaceContainerHighest : colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: _isSending
-                          ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onSurfaceVariant))
-                          : Icon(Icons.arrow_upward_rounded, color: colorScheme.onPrimary, size: 20),
-                    ),
+                const SizedBox(width: 12),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: _WorkspaceSendButton(
+                    isSending: _isSending,
+                    onPressed: _sendMessage,
+                    colorScheme: colorScheme,
                   ),
                 ),
               ],
@@ -901,42 +951,271 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     );
   }
 
+  Widget _buildToolsChipsList(ColorScheme colorScheme) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8, left: 4),
+      height: 28,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _selectedTools.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final tool = _selectedTools.elementAt(index);
+          return _WorkspaceToolChip(
+            label: _getToolShortName(tool),
+            onRemove: () => setState(() => _selectedTools.remove(tool)),
+            colorScheme: colorScheme,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildChatTextField(AppLocalizations? l10n, ColorScheme colorScheme, bool isDesktop) {
+    final textField = TextField(
+      controller: _messageController,
+      focusNode: _inputFocusNode,
+      minLines: 1,
+      maxLines: 8,
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.newline,
+      scrollPhysics: const ClampingScrollPhysics(),
+      style: TextStyle(
+        fontSize: 16,
+        height: 1.4,
+        color: colorScheme.onSurface,
+      ),
+      decoration: InputDecoration(
+        filled: false,
+        hintText: _selectedColors.isNotEmpty
+            ? 'Ask about ${_selectedColors.join(", ")} highlights...'
+            : (l10n?.type_message ?? 'Message...'),
+        hintStyle: TextStyle(
+          color: colorScheme.onSurfaceVariant.withOpacity(0.85),
+        ),
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+      ),
+    );
+
+    if (isDesktop) {
+      return CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.enter): () {
+            if (!HardwareKeyboard.instance.isShiftPressed) {
+              _sendMessage();
+            }
+          },
+        },
+        child: textField,
+      );
+    }
+
+    return textField;
+  }
+
+  String _getToolShortName(String tool) {
+    switch (tool) {
+      case 'Wiedza z plików':
+        return 'Files';
+      case 'Generowanie fiszek':
+        return 'Flashcards';
+      case 'Generowanie egzaminu':
+        return 'Exam';
+      case 'Wyszukaj w internecie':
+        return 'Web';
+      default:
+        return tool;
+    }
+  }
+
   Widget _buildChatEmptyState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.5),
-                shape: BoxShape.circle,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 40),
+          // Animated Icon Container
+          Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  colorScheme.primaryContainer.withOpacity(isDark ? 0.3 : 0.5),
+                  colorScheme.secondaryContainer.withOpacity(isDark ? 0.2 : 0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              child: Icon(Icons.auto_awesome, size: 48, color: colorScheme.primary),
-            ),
-            const SizedBox(height: 24),
-            Text('Ask about your document', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              'Select highlighted text to focus the AI,\nor try a quick action below.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 24),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildQuickAction('Summarize', Icons.short_text),
-                _buildQuickAction('Generate Flashcards', Icons.style),
-                _buildQuickAction('Quiz Me', Icons.quiz),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: colorScheme.primary.withOpacity(0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
-          ],
+            child: Icon(
+              Icons.auto_awesome_rounded,
+              size: 40,
+              color: colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Title
+          Text(
+            'Ready to study?',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Subtitle
+          Text(
+            'Highlight text to focus the AI,\nor try a quick action below.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.5,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Quick Actions Grid
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildEnhancedQuickAction(
+                context,
+                'Summarize',
+                Icons.short_text_rounded,
+                colorScheme.tertiary,
+              ),
+              _buildEnhancedQuickAction(
+                context,
+                'Flashcards',
+                Icons.style_rounded,
+                colorScheme.secondary,
+              ),
+              _buildEnhancedQuickAction(
+                context,
+                'Quiz Me',
+                Icons.quiz_rounded,
+                colorScheme.primary,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 32),
+
+          // Hint about color filters
+          if (_selectedColors.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline_rounded,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(
+                      'Tip: Use color filters above to focus on specific highlights',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnhancedQuickAction(
+    BuildContext context,
+    String label,
+    IconData icon,
+    Color accentColor,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          _messageController.text = label;
+          _sendMessage();
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? colorScheme.surfaceContainerHigh
+                : colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withOpacity(0.3),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, size: 16, color: accentColor),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -955,41 +1234,408 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   Widget _buildChatHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
       child: Row(
         children: [
-          Icon(Icons.auto_awesome, size: 18, color: colorScheme.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _currentConversation?.title ?? 'New Conversation',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-              overflow: TextOverflow.ellipsis,
+          // AI Indicator
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.primary.withOpacity(0.15),
+                  colorScheme.primary.withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.auto_awesome,
+              size: 16,
+              color: colorScheme.primary,
             ),
           ),
-          PopupMenuButton<WorkspaceConversation?>(
-            icon: const Icon(Icons.history),
+          const SizedBox(width: 12),
+          // Title
+          Expanded(
+            child: GestureDetector(
+              onTap: _conversations.length > 1 ? () => _showConversationSelector(context) : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _currentConversation?.title ?? 'New Conversation',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_conversations.length > 1) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 16,
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (_workspace != null)
+                    Text(
+                      _workspace!.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Action buttons
+          _ChatHeaderAction(
+            icon: Icons.add_rounded,
+            tooltip: 'New Chat',
+            onPressed: _createNewConversationWithFeedback,
+            colorScheme: colorScheme,
+            isPrimary: true,
+          ),
+          _ChatHeaderAction(
+            icon: Icons.history_rounded,
             tooltip: 'History',
-            onSelected: (conv) {
-              if (conv == null) _createConversation();
-              else {
-                setState(() {
-                  _currentConversation = conv;
-                  _messages = [];
-                });
-                _loadMessages();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: null, child: Text('+ New Conversation')),
-              const PopupMenuDivider(),
-              ..._conversations.map((c) => PopupMenuItem(value: c, child: Text(c.title ?? 'Untitled'))),
-            ],
-          )
+            onPressed: () => _showHistoryMenu(context),
+            colorScheme: colorScheme,
+          ),
         ],
       ),
     );
+  }
+
+  void _showHistoryMenu(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    'Chat History',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _createNewConversationWithFeedback();
+                    },
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('New'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // List
+            Flexible(
+              child: _conversations.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        'No conversations yet',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      ),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _conversations.length,
+                      itemBuilder: (context, index) {
+                        final conv = _conversations[index];
+                        final isSelected = conv.id == _currentConversation?.id;
+                        return ListTile(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _switchConversation(conv);
+                          },
+                          leading: Icon(
+                            isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                            size: 20,
+                            color: isSelected
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                          title: Text(
+                            conv.title ?? 'Untitled',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedTileColor: colorScheme.primaryContainer.withOpacity(0.3),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 4,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Creates a new conversation with visual feedback
+  Future<void> _createNewConversationWithFeedback() async {
+    // Show loading indicator briefly
+    setState(() => _isSending = true);
+
+    try {
+      final newConversation = await _workspaceService.createWorkspaceConversation(
+        widget.workspaceId,
+      );
+
+      if (mounted) {
+        // Haptic feedback for success
+        HapticFeedback.mediumImpact();
+
+        setState(() {
+          _conversations.insert(0, newConversation);
+          _currentConversation = newConversation;
+          _messages = [];
+          _currentSteps.clear();
+          _generatedActions.clear();
+          _streamingText = '';
+          _isSending = false;
+        });
+
+        // Show confirmation snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_outline, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                const Text('New conversation started'),
+              ],
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+
+        // Focus on input field
+        _inputFocusNode.requestFocus();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSending = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error creating conversation: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Switches to a different conversation
+  void _switchConversation(WorkspaceConversation conv) {
+    if (conv.id == _currentConversation?.id) return;
+
+    HapticFeedback.selectionClick();
+
+    setState(() {
+      _currentConversation = conv;
+      _messages = [];
+      _currentSteps.clear();
+      _generatedActions.clear();
+      _streamingText = '';
+    });
+
+    _loadMessages();
+  }
+
+  /// Shows a bottom sheet with conversation selector (for mobile)
+  void _showConversationSelector(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.6,
+        ),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.chat_bubble_outline, color: colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Conversations',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _createNewConversationWithFeedback();
+                    },
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('New'),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1),
+
+            // Conversation List
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                itemCount: _conversations.length,
+                itemBuilder: (context, index) {
+                  final conv = _conversations[index];
+                  final isSelected = conv.id == _currentConversation?.id;
+
+                  return ListTile(
+                    leading: Icon(
+                      isSelected
+                          ? Icons.chat_bubble_rounded
+                          : Icons.chat_bubble_outline_rounded,
+                      color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                    ),
+                    title: Text(
+                      conv.title ?? 'Untitled',
+                      style: TextStyle(
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      _formatConversationDate(conv.createdAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    selected: isSelected,
+                    selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _switchConversation(conv);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Formats conversation date for display
+  String _formatConversationDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inDays == 0) {
+        return 'Today';
+      } else if (diff.inDays == 1) {
+        return 'Yesterday';
+      } else if (diff.inDays < 7) {
+        return '${diff.inDays} days ago';
+      } else {
+        return '${date.day}/${date.month}/${date.year}';
+      }
+    } catch (_) {
+      return '';
+    }
   }
 
   Widget _buildColorFilters(BuildContext context) {
@@ -997,41 +1643,128 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final colorMap = {
-      'red': isDark ? Colors.red[400]! : Colors.red,
-      'yellow': isDark ? Colors.yellow[600]! : Colors.amber,
-      'green': isDark ? Colors.green[400]! : Colors.green,
-      'blue': isDark ? Colors.blue[400]! : Colors.blue,
-      'purple': isDark ? Colors.purple[300]! : Colors.purple,
+      'red': isDark ? Colors.red[400]! : Colors.red[500]!,
+      'yellow': isDark ? Colors.amber[400]! : Colors.amber[600]!,
+      'green': isDark ? Colors.green[400]! : Colors.green[500]!,
+      'blue': isDark ? Colors.blue[400]! : Colors.blue[500]!,
+      'purple': isDark ? Colors.purple[300]! : Colors.purple[500]!,
     };
 
+    const double chipSize = 28.0;
+
     return Container(
-      height: 40,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
         children: [
-          Center(child: Text('Focus context: ', style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant))),
-          ..._availableColors.map((color) {
-            final isSelected = _selectedColors.contains(color);
-            return Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: FilterChip(
-                showCheckmark: false,
-                selected: isSelected,
-                label: Container(
-                  width: 12, height: 12,
-                  decoration: BoxDecoration(color: colorMap[color], shape: BoxShape.circle),
-                ),
-                padding: EdgeInsets.zero,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                onSelected: (_) => _toggleColorFilter(color),
-                visualDensity: VisualDensity.compact,
-                side: isSelected ? BorderSide(color: colorMap[color]!, width: 2) : BorderSide.none,
-                backgroundColor: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-              ),
-            );
-          }),
+          // Label
+          Text(
+            'Focus',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Color chips
+          Expanded(
+            child: Row(
+              children: _availableColors.map((color) {
+                final isSelected = _selectedColors.contains(color);
+                final colorValue = colorMap[color]!;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => _toggleColorFilter(color),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      width: chipSize,
+                      height: chipSize,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? colorValue
+                            : colorValue.withOpacity(isDark ? 0.15 : 0.12),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isSelected
+                              ? colorValue
+                              : colorValue.withOpacity(isDark ? 0.4 : 0.3),
+                          width: isSelected ? 0 : 1.5,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: colorValue.withOpacity(0.4),
+                                  blurRadius: 8,
+                                  spreadRadius: 0,
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 150),
+                          child: isSelected
+                              ? const Icon(
+                                  Icons.check_rounded,
+                                  size: 16,
+                                  color: Colors.white,
+                                  key: ValueKey('check'),
+                                )
+                              : const SizedBox.shrink(key: ValueKey('empty')),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          // Clear button
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: _selectedColors.isNotEmpty ? 1.0 : 0.0,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: _selectedColors.isNotEmpty ? null : 0,
+              child: _selectedColors.isNotEmpty
+                  ? GestureDetector(
+                      onTap: () => setState(() => _selectedColors.clear()),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.close_rounded,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Clear',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ),
         ],
       ),
     );
@@ -1100,14 +1833,187 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   }
 
   Widget _buildNoDocumentSelected(BuildContext context) {
-    return Center(
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Take first 4 documents for quick access
+    final quickAccessDocs = _documents.take(4).toList();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(32),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.article_outlined, size: 64, color: Theme.of(context).colorScheme.outlineVariant),
-          const SizedBox(height: 16),
-          const Text('Select a document to start reading'),
+          // Welcome Header
+          Text(
+            'Welcome back! 👋',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Select a document from above to start studying, or pick one from your recent files.',
+            style: TextStyle(
+              fontSize: 15,
+              color: colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Quick Access Section
+          if (quickAccessDocs.isNotEmpty) ...[
+            Row(
+              children: [
+                Icon(Icons.history_rounded, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Quick Access',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Document Grid
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.4,
+              ),
+              itemCount: quickAccessDocs.length,
+              itemBuilder: (context, index) {
+                final doc = quickAccessDocs[index];
+                return _buildQuickAccessCard(context, doc, isDark, colorScheme);
+              },
+            ),
+          ] else ...[
+            // Empty state when no documents
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.folder_open_outlined,
+                      size: 48,
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'No documents yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Upload files in My Files to see them here',
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessCard(
+    BuildContext context,
+    WorkspaceDocumentBrief doc,
+    bool isDark,
+    ColorScheme colorScheme,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _selectedDocumentId = doc.id),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark
+                ? colorScheme.surfaceContainerHigh
+                : colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withOpacity(0.3),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // File Icon
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  _getFileIcon(doc.title),
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const Spacer(),
+              // File Name
+              Text(
+                doc.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              if (doc.categoryName != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  doc.categoryName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1199,6 +2105,39 @@ class _KeepAlivePageState extends State<_KeepAlivePage> with AutomaticKeepAliveC
   bool get wantKeepAlive => true;
 }
 
+/// Chat Avatar - identical to chat_screen.dart
+class _WorkspaceChatAvatar extends StatelessWidget {
+  final bool isUser;
+  final ColorScheme colorScheme;
+
+  const _WorkspaceChatAvatar({required this.isUser, required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: isUser ? Colors.transparent : colorScheme.primaryContainer,
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: isUser
+            ? const SizedBox()
+            : Padding(
+                padding: const EdgeInsets.all(6.0),
+                child: Image.asset(
+                  'assets/images/favicon.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+/// Minimal message bubble - identical style to chat_screen.dart
 class _MinimalMessageBubble extends StatelessWidget {
   final WorkspaceMessage message;
   final bool isUser;
@@ -1216,32 +2155,75 @@ class _MinimalMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(top: 8, bottom: 4),
-        constraints: BoxConstraints(maxWidth: isMobile ? 300 : 380),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: isUser ? colorScheme.primaryContainer : colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isUser ? 20 : 4),
-            bottomRight: Radius.circular(isUser ? 4 : 20),
-          ),
-        ),
-        child: MarkdownBody(
-          data: message.text + (isStreaming ? ' ▌' : ''),
-          styleSheet: MarkdownStyleSheet(
-            p: TextStyle(color: colorScheme.onSurface, fontSize: 15),
-            code: TextStyle(backgroundColor: colorScheme.surface, fontFamily: 'monospace', fontSize: 13),
-            codeblockDecoration: BoxDecoration(
-              color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: EdgeInsets.only(
+        top: 16,
+        bottom: 8,
+        left: isUser ? 40 : 0,
+        right: isUser ? 0 : 20,
+      ),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Bot Avatar (Left)
+          if (!isUser) ...[
+            _WorkspaceChatAvatar(isUser: false, colorScheme: colorScheme),
+            const SizedBox(width: 12),
+          ],
+
+          // Message Content
+          Flexible(
+            child: Container(
+              padding: isUser
+                  ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+                  : const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+              decoration: BoxDecoration(
+                color: isUser
+                    ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(isUser ? 20 : 0),
+              ),
+              child: MarkdownBody(
+                data: message.text + (isStreaming ? ' ▌' : ''),
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: isMobile ? 15 : 16,
+                    height: 1.6,
+                  ),
+                  h1: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22),
+                  h2: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20),
+                  h3: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18),
+                  strong: const TextStyle(fontWeight: FontWeight.w700),
+                  code: TextStyle(
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    color: colorScheme.onSurface,
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: colorScheme.outline.withOpacity(0.2)),
+                  ),
+                ),
+                selectable: true,
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1256,46 +2238,140 @@ class _MinimalStepsPanel extends StatefulWidget {
 }
 
 class _MinimalStepsPanelState extends State<_MinimalStepsPanel> {
-  bool _expanded = true;
+  bool _isExpanded = true;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final loading = widget.steps.any((s) => s.status == 'loading');
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isMobile = MediaQuery.of(context).size.width < kDesktopBreakpoint;
+
+    // Determine if we are still processing
+    final bool isThinking =
+        widget.steps.any((step) => step.status == 'loading');
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: colorScheme.outlineVariant, width: 3)),
+      margin: EdgeInsets.only(
+        left: isMobile ? 44 : 44, // Align with text start
+        right: 16,
+        bottom: 8,
+        top: 8,
       ),
-      padding: const EdgeInsets.only(left: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Row(
-              children: [
-                if (loading) SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.primary))
-                else Icon(Icons.check_circle, size: 14, color: Colors.green),
-                const SizedBox(width: 8),
-                Text(loading ? 'Thinking Process...' : 'Process Completed', style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 12)),
-                const Spacer(),
-                Icon(_expanded ? Icons.expand_less : Icons.expand_more, size: 16, color: colorScheme.onSurfaceVariant),
-              ],
-            ),
-          ),
-          if (_expanded)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: widget.steps.map((step) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• ${step.content}', style: TextStyle(fontSize: 12, color: colorScheme.onSurface)),
-                )).toList(),
+            onTap: () => setState(() => _isExpanded = !_isExpanded),
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isThinking)
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isThinking ? 'Thinking...' : 'Thought Process',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
               ),
             ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: 8, left: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: widget.steps
+                    .map((step) => _WorkspaceStepItem(
+                          step: step,
+                          colorScheme: colorScheme,
+                        ))
+                    .toList(),
+              ),
+            ),
+            crossFadeState: _isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceStepItem extends StatelessWidget {
+  final ChatStep step;
+  final ColorScheme colorScheme;
+
+  const _WorkspaceStepItem({required this.step, required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoading = step.status == 'loading';
+    final isComplete = step.status == 'complete';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(
+              isLoading
+                  ? Icons.circle_outlined
+                  : (isComplete
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.circle_outlined),
+              size: 14,
+              color: isLoading
+                  ? colorScheme.primary
+                  : (isComplete
+                      ? Colors.green
+                      : colorScheme.onSurfaceVariant),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              step.content,
+              style: TextStyle(
+                fontSize: 13,
+                color: isLoading
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -1368,3 +2444,208 @@ class _MinimalPersistedActionsWidget extends StatelessWidget {
     );
   }
 }
+
+// =============================================================================
+// WORKSPACE CHAT INPUT HELPER WIDGETS (Matching chat_screen.dart style)
+// =============================================================================
+
+class _WorkspaceToolsButton extends StatelessWidget {
+  final bool hasTools;
+  final int toolCount;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+
+  const _WorkspaceToolsButton({
+    required this.hasTools,
+    required this.toolCount,
+    required this.onPressed,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: hasTools
+            ? colorScheme.primary.withOpacity(0.1)
+            : Colors.transparent,
+        padding: EdgeInsets.zero,
+        fixedSize: const Size(36, 36),
+      ),
+      icon: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(
+            Icons.add_circle_outline_rounded,
+            size: 26,
+            color: hasTools
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant.withOpacity(0.8),
+          ),
+          if (hasTools)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorScheme.surface, width: 1.5),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceSendButton extends StatelessWidget {
+  final bool isSending;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+
+  const _WorkspaceSendButton({
+    required this.isSending,
+    required this.onPressed,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: isSending ? null : onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: isSending
+              ? colorScheme.surfaceContainerHighest
+              : colorScheme.primary,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: isSending
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                )
+              : Icon(
+                  Icons.arrow_upward_rounded,
+                  size: 20,
+                  color: colorScheme.onPrimary,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkspaceToolChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onRemove;
+  final ColorScheme colorScheme;
+
+  const _WorkspaceToolChip({
+    required this.label,
+    required this.onRemove,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.only(left: 10, right: 4, top: 2, bottom: 2),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: colorScheme.outline.withOpacity(0.1),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(width: 4),
+          InkWell(
+            onTap: onRemove,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                Icons.close_rounded,
+                size: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Minimal header action button for the chat header
+class _ChatHeaderAction extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+  final bool isPrimary;
+
+  const _ChatHeaderAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    required this.colorScheme,
+    this.isPrimary = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: isPrimary
+                  ? colorScheme.primary.withOpacity(0.1)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isPrimary
+                  ? colorScheme.primary
+                  : colorScheme.onSurfaceVariant.withOpacity(0.7),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
