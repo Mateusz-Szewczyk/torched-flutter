@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../models/models.dart';
 import '../../models/subscription_stats.dart';
+import '../../services/auth_service.dart';
 import '../profile/memories_section.dart';
 import '../profile/subscription_section.dart';
 
@@ -634,16 +635,6 @@ class _ProfileContentState extends State<_ProfileContent> {
     );
   }
 
-  String _formatJoinDate(String? dateStr) {
-    if (dateStr == null) return 'Unknown';
-
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
-    } catch (_) {
-      return dateStr;
-    }
-  }
 
   Widget _buildSubscriptionCard(
     BuildContext context,
@@ -1083,6 +1074,7 @@ class _PasswordContentState extends State<_PasswordContent> {
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -1164,11 +1156,17 @@ class _PasswordContentState extends State<_PasswordContent> {
               width: double.infinity,
               height: 56,
               child: FilledButton(
-                onPressed: _handleChangePassword,
+                onPressed: _isLoading ? null : _handleChangePassword,
                 style: FilledButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
-                child: const Text('Update Password', style: TextStyle(fontSize: 16)),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Update Password', style: TextStyle(fontSize: 16)),
               ),
             ),
           ],
@@ -1208,10 +1206,42 @@ class _PasswordContentState extends State<_PasswordContent> {
   Future<void> _handleChangePassword() async {
     if (_formKey.currentState?.validate() != true) return;
 
-    // TODO: Implement password change
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Password change not yet implemented')),
-    );
+    setState(() => _isLoading = true);
+
+    try {
+      final authService = AuthService();
+      final (success, error) = await authService.changePassword(
+        _currentPasswordController.text,
+        _newPasswordController.text,
+      );
+
+      if (!mounted) return;
+
+      if (success) {
+        // Clear form
+        _currentPasswordController.clear();
+        _newPasswordController.clear();
+        _confirmPasswordController.clear();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password changed successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? 'Failed to change password'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import '../screens/flashcards_screen.dart';
 import '../screens/tests_screen.dart';
 import '../screens/confirm_email_screen.dart';
 import '../screens/reset_password_screen.dart';
+import '../screens/workspace_screen.dart';
 import '../layouts/main_layout.dart';
 import '../providers/auth_provider.dart';
 import 'constants.dart';
@@ -86,16 +87,6 @@ class AppRouter {
             path: Routes.flashcards,
             name: 'flashcards',
             builder: (context, state) => const FlashcardsScreen(),
-            routes: [
-              GoRoute(
-                path: 'study/:deckId',
-                name: 'study-deck',
-                builder: (context, state) {
-                  final deckId = state.pathParameters['deckId'];
-                  return StudyDeckScreen(deckId: int.parse(deckId!));
-                },
-              ),
-            ],
           ),
 
           // Tests / Exams
@@ -103,16 +94,16 @@ class AppRouter {
             path: Routes.tests,
             name: 'tests',
             builder: (context, state) => const TestsScreen(),
-            routes: [
-              GoRoute(
-                path: 'study/:examId',
-                name: 'study-exam',
-                builder: (context, state) {
-                  final examId = state.pathParameters['examId'];
-                  return StudyExamScreen(examId: int.parse(examId!));
-                },
-              ),
-            ],
+          ),
+
+          // Workspace - Document Reader & AI Assistant
+          GoRoute(
+            path: '${Routes.workspace}/:workspaceId',
+            name: 'workspace',
+            builder: (context, state) {
+              final workspaceId = state.pathParameters['workspaceId'] ?? '';
+              return WorkspaceScreen(workspaceId: workspaceId);
+            },
           ),
         ],
       ),
@@ -164,34 +155,8 @@ class AppRouter {
   );
 }
 
-// Placeholder screens (will be implemented later)
-class StudyDeckScreen extends StatelessWidget {
-  final int deckId;
-
-  const StudyDeckScreen({required this.deckId, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Study Deck $deckId')),
-      body: Center(child: Text('Deck $deckId study screen - TODO')),
-    );
-  }
-}
-
-class StudyExamScreen extends StatelessWidget {
-  final int examId;
-
-  const StudyExamScreen({required this.examId, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Study Exam $examId')),
-      body: Center(child: Text('Exam $examId study screen - TODO')),
-    );
-  }
-}
+// Note: StudyDeckWidget and StudyExamWidget are implemented in their respective
+// widget files and are invoked from flashcards_screen.dart and exams_screen.dart
 
 
 

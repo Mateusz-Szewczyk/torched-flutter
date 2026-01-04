@@ -149,35 +149,56 @@ class ChatService {
 
   /// Send a query and get streaming response
   /// Returns a Stream of response chunks
+  ///
+  /// [chatType] - 'normal' for standard chat, 'workspace' for document workspace chat
+  /// [workspaceMetadata] - Required for workspace chat, contains document_id and filter_colors
   Stream<ChatStreamEvent> streamQuery({
     required int conversationId,
     required String query,
     List<String> selectedTools = const [],
+    String chatType = 'normal',
+    Map<String, dynamic>? workspaceMetadata,
   }) async* {
     final storageService = StorageService();
     final token = await storageService.getToken();
 
+    debugPrint('[ChatService] streamQuery started for conversation $conversationId');
+    debugPrint('[ChatService] Token present: ${token != null && token.isNotEmpty}');
+    debugPrint('[ChatService] Chat type: $chatType');
+
     if (token == null || token.isEmpty) {
+      debugPrint('[ChatService] ERROR: No token available for streaming request');
       yield ChatStreamEvent.error('Not authenticated. Please log in again.');
       return;
     }
 
     final uri = Uri.parse('${_api.ragBaseUrl}/query/');
+    debugPrint('[ChatService] Streaming to URI: $uri');
 
     final request = http.Request('POST', uri);
     request.headers['Content-Type'] = 'application/json';
     request.headers['Accept'] = 'text/event-stream';
     request.headers['Authorization'] = 'Bearer $token';
 
-    request.body = jsonEncode({
+    final body = <String, dynamic>{
       'conversation_id': conversationId,
       'query': query,
       'selected_tools': selectedTools,
-    });
+      'chat_type': chatType,
+    };
+
+    // Add workspace metadata if provided
+    if (chatType == 'workspace' && workspaceMetadata != null) {
+      body['workspace_metadata'] = workspaceMetadata;
+    }
+
+    request.body = jsonEncode(body);
 
     try {
       final client = http.Client();
+      debugPrint('[ChatService] Sending request...');
       final streamedResponse = await client.send(request);
+      debugPrint('[ChatService] Response status: ${streamedResponse.statusCode}');
 
       if (streamedResponse.statusCode != 200) {
         String errorMessage = 'HTTP error: ${streamedResponse.statusCode}';

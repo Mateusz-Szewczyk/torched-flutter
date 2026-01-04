@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/conversation_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/workspace_provider.dart';
+import '../../services/workspace_service.dart' show WorkspaceModel;
 import '../dialogs/login_register_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/profile_dialog.dart';
 import '../dialogs/manage_files_dialog.dart';
+import '../workspace_form_dialog.dart';
 import '../profile/subscription_section.dart';
 import 'conversation_list.dart';
 
@@ -30,27 +33,50 @@ class LeftPanel extends StatefulWidget {
 }
 
 class _LeftPanelState extends State<LeftPanel> {
+  bool _hasFetchedInitially = false;
+
   @override
   void initState() {
     super.initState();
-    _fetchSubscriptionIfNeeded();
+    _fetchDataOnce();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _fetchSubscriptionIfNeeded();
+    // Only fetch once, not on every dependency change
+    if (!_hasFetchedInitially) {
+      _fetchDataOnce();
+    }
+  }
+
+  void _fetchDataOnce() {
+    if (_hasFetchedInitially) return;
+    _hasFetchedInitially = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _fetchSubscriptionIfNeeded();
+      _fetchWorkspacesIfNeeded();
+    });
   }
 
   void _fetchSubscriptionIfNeeded() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final authProvider = context.read<AuthProvider>();
-      final subscriptionProvider = context.read<SubscriptionProvider>();
-      if (authProvider.isAuthenticated && subscriptionProvider.stats == null && !subscriptionProvider.isLoading) {
-        subscriptionProvider.fetchStats();
-      }
-    });
+    if (!mounted) return;
+    final authProvider = context.read<AuthProvider>();
+    final subscriptionProvider = context.read<SubscriptionProvider>();
+    if (authProvider.isAuthenticated && subscriptionProvider.stats == null && !subscriptionProvider.isLoading) {
+      subscriptionProvider.fetchStats();
+    }
+  }
+
+  void _fetchWorkspacesIfNeeded() {
+    if (!mounted) return;
+    final authProvider = context.read<AuthProvider>();
+    final workspaceProvider = context.read<WorkspaceProvider>();
+    if (authProvider.isAuthenticated && !workspaceProvider.hasFetchedWorkspaces && !workspaceProvider.isLoadingWorkspaces) {
+      workspaceProvider.fetchWorkspaces();
+    }
   }
 
   @override
@@ -75,6 +101,12 @@ class _LeftPanelState extends State<LeftPanel> {
                 children: [
                   // Primary navigation
                   _buildPrimaryNavigation(context, isAuthenticated),
+
+                  // Workspaces section (only if authenticated)
+                  if (isAuthenticated) ...[
+                    const SizedBox(height: 16),
+                    _buildWorkspacesSection(context),
+                  ],
 
                   // Conversations section (only if authenticated)
                   if (isAuthenticated) ...[
@@ -253,6 +285,177 @@ class _LeftPanelState extends State<LeftPanel> {
     );
   }
 
+  Widget _buildWorkspacesSection(BuildContext context) {
+    final workspaceProvider = context.watch<WorkspaceProvider>();
+    final workspaces = workspaceProvider.workspaces;
+    final isLoading = workspaceProvider.isLoadingWorkspaces;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.isPanelVisible) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'WORKSPACES',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Theme.of(context).textTheme.bodySmall?.color,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => _showCreateWorkspaceDialog(context),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(
+                        Icons.add,
+                        size: 18,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Workspaces list
+            if (isLoading)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            else if (workspaces.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.work_outline,
+                      size: 32,
+                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'No workspaces yet',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Theme.of(context).textTheme.bodySmall?.color,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () => _showCreateWorkspaceDialog(context),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Create workspace'),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        textStyle: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: workspaces.length,
+                itemBuilder: (context, index) {
+                  final workspace = workspaces[index];
+                  return _WorkspaceItem(
+                    workspace: workspace,
+                    isPanelVisible: widget.isPanelVisible,
+                    isMobile: widget.isMobile,
+                    onTap: () {
+                      context.go('/workspace/${workspace.id}');
+                      if (widget.isMobile) widget.togglePanel();
+                    },
+                    onDelete: () => _confirmDeleteWorkspace(context, workspace),
+                    onEdit: () => _showEditWorkspaceDialog(context, workspace),
+                  );
+                },
+              ),
+          ] else
+            // Collapsed view - just show icon
+            Tooltip(
+              message: 'Workspaces',
+              child: IconButton(
+                icon: const Icon(Icons.work_outline),
+                onPressed: widget.togglePanel,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showCreateWorkspaceDialog(BuildContext context) async {
+    final result = await showDialog<WorkspaceModel>(
+      context: context,
+      builder: (context) => const WorkspaceFormDialog(),
+    );
+
+    if (result != null && mounted) {
+      context.read<WorkspaceProvider>().addWorkspace(result);
+    }
+  }
+
+  void _showEditWorkspaceDialog(BuildContext context, WorkspaceModel workspace) async {
+    final result = await showDialog<WorkspaceModel>(
+      context: context,
+      builder: (context) => WorkspaceFormDialog(workspace: workspace),
+    );
+
+    if (result != null && mounted) {
+      context.read<WorkspaceProvider>().updateWorkspaceInList(result);
+    }
+  }
+
+  void _confirmDeleteWorkspace(BuildContext context, WorkspaceModel workspace) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Workspace'),
+        content: Text('Are you sure you want to delete "${workspace.name}"? This will also delete all conversations within it.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final success = await context.read<WorkspaceProvider>().deleteWorkspace(workspace.id);
+              if (!success && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to delete workspace'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildConversationsSection(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -393,6 +596,142 @@ class _LeftPanelState extends State<LeftPanel> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// Workspace item widget
+class _WorkspaceItem extends StatelessWidget {
+  final WorkspaceModel workspace;
+  final bool isPanelVisible;
+  final bool isMobile;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final VoidCallback onEdit;
+
+  const _WorkspaceItem({
+    required this.workspace,
+    required this.isPanelVisible,
+    required this.isMobile,
+    required this.onTap,
+    required this.onDelete,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (!isPanelVisible) {
+      return Tooltip(
+        message: workspace.name,
+        child: IconButton(
+          icon: const Icon(Icons.folder_outlined, size: 20),
+          onPressed: onTap,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
+        child: Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 10,
+            vertical: isMobile ? 12 : 8,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: isMobile ? 36 : 32,
+                height: isMobile ? 36 : 32,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.work_outline,
+                  size: isMobile ? 18 : 16,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      workspace.name,
+                      style: TextStyle(
+                        fontSize: isMobile ? 14 : 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (workspace.categories.isNotEmpty)
+                      Text(
+                        '${workspace.categories.length} ${workspace.categories.length == 1 ? 'category' : 'categories'}',
+                        style: TextStyle(
+                          fontSize: isMobile ? 11 : 10,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_vert,
+                  size: isMobile ? 20 : 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onSelected: (value) {
+                  switch (value) {
+                    case 'edit':
+                      onEdit();
+                      break;
+                    case 'delete':
+                      onDelete();
+                      break;
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit Details'),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        const SizedBox(width: 8),
+                        const Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -9,6 +9,7 @@ import 'providers/conversation_provider.dart';
 import 'providers/flashcards_provider.dart';
 import 'providers/exams_provider.dart';
 import 'providers/subscription_provider.dart';
+import 'providers/workspace_provider.dart';
 import 'services/api_service.dart';
 import 'services/storage_service.dart';
 import 'services/subscription_service.dart';
@@ -49,6 +50,7 @@ class TorchEdApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => FlashcardsProvider()),
         ChangeNotifierProvider(create: (_) => ExamsProvider()),
         ChangeNotifierProvider(create: (_) => SubscriptionProvider(subscriptionService)),
+        ChangeNotifierProvider(create: (_) => WorkspaceProvider()),
       ],
       child: const _AppContent(),
     );

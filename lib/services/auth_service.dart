@@ -321,6 +321,68 @@ class AuthService {
   }
 
   // ============================================================================
+  // PASSWORD CHANGE
+  // ============================================================================
+
+  /// Change user's password
+  /// Returns (success, errorMessage)
+  Future<(bool, String?)> changePassword(String currentPassword, String newPassword) async {
+    try {
+      final response = await _api.post<Map<String, dynamic>>(
+        '${AppConfig.userEndpoint}/change-password',
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data!['success'] as bool? ?? false;
+        if (success) {
+          return (true, null);
+        }
+        return (false, response.data!['error'] as String? ?? 'Password change failed');
+      }
+
+      return (false, response.data?['error'] as String? ?? 'Password change failed');
+    } catch (e) {
+      debugPrint('[AuthService] Change password error: $e');
+      return (false, _api.getErrorMessage(e));
+    }
+  }
+
+  // ============================================================================
+  // ACCOUNT DELETION
+  // ============================================================================
+
+  /// Delete user account permanently
+  /// Requires confirmation text: 'USUŃ KONTO' or 'DELETE ACCOUNT'
+  /// Returns (success, errorMessage)
+  Future<(bool, String?)> deleteAccount(String confirmation) async {
+    try {
+      final response = await _api.delete<Map<String, dynamic>>(
+        '${AppConfig.userEndpoint}/delete-account',
+        data: {'confirmation': confirmation},
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final success = response.data!['success'] as bool? ?? false;
+        if (success) {
+          // Clear local data after successful deletion
+          await _storage.clearUserData();
+          return (true, null);
+        }
+        return (false, response.data!['error'] as String? ?? 'Account deletion failed');
+      }
+
+      return (false, response.data?['error'] as String? ?? 'Account deletion failed');
+    } catch (e) {
+      debugPrint('[AuthService] Delete account error: $e');
+      return (false, _api.getErrorMessage(e));
+    }
+  }
+
+  // ============================================================================
   // TOKEN REFRESH (for subscription upgrades)
   // ============================================================================
 

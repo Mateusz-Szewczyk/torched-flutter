@@ -694,4 +694,164 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get time => 'Time';
+
+  @override
+  String get addNewCategory => 'Add New Category';
+
+  @override
+  String get categoryName => 'Category Name';
+
+  @override
+  String get enterCategoryName => 'e.g., Biology, History';
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get systemCategories => 'System Categories';
+
+  @override
+  String get myCategories => 'My Categories';
+
+  @override
+  String get selectCategory => 'Select a category';
+
+  @override
+  String get categoryRequired => 'Please select a category';
+
+  @override
+  String get workspaces => 'Workspaces';
+
+  @override
+  String get workspace => 'Workspace';
+
+  @override
+  String get newWorkspace => 'New Workspace';
+
+  @override
+  String get createWorkspace => 'Create Workspace';
+
+  @override
+  String get editWorkspace => 'Edit Workspace';
+
+  @override
+  String get deleteWorkspace => 'Delete Workspace';
+
+  @override
+  String get workspaceName => 'Workspace Name';
+
+  @override
+  String get enterWorkspaceName => 'Enter workspace name';
+
+  @override
+  String get workspaceDescription => 'Description';
+
+  @override
+  String get enterWorkspaceDescription => 'Enter description (optional)';
+
+  @override
+  String get selectCategories => 'Select Categories';
+
+  @override
+  String get selectCategoriesHint => 'Choose which categories to include';
+
+  @override
+  String get noWorkspaces => 'No workspaces yet';
+
+  @override
+  String get createFirstWorkspace =>
+      'Create your first workspace to organize your study materials';
+
+  @override
+  String deleteWorkspaceConfirm(Object name) {
+    return 'Are you sure you want to delete \"$name\"? This will also delete all conversations in this workspace.';
+  }
+
+  @override
+  String get workspaceCreated => 'Workspace created';
+
+  @override
+  String get workspaceUpdated => 'Workspace updated';
+
+  @override
+  String get workspaceDeleted => 'Workspace deleted';
+
+  @override
+  String get documents => 'Documents';
+
+  @override
+  String get noDocuments => 'No documents';
+
+  @override
+  String get uploadDocument => 'Upload Document';
+
+  @override
+  String get openWorkspace => 'Open Workspace';
+
+  @override
+  String get reader => 'Reader';
+
+  @override
+  String get aiAssistant => 'AI Assistant';
+
+  @override
+  String get files => 'Files';
+
+  @override
+  String get highlights => 'Highlights';
+
+  @override
+  String get noHighlights => 'No highlights yet';
+
+  @override
+  String get selectTextToHighlight => 'Select text in the reader to highlight';
+
+  @override
+  String get filterByColor => 'Filter by Color';
+
+  @override
+  String get allColors => 'All Colors';
+
+  @override
+  String get red => 'Red';
+
+  @override
+  String get orange => 'Orange';
+
+  @override
+  String get yellow => 'Yellow';
+
+  @override
+  String get green => 'Green';
+
+  @override
+  String get blue => 'Blue';
+
+  @override
+  String get purple => 'Purple';
+
+  @override
+  String get addNote => 'Add Note';
+
+  @override
+  String get editNote => 'Edit Note';
+
+  @override
+  String get deleteHighlight => 'Delete Highlight';
+
+  @override
+  String get loadingDocument => 'Loading document...';
+
+  @override
+  String get documentLoadError => 'Failed to load document';
+
+  @override
+  String get noDocumentSelected => 'No document selected';
+
+  @override
+  String get selectDocumentToRead =>
+      'Select a document from the sidebar to start reading';
+
+  @override
+  String get read => 'Read';
 }

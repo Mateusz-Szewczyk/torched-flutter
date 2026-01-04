@@ -6,7 +6,7 @@ import '../config/constants.dart';
 
 /// Model for uploaded file from backend
 class UploadedFileInfo {
-  final int id;
+  final String id;
   final String name;
   final String description;
   final String category;
@@ -22,7 +22,7 @@ class UploadedFileInfo {
 
   factory UploadedFileInfo.fromJson(Map<String, dynamic> json) {
     return UploadedFileInfo(
-      id: json['id'] as int? ?? 0,
+      id: json['id'] as String? ?? '', // UUID as string
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
       category: json['category'] as String? ?? '',
@@ -58,13 +58,13 @@ class FileService {
     required String fileName,
     required Uint8List fileBytes,
     required String description,
-    required String category,
+    required String categoryId, // Changed from 'category' to 'categoryId' (UUID)
     void Function(int sent, int total)? onProgress,
   }) async {
     try {
       final formData = FormData.fromMap({
         'file_description': description,
-        'category': category,
+        'category_id': categoryId, // Changed from 'category' to 'category_id'
         'file': MultipartFile.fromBytes(
           fileBytes,
           filename: fileName,

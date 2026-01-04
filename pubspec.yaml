@@ -51,6 +51,8 @@ dependencies:
   # Markdown
   flutter_markdown: ^0.7.4
 
+  # Math/LaTeX rendering
+  flutter_math_fork: ^0.7.2
 
   # File picker
   file_picker: ^8.1.6

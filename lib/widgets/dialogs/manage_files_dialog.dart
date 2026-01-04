@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/file_service.dart';
+import '../../services/category_service.dart';
+import '../category_dropdown.dart';
 
 /// Mobile-first dialog for managing uploaded files
 /// Uses bottom sheet on mobile, dialog on desktop
@@ -106,7 +108,7 @@ class _MobileFilesSheetState extends State<_MobileFilesSheet>
     _tabController.animateTo(1);
   }
 
-  void _onFileDeleted(int fileId) {
+  void _onFileDeleted(String fileId) {
     setState(() {
       _files = _files.where((f) => f.id != fileId).toList();
     });
@@ -249,9 +251,11 @@ class _MobileUploadTab extends StatefulWidget {
 
 class _MobileUploadTabState extends State<_MobileUploadTab> {
   final FileService _fileService = FileService();
+  final CategoryService _categoryService = CategoryService();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _categoryController = TextEditingController();
 
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
   String? _selectedFileName;
   Uint8List? _selectedFileBytes;
   bool _isUploading = false;
@@ -262,7 +266,6 @@ class _MobileUploadTabState extends State<_MobileUploadTab> {
   @override
   void dispose() {
     _descriptionController.dispose();
-    _categoryController.dispose();
     super.dispose();
   }
 
@@ -299,8 +302,8 @@ class _MobileUploadTabState extends State<_MobileUploadTab> {
       return;
     }
 
-    if (_categoryController.text.trim().isEmpty) {
-      setState(() => _error = 'Please enter a category');
+    if (_selectedCategoryId == null) {
+      setState(() => _error = 'Please select a category');
       return;
     }
 
@@ -317,7 +320,7 @@ class _MobileUploadTabState extends State<_MobileUploadTab> {
         fileName: _selectedFileName!,
         fileBytes: _selectedFileBytes!,
         description: _descriptionController.text.trim(),
-        category: _categoryController.text.trim(),
+        categoryId: _selectedCategoryId!, // Send category UUID, not name
         onProgress: (sent, total) {
           if (total > 0) {
             setState(() => _uploadProgress = sent / total);
@@ -330,7 +333,8 @@ class _MobileUploadTabState extends State<_MobileUploadTab> {
         _selectedFileName = null;
         _selectedFileBytes = null;
         _descriptionController.clear();
-        _categoryController.clear();
+        _selectedCategoryId = null;
+        _selectedCategoryName = null;
         _isUploading = false;
         _uploadProgress = 0;
         _successMessage = 'File uploaded successfully!';
@@ -408,24 +412,26 @@ class _MobileUploadTabState extends State<_MobileUploadTab> {
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
-            controller: _categoryController,
-            decoration: InputDecoration(
-              hintText: l10n?.enter_category ?? 'e.g., Math, Physics, Notes',
-              filled: true,
-              fillColor: colorScheme.surfaceContainerHighest,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: colorScheme.primary, width: 2),
-              ),
-              contentPadding: const EdgeInsets.all(16),
-            ),
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _uploadFile(),
+          CategoryDropdown(
+            selectedCategoryId: _selectedCategoryId,
+            onChanged: (categoryId) async {
+              setState(() => _selectedCategoryId = categoryId);
+              // Get the category name for upload
+              if (categoryId != null) {
+                try {
+                  final categories = await _categoryService.getCategories();
+                  final category = categories.firstWhere(
+                    (c) => c.id == categoryId,
+                    orElse: () => CategoryModel(id: categoryId, name: categoryId, isSystem: false),
+                  );
+                  setState(() => _selectedCategoryName = category.name);
+                } catch (e) {
+                  setState(() => _selectedCategoryName = categoryId);
+                }
+              }
+            },
+            isEnabled: !_isUploading,
+            hintText: l10n?.enter_category ?? 'Select a category',
           ),
 
           const SizedBox(height: 24),
@@ -642,7 +648,7 @@ class _MobileFilesTab extends StatefulWidget {
   final bool isLoading;
   final String? error;
   final VoidCallback onRefresh;
-  final Function(int) onDelete;
+  final Function(String) onDelete;
 
   const _MobileFilesTab({
     required this.files,
@@ -1209,10 +1215,12 @@ class _DesktopFilesDialog extends StatefulWidget {
 
 class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
   final FileService _fileService = FileService();
+  final CategoryService _categoryService = CategoryService();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _categoryController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
 
+  String? _selectedCategoryId;
+  String? _selectedCategoryName;
   List<UploadedFileInfo> _files = [];
   bool _isLoading = true;
   bool _isUploading = false;
@@ -1231,7 +1239,6 @@ class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
   @override
   void dispose() {
     _descriptionController.dispose();
-    _categoryController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -1288,8 +1295,8 @@ class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
       return;
     }
 
-    if (_categoryController.text.trim().isEmpty) {
-      setState(() => _error = 'Please enter a category');
+    if (_selectedCategoryId == null) {
+      setState(() => _error = 'Please select a category');
       return;
     }
 
@@ -1305,7 +1312,7 @@ class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
         fileName: _selectedFileName!,
         fileBytes: _selectedFileBytes!,
         description: _descriptionController.text.trim(),
-        category: _categoryController.text.trim(),
+        categoryId: _selectedCategoryId!, // Send category UUID, not name
         onProgress: (sent, total) {
           if (total > 0) {
             setState(() => _uploadProgress = sent / total);
@@ -1318,7 +1325,8 @@ class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
         _selectedFileName = null;
         _selectedFileBytes = null;
         _descriptionController.clear();
-        _categoryController.clear();
+        _selectedCategoryId = null;
+        _selectedCategoryName = null;
         _isUploading = false;
         _uploadProgress = 0;
         _successMessage = 'File uploaded successfully!';
@@ -1394,6 +1402,7 @@ class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     return Dialog(
+      clipBehavior: Clip.none,
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: screenWidth > 1200 ? 1000 : 800,
@@ -1488,12 +1497,26 @@ class _DesktopFilesDialogState extends State<_DesktopFilesDialog> {
           const SizedBox(height: 16),
 
           // Category
-          TextField(
-            controller: _categoryController,
-            decoration: InputDecoration(
-              labelText: l10n?.category ?? 'Category',
-              border: const OutlineInputBorder(),
-            ),
+          CategoryDropdown(
+            selectedCategoryId: _selectedCategoryId,
+            onChanged: (categoryId) async {
+              setState(() => _selectedCategoryId = categoryId);
+              // Get the category name for upload
+              if (categoryId != null) {
+                try {
+                  final categories = await _categoryService.getCategories();
+                  final category = categories.firstWhere(
+                    (c) => c.id == categoryId,
+                    orElse: () => CategoryModel(id: categoryId, name: categoryId, isSystem: false),
+                  );
+                  setState(() => _selectedCategoryName = category.name);
+                } catch (e) {
+                  setState(() => _selectedCategoryName = categoryId);
+                }
+              }
+            },
+            isEnabled: !_isUploading,
+            labelText: l10n?.category ?? 'Category',
           ),
 
           const SizedBox(height: 20),

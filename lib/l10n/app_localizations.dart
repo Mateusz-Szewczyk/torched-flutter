@@ -1423,6 +1423,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Time'**
   String get time;
+
+  /// No description provided for @addNewCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Add New Category'**
+  String get addNewCategory;
+
+  /// No description provided for @categoryName.
+  ///
+  /// In en, this message translates to:
+  /// **'Category Name'**
+  String get categoryName;
+
+  /// No description provided for @enterCategoryName.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g., Biology, History'**
+  String get enterCategoryName;
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @systemCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'System Categories'**
+  String get systemCategories;
+
+  /// No description provided for @myCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'My Categories'**
+  String get myCategories;
+
+  /// No description provided for @selectCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a category'**
+  String get selectCategory;
+
+  /// No description provided for @categoryRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a category'**
+  String get categoryRequired;
+
+  /// No description provided for @workspaces.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspaces'**
+  String get workspaces;
+
+  /// No description provided for @workspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get workspace;
+
+  /// No description provided for @newWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'New Workspace'**
+  String get newWorkspace;
+
+  /// No description provided for @createWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Workspace'**
+  String get createWorkspace;
+
+  /// No description provided for @editWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Workspace'**
+  String get editWorkspace;
+
+  /// No description provided for @deleteWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Workspace'**
+  String get deleteWorkspace;
+
+  /// No description provided for @workspaceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace Name'**
+  String get workspaceName;
+
+  /// No description provided for @enterWorkspaceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter workspace name'**
+  String get enterWorkspaceName;
+
+  /// No description provided for @workspaceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get workspaceDescription;
+
+  /// No description provided for @enterWorkspaceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter description (optional)'**
+  String get enterWorkspaceDescription;
+
+  /// No description provided for @selectCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Categories'**
+  String get selectCategories;
+
+  /// No description provided for @selectCategoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which categories to include'**
+  String get selectCategoriesHint;
+
+  /// No description provided for @noWorkspaces.
+  ///
+  /// In en, this message translates to:
+  /// **'No workspaces yet'**
+  String get noWorkspaces;
+
+  /// No description provided for @createFirstWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your first workspace to organize your study materials'**
+  String get createFirstWorkspace;
+
+  /// No description provided for @deleteWorkspaceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete \"{name}\"? This will also delete all conversations in this workspace.'**
+  String deleteWorkspaceConfirm(Object name);
+
+  /// No description provided for @workspaceCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace created'**
+  String get workspaceCreated;
+
+  /// No description provided for @workspaceUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace updated'**
+  String get workspaceUpdated;
+
+  /// No description provided for @workspaceDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace deleted'**
+  String get workspaceDeleted;
+
+  /// No description provided for @documents.
+  ///
+  /// In en, this message translates to:
+  /// **'Documents'**
+  String get documents;
+
+  /// No description provided for @noDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents'**
+  String get noDocuments;
+
+  /// No description provided for @uploadDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Document'**
+  String get uploadDocument;
+
+  /// No description provided for @openWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Workspace'**
+  String get openWorkspace;
+
+  /// No description provided for @reader.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader'**
+  String get reader;
+
+  /// No description provided for @aiAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Assistant'**
+  String get aiAssistant;
+
+  /// No description provided for @files.
+  ///
+  /// In en, this message translates to:
+  /// **'Files'**
+  String get files;
+
+  /// No description provided for @highlights.
+  ///
+  /// In en, this message translates to:
+  /// **'Highlights'**
+  String get highlights;
+
+  /// No description provided for @noHighlights.
+  ///
+  /// In en, this message translates to:
+  /// **'No highlights yet'**
+  String get noHighlights;
+
+  /// No description provided for @selectTextToHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Select text in the reader to highlight'**
+  String get selectTextToHighlight;
+
+  /// No description provided for @filterByColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter by Color'**
+  String get filterByColor;
+
+  /// No description provided for @allColors.
+  ///
+  /// In en, this message translates to:
+  /// **'All Colors'**
+  String get allColors;
+
+  /// No description provided for @red.
+  ///
+  /// In en, this message translates to:
+  /// **'Red'**
+  String get red;
+
+  /// No description provided for @orange.
+  ///
+  /// In en, this message translates to:
+  /// **'Orange'**
+  String get orange;
+
+  /// No description provided for @yellow.
+  ///
+  /// In en, this message translates to:
+  /// **'Yellow'**
+  String get yellow;
+
+  /// No description provided for @green.
+  ///
+  /// In en, this message translates to:
+  /// **'Green'**
+  String get green;
+
+  /// No description provided for @blue.
+  ///
+  /// In en, this message translates to:
+  /// **'Blue'**
+  String get blue;
+
+  /// No description provided for @purple.
+  ///
+  /// In en, this message translates to:
+  /// **'Purple'**
+  String get purple;
+
+  /// No description provided for @addNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Note'**
+  String get addNote;
+
+  /// No description provided for @editNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Note'**
+  String get editNote;
+
+  /// No description provided for @deleteHighlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Highlight'**
+  String get deleteHighlight;
+
+  /// No description provided for @loadingDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading document...'**
+  String get loadingDocument;
+
+  /// No description provided for @documentLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load document'**
+  String get documentLoadError;
+
+  /// No description provided for @noDocumentSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No document selected'**
+  String get noDocumentSelected;
+
+  /// No description provided for @selectDocumentToRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a document from the sidebar to start reading'**
+  String get selectDocumentToRead;
+
+  /// No description provided for @read.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get read;
 }
 
 class _AppLocalizationsDelegate

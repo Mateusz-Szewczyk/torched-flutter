@@ -78,6 +78,7 @@ class Routes {
   static const String chat = '/chat';
   static const String flashcards = '/flashcards';
   static const String tests = '/tests';
+  static const String workspace = '/workspace';
   static const String confirmEmail = '/confirm-email';
   static const String resetPassword = '/reset-password';
   static const String studyDeck = '/flashcards/study';

@@ -688,8 +688,170 @@ class AppLocalizationsPl extends AppLocalizations {
   String get errorLoadingData => 'Błąd ładowania danych';
 
   @override
-  String get incorrect => 'Incorrect';
+  String get incorrect => 'Niepoprawne';
 
   @override
-  String get time => 'Time';
+  String get time => 'Czas';
+
+  @override
+  String get addNewCategory => 'Dodaj Nową Kategorię';
+
+  @override
+  String get categoryName => 'Nazwa Kategorii';
+
+  @override
+  String get enterCategoryName => 'np. Biologia, Historia';
+
+  @override
+  String get create => 'Utwórz';
+
+  @override
+  String get systemCategories => 'Kategorie Systemowe';
+
+  @override
+  String get myCategories => 'Moje Kategorie';
+
+  @override
+  String get selectCategory => 'Wybierz kategorię';
+
+  @override
+  String get categoryRequired => 'Proszę wybrać kategorię';
+
+  @override
+  String get workspaces => 'Przestrzenie robocze';
+
+  @override
+  String get workspace => 'Przestrzeń robocza';
+
+  @override
+  String get newWorkspace => 'Nowa Przestrzeń';
+
+  @override
+  String get createWorkspace => 'Utwórz Przestrzeń';
+
+  @override
+  String get editWorkspace => 'Edytuj Przestrzeń';
+
+  @override
+  String get deleteWorkspace => 'Usuń Przestrzeń';
+
+  @override
+  String get workspaceName => 'Nazwa Przestrzeni';
+
+  @override
+  String get enterWorkspaceName => 'Wprowadź nazwę przestrzeni';
+
+  @override
+  String get workspaceDescription => 'Opis';
+
+  @override
+  String get enterWorkspaceDescription => 'Wprowadź opis (opcjonalnie)';
+
+  @override
+  String get selectCategories => 'Wybierz Kategorie';
+
+  @override
+  String get selectCategoriesHint =>
+      'Wybierz które kategorie mają być uwzględnione';
+
+  @override
+  String get noWorkspaces => 'Brak przestrzeni roboczych';
+
+  @override
+  String get createFirstWorkspace =>
+      'Utwórz swoją pierwszą przestrzeń roboczą, aby zorganizować materiały do nauki';
+
+  @override
+  String deleteWorkspaceConfirm(Object name) {
+    return 'Czy na pewno chcesz usunąć \"$name\"? Spowoduje to również usunięcie wszystkich konwersacji w tej przestrzeni.';
+  }
+
+  @override
+  String get workspaceCreated => 'Przestrzeń utworzona';
+
+  @override
+  String get workspaceUpdated => 'Przestrzeń zaktualizowana';
+
+  @override
+  String get workspaceDeleted => 'Przestrzeń usunięta';
+
+  @override
+  String get documents => 'Dokumenty';
+
+  @override
+  String get noDocuments => 'Brak dokumentów';
+
+  @override
+  String get uploadDocument => 'Prześlij Dokument';
+
+  @override
+  String get openWorkspace => 'Otwórz Przestrzeń';
+
+  @override
+  String get reader => 'Czytnik';
+
+  @override
+  String get aiAssistant => 'Asystent AI';
+
+  @override
+  String get files => 'Pliki';
+
+  @override
+  String get highlights => 'Zaznaczenia';
+
+  @override
+  String get noHighlights => 'Brak zaznaczeń';
+
+  @override
+  String get selectTextToHighlight =>
+      'Zaznacz tekst w czytniku, aby go podświetlić';
+
+  @override
+  String get filterByColor => 'Filtruj po Kolorze';
+
+  @override
+  String get allColors => 'Wszystkie Kolory';
+
+  @override
+  String get red => 'Czerwony';
+
+  @override
+  String get orange => 'Pomarańczowy';
+
+  @override
+  String get yellow => 'Żółty';
+
+  @override
+  String get green => 'Zielony';
+
+  @override
+  String get blue => 'Niebieski';
+
+  @override
+  String get purple => 'Fioletowy';
+
+  @override
+  String get addNote => 'Dodaj Notatkę';
+
+  @override
+  String get editNote => 'Edytuj Notatkę';
+
+  @override
+  String get deleteHighlight => 'Usuń Zaznaczenie';
+
+  @override
+  String get loadingDocument => 'Ładowanie dokumentu...';
+
+  @override
+  String get documentLoadError => 'Nie udało się załadować dokumentu';
+
+  @override
+  String get noDocumentSelected => 'Nie wybrano dokumentu';
+
+  @override
+  String get selectDocumentToRead =>
+      'Wybierz dokument z panelu bocznego, aby rozpocząć czytanie';
+
+  @override
+  String get read => 'Read';
 }

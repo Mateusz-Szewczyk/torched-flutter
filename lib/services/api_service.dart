@@ -25,6 +25,9 @@ class ApiService {
   /// Get the RAG API base URL for streaming requests
   String get ragBaseUrl => AppConfig.ragApiUrl;
 
+  /// Get the RAG API base URL (method for backward compatibility)
+  String getRagBaseUrl() => AppConfig.ragApiUrl;
+
   void init() {
     // Initialize Flask API client (auth, user management)
     _flaskDio = _createDio(AppConfig.flaskApiUrl);
@@ -216,8 +219,8 @@ class ApiService {
     return await _ragDio.get<T>(path, queryParameters: queryParameters);
   }
 
-  Future<Response<T>> ragPost<T>(String path, {dynamic data}) async {
-    return await _ragDio.post<T>(path, data: data);
+  Future<Response<T>> ragPost<T>(String path, {dynamic data, Options? options}) async {
+    return await _ragDio.post<T>(path, data: data, options: options);
   }
 
   Future<Response<T>> ragPut<T>(String path, {dynamic data}) async {
