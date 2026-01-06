@@ -262,7 +262,8 @@ class _WorkspaceFormDialogState extends State<WorkspaceFormDialog> {
 
     return BaseGlassDialog(
       title: isEditing ? (l10n?.editWorkspace ?? 'Edit Workspace') : (l10n?.createWorkspace ?? 'Create Workspace'),
-      maxWidth: 600,
+      maxWidth: 700,
+      maxHeight: 750,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
         child: Form(
