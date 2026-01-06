@@ -6,6 +6,8 @@ import '../models/models.dart';
 import '../providers/flashcards_provider.dart';
 import '../services/deck_service.dart';
 import '../widgets/study_deck_widget.dart';
+import '../widgets/dialogs/base_glass_dialog.dart';
+import '../widgets/dialogs/flashcard_dialogs.dart';
 
 /// Flashcards screen - equivalent to app/flashcards/page.tsx
 /// Main screen for managing and studying flashcard decks
@@ -433,25 +435,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     DeckInfo deckInfo,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n?.removeSharedDeck ?? 'Remove Shared Deck'),
-        content: Text(
-          l10n?.removeSharedDeckConfirm ??
-              'Are you sure you want to remove this shared deck from your library?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n?.cancel ?? 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n?.remove ?? 'Remove'),
-          ),
-        ],
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: l10n?.removeSharedDeck ?? 'Remove Shared Deck',
+      content: l10n?.removeSharedDeckConfirm ??
+          'Are you sure you want to remove this shared deck from your library?',
+      confirmLabel: l10n?.remove ?? 'Remove',
+      isDestructive: true,
     );
 
     if (confirmed == true) {
@@ -461,21 +451,74 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   void _showCreateDeckDialog(
       BuildContext context, FlashcardsProvider provider) {
-    showDialog(
-      context: context,
-      builder: (context) => _EditDeckDialog(
-        onSave: (name, description, flashcards) async {
-          final success = await provider.createDeck(
-            name: name,
-            description: description,
-            flashcards: flashcards,
-          );
-          if (success && mounted) {
-            Navigator.pop(context);
-          }
-          return success;
-        },
-      ),
+    EditDeckDialog.show(
+      context,
+      onSave: (name, description, flashcards) async {
+        final success = await provider.createDeck(
+          name: name,
+          description: description,
+          flashcards: flashcards,
+        );
+        if (success && mounted) {
+           Navigator.pop(context); // Note: BaseGlassDialog usually closes on successful action in its child if implemented that way, but here we are passing onSave. 
+           // Wait, the EditDeckDialog implementation I wrote calls onSave. The original code waited for onSave and then popped.
+           // In my refactored EditDeckDialog, I didn't auto pop in onSave. 
+           // IMPORTANT: BaseGlassDialog doesn't return the result of the child's logic directly unless we pass it.
+           // My EditDeckDialog implementation calls onSave and updates state. It does NOT pop itself on success yet (I commented about it).
+           // I should rely on the dialog popping itself or handle it here. 
+           // Let's re-read my EditDeckDialog implementation.
+           // It says: "if (mounted) setState(() => _isSaving = false);"
+           // It does NOT pop. So I need to pop it inside EditDeckDialog or handle it. 
+           // Actually, standard pattern is to return success.
+           // Let's assume EditDeckDialog pops itself on success. 
+           // Wait, I *did not* make it pop on success in the new file. I should have. 
+           // I'll update EditDeckDialog in a subsequent step if needed, or I can rely on the fact that I passed `onSave` to it.
+           // If I pass `onSave` to it, `EditDeckDialog` calls it. 
+           // If `EditDeckDialog` doesn't pop, `_showCreateDeckDialog` can't pop it because it's not awaiting the result in the same way? 
+           // `EditDeckDialog.show` returns a Future. 
+           // The original code passed `onSave` which returned a boolean. The dialog itself called this `onSave` and popped if true.
+           // My new `EditDeckDialog` calls `widget.onSave`. It does NOT pop.
+           // I made a mistake in `EditDeckDialog`. It should pop on success.
+           // I will fix `EditDeckDialog` in a separate step. For now, let's assume `EditDeckDialog` will handle the logic or I will pass a wrapper that pops.
+           // Actually, `Navigator.pop(context)` in `_showCreateDeckDialog` (lines 474) was inside the `onSave` callback!
+           // The original `_EditDeckDialog` called the callback, and the callback popped the context provided by `showDialog`? No, `Navigator.pop(context)` uses the context captured in `_showCreateDeckDialog`.
+           // But `showDialog` pushes a new route. So `context` in `_showCreateDeckDialog` is the parent context. popping that would close the screen? NO. `Navigator.pop(context)` uses the *build context* of the method?
+           // No, `Navigator.pop(context)` pops the top-most route *if* context is not specific?
+           // No, `Navigator.pop(context)` pops the route that `context` is in?
+           // If `context` is `FlashcardsScreen`, pop would pop the screen.
+           // THIS IS A BUG IN ORIGINAL CODE? 
+           // Line 474: `Navigator.pop(context);` where `context` is the argument to `_showCreateDeckDialog`.
+           // `showDialog` pushes a dialog route. 
+           // If you call `Navigator.pop(parentContext)`, it might work if the dialog is the top route? No.
+           // Wait, `builder: (context) => ...`. The original code used `context` from `builder`.
+           // Ah, line 474 uses `context` which is... wait.
+           // `builder: (context) => _EditDeckDialog(...)`. The `context` used in `Navigator.pop(context)` is SHADOWED by the builder's context?
+           // No, `onSave: (name...) async { ... Navigator.pop(context); }`. The `context` here is the one from `_showCreateDeckDialog` arguments?
+           // If so, it would close the SCREEN, not the dialog?
+           // Unless `_showCreateDeckDialog` is called with a builder context?
+           // `FlashcardsScreen` calls `_showCreateDeckDialog(context, provider)`.
+           // So `context` is `FlashcardsScreen`'s context.
+           // `Navigator.pop(context)` would pop the screen.
+           // BUT, `_EditDeckDialog` was probably calling `onSave` and expecting it to close the dialog.
+           // Let's look at `_EditDeckDialog` original code again.
+           // `await widget.onSave(...)`. It doesn't pop.
+           // So the original code might have been buggy or relying on something else.
+           // OR `Navigator.pop` works on the Navigator of the context.
+           // `Navigator.of(context).pop()` pops the top-most route of the navigator.
+           // So if a dialog is open, it pops the dialog. Even if you pass the parent context.
+           // YES. `Navigator.pop(context)` is just `Navigator.of(context).pop()`.
+           // So passing `onSave` that does `Navigator.pop` works.
+           
+           // So, my refactoring in `FlashcardsScreen`:
+           // `EditDeckDialog.show(context, onSave: (name, desc, cards) async { ... Navigator.of(context).pop(); return success; })`
+           // But wait, `EditDeckDialog.show` inside `flashcard_dialogs.dart` pushes the dialog.
+           // The `onSave` is executed.
+           // If I call `Navigator.of(context).pop()` inside `onSave` where `context` is `FlashcardsScreen` context, it will pop the top route (the dialog).
+           // So it SHOULD work.
+           return success; 
+        }
+        return success;
+      },
     );
   }
 
@@ -529,23 +572,25 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (editDialogContext) => _EditDeckDialog(
-        deck: deck,
-        onSave: (name, description, flashcards) async {
-          final success = await provider.updateDeck(
-            deckId: deck!.id,
-            name: name,
-            description: description,
-            flashcards: flashcards,
-          );
-          if (success) {
-            Navigator.of(editDialogContext).pop();
-          }
-          return success;
-        },
-      ),
+    EditDeckDialog.show(
+      context,
+      deck: deck,
+      onSave: (name, description, flashcards) async {
+        final success = await provider.updateDeck(
+          deckId: deck!.id,
+          name: name,
+          description: description,
+          flashcards: flashcards,
+        );
+        if (success) {
+          // Find the dialog context or use root navigator to pop?
+          // The context passed here is 'editDialogContext' in original code, but now we don't have it exposed directly in the builder.
+          // But as discussed, Navigator.pop(context) using parent context pops the top route.
+          // However, EditDeckDialog.show calls BaseGlassDialog.show which pushes a route.
+          Navigator.of(context).pop();
+        }
+        return success;
+      },
     );
   }
 
@@ -555,28 +600,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
     DeckInfo deckInfo,
   ) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n?.deleteDeck ?? 'Delete Deck'),
-        content: Text(
-          l10n?.deleteDeckConfirm(deckInfo.name) ??
-              'Are you sure you want to delete "${deckInfo.name}"? This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n?.cancel ?? 'Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n?.delete ?? 'Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: l10n?.deleteDeck ?? 'Delete Deck',
+      content: l10n?.deleteDeckConfirm(deckInfo.name) ??
+          'Are you sure you want to delete "${deckInfo.name}"? This cannot be undone.',
+      confirmLabel: l10n?.delete ?? 'Delete',
+      isDestructive: true,
     );
 
     if (confirmed == true) {
@@ -593,19 +623,13 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
   }
 
   void _showAddByCodeDialog(BuildContext context, FlashcardsProvider provider) {
-    showDialog(
-      context: context,
-      builder: (context) => _AddByCodeDialog(provider: provider),
-    );
+    AddFlashcardDeckByCodeDialog.show(context, provider);
   }
 
   void _showManageSharesDialog(
       BuildContext context, FlashcardsProvider provider) {
     provider.fetchMySharedCodes();
-    showDialog(
-      context: context,
-      builder: (context) => _ManageSharesDialog(provider: provider),
-    );
+    ManageFlashcardSharesDialog.show(context, provider);
   }
 }
 
@@ -983,940 +1007,3 @@ class _SortDropdown extends StatelessWidget {
   }
 }
 
-// ============================================================================
-// EDIT DECK DIALOG
-// ============================================================================
-
-class _EditDeckDialog extends StatefulWidget {
-  final Future<bool> Function(
-          String name, String? description, List<Flashcard> flashcards) onSave;
-  final Deck? deck;
-
-  const _EditDeckDialog({
-    required this.onSave,
-    this.deck,
-  });
-
-  @override
-  State<_EditDeckDialog> createState() => _EditDeckDialogState();
-}
-
-class _EditDeckDialogState extends State<_EditDeckDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  List<_FlashcardInput> _flashcards = [];
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.deck != null) {
-      _nameController.text = widget.deck!.name;
-      _descriptionController.text = widget.deck!.description ?? '';
-      _flashcards = widget.deck!.flashcards
-          .map((f) => _FlashcardInput(
-                question: f.question,
-                answer: f.answer,
-              ))
-          .toList();
-    }
-    if (_flashcards.isEmpty) {
-      _flashcards.add(_FlashcardInput());
-    }
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  void _addFlashcard() {
-    setState(() {
-      _flashcards.add(_FlashcardInput());
-    });
-  }
-
-  void _removeFlashcard(int index) {
-    if (_flashcards.length > 1) {
-      setState(() {
-        _flashcards.removeAt(index);
-      });
-    }
-  }
-
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isSaving = true);
-
-    final flashcards = _flashcards
-        .where((f) => f.question.isNotEmpty && f.answer.isNotEmpty)
-        .map((f) => Flashcard(
-              question: f.question,
-              answer: f.answer,
-            ))
-        .toList();
-
-    if (flashcards.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one flashcard')),
-      );
-      setState(() => _isSaving = false);
-      return;
-    }
-
-    await widget.onSave(
-      _nameController.text.trim(),
-      _descriptionController.text.trim().isEmpty
-          ? null
-          : _descriptionController.text.trim(),
-      flashcards,
-    );
-
-    setState(() => _isSaving = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 600, maxHeight: 750),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-              child: Row(
-                children: [
-                  Text(
-                    widget.deck != null
-                        ? l10n?.editDeck ?? 'Edit Deck'
-                        : l10n?.createDeck ?? 'Create Deck',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-
-            // Content
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: InputDecoration(
-                          labelText: l10n?.deckName ?? 'Deck Name',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.title),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return l10n?.nameRequired ?? 'Name is required';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _descriptionController,
-                        decoration: InputDecoration(
-                          labelText: l10n?.description ?? 'Description (optional)',
-                          border: const OutlineInputBorder(),
-                          prefixIcon: const Icon(Icons.description),
-                        ),
-                        maxLines: 2,
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            l10n?.flashcards ?? 'Flashcards',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          FilledButton.tonalIcon(
-                            onPressed: _addFlashcard,
-                            icon: const Icon(Icons.add),
-                            label: Text(l10n?.addCard ?? 'Add Card'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      ...List.generate(_flashcards.length, (index) {
-                        return _FlashcardInputWidget(
-                          key: ValueKey(index),
-                          input: _flashcards[index],
-                          index: index + 1,
-                          canDelete: _flashcards.length > 1,
-                          onDelete: () => _removeFlashcard(index),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Footer
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(l10n?.cancel ?? 'Cancel'),
-                  ),
-                  const SizedBox(width: 16),
-                  FilledButton(
-                    onPressed: _isSaving ? null : _save,
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(l10n?.save ?? 'Save Deck'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FlashcardInput {
-  String question;
-  String answer;
-
-  _FlashcardInput({this.question = '', this.answer = ''});
-}
-
-class _FlashcardInputWidget extends StatelessWidget {
-  final _FlashcardInput input;
-  final int index;
-  final bool canDelete;
-  final VoidCallback onDelete;
-
-  const _FlashcardInputWidget({
-    super.key,
-    required this.input,
-    required this.index,
-    required this.canDelete,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final cs = Theme.of(context).colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outlineVariant),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withOpacity(0.5),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  '#$index',
-                  style: TextStyle(fontWeight: FontWeight.bold, color: cs.primary),
-                ),
-                const Spacer(),
-                if (canDelete)
-                  InkWell(
-                    onTap: onDelete,
-                    borderRadius: BorderRadius.circular(20),
-                    child: Icon(Icons.close, size: 20, color: cs.error),
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextFormField(
-                  initialValue: input.question,
-                  decoration: InputDecoration(
-                    labelText: l10n?.question ?? 'Question',
-                    border: const OutlineInputBorder(),
-                    filled: true,
-                    fillColor: cs.surface,
-                  ),
-                  onChanged: (value) => input.question = value,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  initialValue: input.answer,
-                  decoration: InputDecoration(
-                    labelText: l10n?.answer ?? 'Answer',
-                    border: const OutlineInputBorder(),
-                    filled: true,
-                    fillColor: cs.surface,
-                  ),
-                  maxLines: 2,
-                  onChanged: (value) => input.answer = value,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// ADD BY CODE DIALOG
-// ============================================================================
-
-class _AddByCodeDialog extends StatefulWidget {
-  final FlashcardsProvider provider;
-
-  const _AddByCodeDialog({required this.provider});
-
-  @override
-  State<_AddByCodeDialog> createState() => _AddByCodeDialogState();
-}
-
-class _AddByCodeDialogState extends State<_AddByCodeDialog> {
-  final _codeController = TextEditingController();
-  bool _isAdding = false;
-
-  @override
-  void dispose() {
-    _codeController.dispose();
-    widget.provider.clearShareCodeInfo();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final provider = widget.provider;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return AlertDialog(
-      title: Text(l10n?.addDeckByCode ?? 'Add Deck by Code'),
-      content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _codeController,
-              decoration: InputDecoration(
-                labelText: l10n?.shareCode ?? 'Share Code',
-                hintText: 'XXXXXXXXXXXX',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.key),
-              ),
-              textCapitalization: TextCapitalization.characters,
-              maxLength: 12,
-              onChanged: (value) {
-                if (value.length == 12) {
-                  provider.getShareCodeInfo(value);
-                } else {
-                  provider.clearShareCodeInfo();
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Share code info
-            ListenableBuilder(
-              listenable: provider,
-              builder: (context, _) {
-                if (provider.isShareCodeLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final info = provider.shareCodeInfo;
-
-                // Handle 404 / Invalid Code state
-                if (info == null && _codeController.text.length == 12 && !provider.isShareCodeLoading) {
-                  return Card(
-                    elevation: 0,
-                    color: colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline, color: colorScheme.onErrorContainer),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Invalid or expired code',
-                              style: TextStyle(
-                                color: colorScheme.onErrorContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                if (info == null) return const SizedBox.shrink();
-
-                return Card(
-                  elevation: 0,
-                  color: colorScheme.surfaceContainerHighest,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          info.name,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${info.itemCount} cards${info.creatorName != null ? ' • by ${info.creatorName}' : ''}',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
-                        ),
-                        if (info.description != null && info.description!.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            info.description!,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                        if (info.alreadyAdded == true) ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Icon(Icons.check_circle,
-                                  size: 16, color: colorScheme.primary),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  l10n?.alreadyAdded ?? 'Already in your library',
-                                  style: TextStyle(
-                                      color: colorScheme.primary,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        if (info.isOwnDeck == true) ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Icon(Icons.info_outline,
-                                  size: 16, color: colorScheme.secondary),
-                              const SizedBox(width: 4),
-                              const Expanded(
-                                child: Text(
-                                  'This is your own deck',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () {
-            provider.clearShareCodeInfo();
-            Navigator.pop(context);
-          },
-          child: Text(l10n?.cancel ?? 'Cancel'),
-        ),
-        ListenableBuilder(
-          listenable: provider,
-          builder: (context, _) {
-            // Determine if button should be disabled
-            final info = provider.shareCodeInfo;
-            final isInvalid = _codeController.text.length != 12;
-            final isAlreadyAdded = info?.alreadyAdded ?? false;
-            final isOwnDeck = info?.isOwnDeck ?? false;
-
-            // Logic: Disable if loading, invalid length, or if we got no info back (404)
-            // OR if the deck is already added or owned by the user.
-            final shouldDisable = _isAdding || isInvalid || info == null || isAlreadyAdded || isOwnDeck;
-
-            return FilledButton(
-              onPressed: shouldDisable
-                  ? null
-                  : () async {
-                      setState(() => _isAdding = true);
-
-                      // Clear any previous errors
-                      provider.clearError();
-
-                      final success = await provider.addDeckByCode(
-                        _codeController.text.trim().toUpperCase(),
-                      );
-
-                      if (!mounted) return;
-                      setState(() => _isAdding = false);
-
-                      if (success) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(l10n?.deckAddedSuccessfully ??
-                                'Deck added successfully'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      } else {
-                        // Display the error from the provider (backend message)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(provider.error ?? 'Failed to add deck'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: colorScheme.error,
-                          ),
-                        );
-                      }
-                    },
-              child: _isAdding
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(l10n?.add ?? 'Add'),
-            );
-          }
-        ),
-      ],
-    );
-  }
-}
-
-// ============================================================================
-// MANAGE SHARES DIALOG
-// ============================================================================
-
-class _ManageSharesDialog extends StatelessWidget {
-  final FlashcardsProvider provider;
-
-  const _ManageSharesDialog({required this.provider});
-
-  String _formatDate(String dateStr) {
-    try {
-      final date = DateTime.parse(dateStr);
-      final now = DateTime.now();
-      final diff = now.difference(date);
-
-      if (diff.inDays == 0) {
-        return 'Today';
-      } else if (diff.inDays == 1) {
-        return 'Yesterday';
-      } else if (diff.inDays < 7) {
-        return '${diff.inDays} days ago';
-      } else if (diff.inDays < 30) {
-        return '${(diff.inDays / 7).floor()} weeks ago';
-      } else {
-        return '${date.day}/${date.month}/${date.year}';
-      }
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDesktop = MediaQuery.of(context).size.width > 600;
-
-    return Dialog(
-      backgroundColor: colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(isDesktop ? 24 : 16),
-      ),
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isDesktop ? 100 : 16,
-        vertical: isDesktop ? 40 : 24,
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: isDesktop ? 600 : double.infinity,
-          maxHeight: MediaQuery.of(context).size.height * (isDesktop ? 0.7 : 0.85),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.3),
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(Icons.share_rounded, color: colorScheme.primary),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n?.manageShares ?? 'Manage Shared Decks',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Share codes you created',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-
-            // Content
-            Flexible(
-              child: ListenableBuilder(
-                listenable: provider,
-                builder: (context, _) {
-                  if (provider.mySharedCodes.isEmpty) {
-                    return _buildEmptyState(context, colorScheme, l10n);
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    itemCount: provider.mySharedCodes.length,
-                    itemBuilder: (context, index) {
-                      final code = provider.mySharedCodes[index];
-                      return _ShareCodeCard(
-                        code: code,
-                        contentTypeLabel: 'cards',
-                        onCopy: () {
-                          Clipboard.setData(ClipboardData(text: code.shareCode));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Row(
-                                children: [
-                                  Icon(Icons.check_circle, color: colorScheme.onPrimary, size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: Text('Copied: ${code.shareCode}')),
-                                ],
-                              ),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: colorScheme.primary,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          );
-                        },
-                        onDelete: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('Deactivate Share Code?'),
-                              content: Text(
-                                'This will prevent others from using code "${code.shareCode}" to add this deck. '
-                                'Users who already added it will keep their copy.',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(context, false),
-                                  child: const Text('Cancel'),
-                                ),
-                                FilledButton(
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: colorScheme.error,
-                                  ),
-                                  onPressed: () => Navigator.pop(context, true),
-                                  child: const Text('Deactivate'),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            await provider.deactivateShareCode(code.shareCode);
-                          }
-                        },
-                        formatDate: _formatDate,
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context, ColorScheme colorScheme, AppLocalizations? l10n) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.share_outlined,
-              size: 48,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            l10n?.noSharedDecks ?? 'No shared decks yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Share a deck to generate a code that others can use to add it to their library.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: colorScheme.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Reusable share code card widget
-class _ShareCodeCard extends StatefulWidget {
-  final MySharedCode code;
-  final String contentTypeLabel; // 'cards' or 'questions'
-  final VoidCallback onCopy;
-  final VoidCallback onDelete;
-  final String Function(String) formatDate;
-
-  const _ShareCodeCard({
-    required this.code,
-    required this.contentTypeLabel,
-    required this.onCopy,
-    required this.onDelete,
-    required this.formatDate,
-  });
-
-  @override
-  State<_ShareCodeCard> createState() => _ShareCodeCardState();
-}
-
-class _ShareCodeCardState extends State<_ShareCodeCard> {
-  bool _isDeleting = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title and item count row
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.code.contentName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            widget.contentTypeLabel == 'cards'
-                                ? Icons.style_rounded
-                                : Icons.quiz_rounded,
-                            size: 16,
-                            color: colorScheme.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${widget.code.itemCount} ${widget.contentTypeLabel}',
-                            style: TextStyle(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Share code display
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.key, size: 20, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SelectableText(
-                      widget.code.shareCode,
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  IconButton.filledTonal(
-                    icon: const Icon(Icons.copy_rounded, size: 20),
-                    onPressed: widget.onCopy,
-                    tooltip: 'Copy code',
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Stats and actions row
-            Row(
-              children: [
-                // Created date
-                Icon(Icons.schedule, size: 16, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  widget.formatDate(widget.code.createdAt),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // Access count
-                Icon(Icons.people_outline, size: 16, color: colorScheme.onSurfaceVariant),
-                const SizedBox(width: 4),
-                Text(
-                  '${widget.code.accessCount} ${widget.code.accessCount == 1 ? 'user' : 'users'}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-
-                const Spacer(),
-
-                // Delete button
-                TextButton.icon(
-                  onPressed: _isDeleting ? null : () async {
-                    setState(() => _isDeleting = true);
-                    await Future(() => widget.onDelete());
-                    if (mounted) setState(() => _isDeleting = false);
-                  },
-                  icon: _isDeleting
-                      ? SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colorScheme.error,
-                          ),
-                        )
-                      : Icon(Icons.delete_outline, size: 18, color: colorScheme.error),
-                  label: Text(
-                    'Deactivate',
-                    style: TextStyle(color: colorScheme.error),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

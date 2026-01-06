@@ -11,6 +11,7 @@ import '../dialogs/login_register_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/profile_dialog.dart';
 import '../dialogs/manage_files_dialog.dart';
+import '../dialogs/base_glass_dialog.dart';
 import '../workspace_form_dialog.dart';
 import '../profile/subscription_section.dart';
 import 'conversation_list.dart';
@@ -423,10 +424,7 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 
   void _showCreateWorkspaceDialog(BuildContext context) async {
-    final result = await showDialog<WorkspaceModel>(
-      context: context,
-      builder: (context) => const WorkspaceFormDialog(),
-    );
+    final result = await WorkspaceFormDialog.show(context);
 
     if (result != null && mounted) {
       context.read<WorkspaceProvider>().addWorkspace(result);
@@ -434,10 +432,7 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 
   void _showEditWorkspaceDialog(BuildContext context, WorkspaceModel workspace) async {
-    final result = await showDialog<WorkspaceModel>(
-      context: context,
-      builder: (context) => WorkspaceFormDialog(workspace: workspace),
-    );
+    final result = await WorkspaceFormDialog.show(context, workspace: workspace);
 
     if (result != null && mounted) {
       context.read<WorkspaceProvider>().updateWorkspaceInList(result);
@@ -445,35 +440,25 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 
   void _confirmDeleteWorkspace(BuildContext context, WorkspaceModel workspace) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Workspace'),
-        content: Text('Are you sure you want to delete "${workspace.name}"? This will also delete all conversations within it.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              final success = await context.read<WorkspaceProvider>().deleteWorkspace(workspace.id);
-              if (!success && mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to delete workspace'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+    GlassConfirmationDialog.show(
+      context,
+      title: 'Delete Workspace',
+      content: 'Are you sure you want to delete "${workspace.name}"? This will also delete all conversations within it.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    ).then((confirmed) async {
+      if (confirmed == true) {
+        final success = await context.read<WorkspaceProvider>().deleteWorkspace(workspace.id);
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to delete workspace'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
   }
 
   Widget _buildConversationsSection(BuildContext context) {
@@ -578,10 +563,7 @@ class _LeftPanelState extends State<LeftPanel> {
                 isMobile: widget.isMobile,
                 variant: _NavItemVariant.filled,
                 onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => const LoginRegisterDialog(),
-                  );
+                  LoginRegisterDialog.show(context);
                   if (widget.isMobile) widget.togglePanel();
                 },
               ),

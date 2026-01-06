@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/constants.dart';
+import 'base_glass_dialog.dart';
 
 /// Login/Register Dialog - Glassmorphism & Futuristic Minimalist Design
 /// Supports email/password auth and OAuth (Google, GitHub)
@@ -16,6 +17,13 @@ class LoginRegisterDialog extends StatefulWidget {
     this.initialView = 'auth',
     this.resetToken,
   });
+
+  static Future<dynamic> show(BuildContext context, {String initialView = 'auth'}) {
+    return BaseGlassDialog.show(
+      context,
+      builder: (context) => LoginRegisterDialog(initialView: initialView),
+    );
+  }
 
   @override
   State<LoginRegisterDialog> createState() => _LoginRegisterDialogState();
@@ -300,58 +308,16 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 500;
 
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 40,
-        vertical: isMobile ? 24 : 40,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            width: isMobile ? double.infinity : 450,
-            constraints: BoxConstraints(
-              maxHeight: isMobile ? screenSize.height * 0.9 : 680,
-            ),
-            decoration: BoxDecoration(
-              // Glassmorphism background
-              color: isDark
-                  ? colorScheme.surface.withOpacity(0.85)
-                  : colorScheme.surface.withOpacity(0.92),
-              borderRadius: BorderRadius.circular(24),
-              // Subtle glass border
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withOpacity(0.08)
-                    : Colors.black.withOpacity(0.05),
-                width: 1,
-              ),
-              // Soft glow shadow
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withOpacity(0.08),
-                  blurRadius: 40,
-                  spreadRadius: -5,
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.4 : 0.15),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
+    return BaseGlassDialog(
+      maxWidth: 450,
+      maxHeight: 680,
+      header: _buildHeader(colorScheme, isDark),
+      // BaseGlassDialog includes close button support via header checks?
+      // I'll pass a custom header which INCLUDES the close button and title logic of existing dialog
+      child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
-                _buildHeader(colorScheme, isDark),
-
                 // Toast
                 if (_toastMessage != null) _buildToast(colorScheme, isDark),
 
@@ -365,9 +331,6 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                 ),
               ],
             ),
-          ),
-        ),
-      ),
     );
   }
 

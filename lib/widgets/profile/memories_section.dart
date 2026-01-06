@@ -532,16 +532,13 @@ class _MemoriesSectionState extends State<MemoriesSection> with SingleTickerProv
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            colorScheme.primaryContainer.withOpacity(0.5),
-            colorScheme.tertiaryContainer.withOpacity(0.3),
+            colorScheme.primaryContainer.withAlpha(130),
+            colorScheme.tertiaryContainer.withAlpha(80),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: colorScheme.primary.withOpacity(0.3),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,9 +714,8 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withAlpha(25),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         children: [
@@ -769,12 +765,8 @@ class _ImportanceChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? color.withAlpha(50) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? color : color.withOpacity(0.4),
-            width: isSelected ? 2 : 1,
-          ),
         ),
         child: Text(
           label,

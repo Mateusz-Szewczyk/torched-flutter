@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import '../services/category_service.dart';
 import '../l10n/app_localizations.dart';
+import 'dialogs/base_glass_dialog.dart';
+import 'common/glass_components.dart';
 
 /// Modern, beautiful category selector with adaptive UI for mobile and desktop
 /// - Mobile: Bottom sheet selection
@@ -290,80 +293,75 @@ class _CategoryDropdownState extends State<CategoryDropdown> {
     final l10n = AppLocalizations.of(context);
     final colorScheme = Theme.of(context).colorScheme;
     final controller = TextEditingController();
-    bool isCreating = false;
+    
+    // We use a ValueNotifier to handle local state without StatefulBuilder intricacies
+    final isCreatingNotifier = ValueNotifier<bool>(false);
 
-    final result = await showDialog<CategoryModel>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.create_new_folder_rounded,
-                  color: colorScheme.onPrimaryContainer, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Text(l10n?.addNewCategory ?? 'New Category'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: l10n?.enterCategoryName ?? 'e.g., Biology, History',
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withAlpha((255 * 0.5).round()),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+    final result = await BaseGlassDialog.show<CategoryModel>(
+      context,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: isCreatingNotifier,
+        builder: (context, isCreating, _) {
+          return BaseGlassDialog(
+            title: l10n?.addNewCategory ?? 'New Category',
+            maxWidth: 400,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                   GhostTextField(
+                    controller: controller,
+                    autofocus: true,
+                    labelText: l10n?.categoryName,
+                    hintText: l10n?.enterCategoryName ?? 'e.g., Biology, History',
+                    prefixIcon: Icons.create_new_folder_outlined,
+                    enabled: !isCreating,
+                    onSubmitted: (value) async {
+                      if (value.trim().isNotEmpty && !isCreating) {
+                        isCreatingNotifier.value = true;
+                        await _createCategory(value.trim(), context);
+                        // If checking mounted after await, the dialog likely popped, 
+                        // so we might not simple 'set' isCreating back to false.
+                      }
+                    },
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-                textCapitalization: TextCapitalization.words,
-                enabled: !isCreating,
-                onSubmitted: (value) async {
-                  if (value.trim().isNotEmpty && !isCreating) {
-                    setDialogState(() => isCreating = true);
-                    await _createCategory(value.trim(), context);
-                  }
-                },
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: isCreating ? null : () => Navigator.of(context).pop(),
+                        child: Text(l10n?.cancel ?? 'Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: isCreating ? null : () async {
+                          if (controller.text.trim().isNotEmpty) {
+                            isCreatingNotifier.value = true;
+                            await _createCategory(controller.text.trim(), context);
+                          }
+                        },
+                        child: isCreating
+                            ? const SizedBox(
+                                width: 16, height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : Text(l10n?.create ?? 'Create'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: isCreating ? null : () => Navigator.of(context).pop(),
-              child: Text(l10n?.cancel ?? 'Cancel'),
             ),
-            FilledButton(
-              onPressed: isCreating ? null : () async {
-                if (controller.text.trim().isNotEmpty) {
-                  setDialogState(() => isCreating = true);
-                  await _createCategory(controller.text.trim(), context);
-                }
-              },
-              child: isCreating
-                  ? const SizedBox(
-                      width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(l10n?.create ?? 'Create'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
 
     controller.dispose();
+    isCreatingNotifier.dispose();
 
     if (result != null) {
       widget.onChanged(result.id);
@@ -466,118 +464,66 @@ class _CategoryDropdownState extends State<CategoryDropdown> {
           ),
           const SizedBox(height: 8),
         ],
-        Container(
+        // Simple dropdown button without nested containers
+        MouseRegion(
           key: _buttonKey,
-          child: MouseRegion(
-              onEnter: (_) => setState(() => _isHovering = true),
-              onExit: (_) => setState(() => _isHovering = false),
-              cursor: widget.isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-              child: GestureDetector(
-                onTap: widget.isEnabled ? _showCategorySelector : null,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: widget.compact ? 12 : 16,
-                    vertical: widget.compact ? 10 : 14,
+          onEnter: (_) => setState(() => _isHovering = true),
+          onExit: (_) => setState(() => _isHovering = false),
+          cursor: widget.isEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+          child: GestureDetector(
+            onTap: widget.isEnabled ? _showCategorySelector : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.compact ? 12 : 16,
+                vertical: widget.compact ? 10 : 14,
+              ),
+              decoration: BoxDecoration(
+                color: _isHovering || _isDropdownOpen
+                    ? colorScheme.surfaceContainerHighest.withAlpha((255 * 0.8).round())
+                    : colorScheme.surfaceContainerHighest.withAlpha((255 * 0.5).round()),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  // Simple icon without extra container
+                  Icon(
+                    hasSelection ? Icons.folder_rounded : Icons.folder_open_rounded,
+                    size: widget.compact ? 18 : 20,
+                    color: hasSelection ? colorScheme.primary : colorScheme.onSurfaceVariant,
                   ),
-                  decoration: BoxDecoration(
-                    color: _isHovering || _isDropdownOpen
-                        ? colorScheme.surfaceContainerHighest.withAlpha((255 * 0.8).round())
-                        : colorScheme.surfaceContainerHighest.withAlpha((255 * 0.5).round()),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _isDropdownOpen
-                          ? colorScheme.primary
-                          : hasSelection
-                              ? colorScheme.primary.withAlpha((255 * 0.3).round())
-                              : _isHovering
-                                  ? colorScheme.outlineVariant
-                                  : colorScheme.outlineVariant.withAlpha((255 * 0.5).round()),
-                      width: _isDropdownOpen ? 2 : 1,
+                  SizedBox(width: widget.compact ? 10 : 12),
+                  Expanded(
+                    child: Text(
+                      hasSelection
+                          ? selectedCategory.name
+                          : (widget.hintText ?? l10n?.selectCategory ?? 'Choose category'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: widget.compact ? 13 : 14,
+                        color: hasSelection
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurfaceVariant,
+                        fontWeight: hasSelection ? FontWeight.w500 : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    boxShadow: _isHovering || _isDropdownOpen
-                        ? [
-                            BoxShadow(
-                              color: colorScheme.primary.withAlpha((255 * 0.08).round()),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
                   ),
-                  child: Row(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: EdgeInsets.all(widget.compact ? 6 : 8),
-                        decoration: BoxDecoration(
-                          color: hasSelection
-                              ? (selectedCategory.isSystem
-                                  ? colorScheme.secondaryContainer
-                                  : colorScheme.primaryContainer)
-                              : colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          hasSelection
-                              ? (selectedCategory.isSystem
-                                  ? Icons.folder_special_rounded
-                                  : Icons.folder_rounded)
-                              : Icons.folder_open_rounded,
-                          size: widget.compact ? 16 : 18,
-                          color: hasSelection
-                              ? (selectedCategory.isSystem
-                                  ? colorScheme.onSecondaryContainer
-                                  : colorScheme.onPrimaryContainer)
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      SizedBox(width: widget.compact ? 8 : 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              hasSelection
-                                  ? selectedCategory.name
-                                  : (widget.hintText ?? l10n?.selectCategory ?? 'Select a category'),
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: widget.compact ? 13 : 14,
-                                color: hasSelection
-                                    ? colorScheme.onSurface
-                                    : colorScheme.onSurfaceVariant,
-                                fontWeight: hasSelection ? FontWeight.w500 : FontWeight.normal,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (hasSelection && selectedCategory.isSystem && !widget.compact)
-                              Text(
-                                'System',
-                                style: theme.textTheme.labelSmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      AnimatedRotation(
-                        duration: const Duration(milliseconds: 200),
-                        turns: _isDropdownOpen ? 0.5 : 0,
-                        child: Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: widget.compact ? 18 : 20,
-                          color: _isHovering || _isDropdownOpen
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                  AnimatedRotation(
+                    duration: const Duration(milliseconds: 200),
+                    turns: _isDropdownOpen ? 0.5 : 0,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: widget.compact ? 18 : 20,
+                      color: _isHovering || _isDropdownOpen
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
+          ),
         ),
       ],
     );
@@ -592,10 +538,6 @@ class _CategoryDropdownState extends State<CategoryDropdown> {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withAlpha((255 * 0.5).round()),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withAlpha((255 * 0.5).round()),
-          width: 1,
-        ),
       ),
       child: child,
     );
@@ -659,50 +601,48 @@ class _CategorySelectorSheetState extends State<_CategorySelectorSheet>
     final systemCategories = widget.categories.where((c) => c.isSystem).toList();
     final userCategories = widget.categories.where((c) => !c.isSystem).toList();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return AnimatedBuilder(
       animation: _scaleAnimation,
-      builder: (context, child) => Container(
-        constraints: BoxConstraints(
-          maxHeight: screenHeight * 0.75,
-        ),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha((255 * 0.1).round()),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+      builder: (context, child) => ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: screenHeight * 0.75,
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            GestureDetector(
-              onVerticalDragEnd: (details) {
-                if (details.primaryVelocity! > 500) {
-                  Navigator.of(context).pop();
-                }
-              },
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Center(
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withOpacity(isDark ? 0.65 : 0.75),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                GestureDetector(
+                  onVerticalDragEnd: (details) {
+                    if (details.primaryVelocity! > 500) {
+                      Navigator.of(context).pop();
+                    }
+                  },
                   child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: colorScheme.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
 
-            // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
               child: Row(
@@ -871,6 +811,8 @@ class _CategorySelectorSheetState extends State<_CategorySelectorSheet>
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );

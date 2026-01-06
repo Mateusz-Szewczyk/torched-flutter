@@ -105,9 +105,6 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
           : null,
         color: isPro ? null : cs.surfaceContainerHighest.withAlpha(100),
         borderRadius: BorderRadius.circular(20),
-        border: isPro
-          ? Border.all(color: cs.primary.withAlpha(50), width: 2)
-          : Border.all(color: cs.outlineVariant.withAlpha(50)),
       ),
       child: Row(
         children: [
@@ -187,17 +184,9 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: plan.popular
-          ? cs.primaryContainer.withAlpha(50)
-          : cs.surfaceContainerHighest.withAlpha(80),
+          ? cs.primaryContainer.withAlpha(60)
+          : cs.surfaceContainerHighest.withAlpha(100),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: plan.popular
-            ? cs.primary.withAlpha(100)
-            : isCurrent
-              ? Colors.green.withAlpha(100)
-              : cs.outlineVariant.withAlpha(50),
-          width: plan.popular || isCurrent ? 2 : 1,
-        ),
       ),
       child: Column(
         children: [
@@ -205,22 +194,26 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
           if (plan.popular)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: cs.primary,
+                gradient: LinearGradient(
+                  colors: [cs.primary, cs.primary.withAlpha(200)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.star, color: Colors.white, size: 16),
-                  const SizedBox(width: 6),
+                  Icon(Icons.star, color: cs.onPrimary, size: 18),
+                  const SizedBox(width: 8),
                   Text(
                     'MOST POPULAR',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: cs.onPrimary,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
                     ),
                   ),
                 ],
@@ -377,9 +370,8 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: cs.errorContainer.withAlpha(50),
+        color: cs.errorContainer.withAlpha(80),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.error.withAlpha(50)),
       ),
       child: Column(
         children: [
