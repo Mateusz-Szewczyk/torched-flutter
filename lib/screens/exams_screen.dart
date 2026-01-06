@@ -7,7 +7,7 @@ import '../providers/exams_provider.dart';
 import '../services/exam_service.dart';
 import '../widgets/study_exam_widget.dart';
 import '../widgets/dialogs/base_glass_dialog.dart';
-import '../widgets/dialogs/exam_dialogs.dart';
+import 'package:torch_ed_flutter/widgets/dialogs/exam_dialogs.dart';
 
 /// Exams screen - equivalent to app/tests/page.tsx
 /// Main screen for managing and taking exams

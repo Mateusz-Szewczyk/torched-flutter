@@ -7,7 +7,7 @@ import '../providers/flashcards_provider.dart';
 import '../services/deck_service.dart';
 import '../widgets/study_deck_widget.dart';
 import '../widgets/dialogs/base_glass_dialog.dart';
-import '../widgets/dialogs/flashcard_dialogs.dart';
+import 'package:torch_ed_flutter/widgets/dialogs/flashcard_dialogs.dart';
 
 /// Flashcards screen - equivalent to app/flashcards/page.tsx
 /// Main screen for managing and studying flashcard decks

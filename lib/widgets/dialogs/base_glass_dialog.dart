@@ -101,7 +101,7 @@ class BaseGlassDialog extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
             decoration: BoxDecoration(
-              color: cs.surface.withOpacity(isDark ? 0.55 : 0.65),
+              color: cs.surface.withOpacity(isDark ? 0.50 : 0.60),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border(
                 top: BorderSide(
@@ -190,7 +190,7 @@ class BaseGlassDialog extends StatelessWidget {
                   filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: cs.surface.withOpacity(isDark ? 0.60 : 0.70),
+                      color: cs.surface.withOpacity(isDark ? 0.55 : 0.65),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isDark 

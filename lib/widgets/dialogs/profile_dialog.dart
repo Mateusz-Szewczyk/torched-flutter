@@ -124,91 +124,67 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
 
     return BaseGlassDialog(
       maxWidth: 700,
-      maxHeight: 800,
-      header: _buildHeader(context, cs),
-      child: Column(
-        children: [
-          // Glass Capsule Tabs
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            decoration: BoxDecoration(
-              color: cs.surface.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cs.outline.withOpacity(0.1)),
+      maxHeight: 750,
+      header: _buildHeaderWithTabs(context, cs),
+      child: TabBarView(
+          controller: _tabController,
+          children: [
+            _ProfileContent(
+              user: user,
+              subscriptionStats: subscriptionProvider.stats,
+              onUpgradeTap: () => _showSubscriptionSheet(context),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicator: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(color: cs.primaryContainer.withOpacity(0.3), blurRadius: 8),
-                ],
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              labelColor: cs.onPrimaryContainer,
-              unselectedLabelColor: cs.onSurfaceVariant,
-              dividerColor: Colors.transparent,
-              padding: const EdgeInsets.all(4),
-              tabs: const [
-                Tab(icon: Icon(Icons.person_outline), text: 'Profile'),
-                Tab(icon: Icon(Icons.psychology_outlined), text: 'Memories'),
-                Tab(icon: Icon(Icons.manage_accounts_outlined), text: 'Account'),
-              ],
+            const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: MemoriesSection(),
             ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // Tab views
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _ProfileContent(
-                  user: user,
-                  subscriptionStats: subscriptionProvider.stats,
-                  onUpgradeTap: () => _showSubscriptionSheet(context),
-                ),
-                const Padding(
-                  padding: EdgeInsets.all(24.0),
-                  child: MemoriesSection(),
-                ),
-                _CombinedAccountContent(user: user),
-              ],
-            ),
-          ),
-        ],
-      ),
+            _CombinedAccountContent(user: user),
+          ],
+        ),
     );
   }
 
-  Widget _buildHeader(BuildContext context, ColorScheme cs) {
+  Widget _buildHeaderWithTabs(BuildContext context, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'My Profile',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+          // Tabs in header
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withAlpha(80),
+                borderRadius: BorderRadius.circular(14),
               ),
-              Text(
-                'Manage your digital identity',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              )
-            ],
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: cs.onPrimaryContainer,
+                unselectedLabelColor: cs.onSurfaceVariant,
+                dividerColor: Colors.transparent,
+                padding: const EdgeInsets.all(4),
+                labelPadding: EdgeInsets.zero,
+                tabs: const [
+                  Tab(height: 40, icon: Icon(Icons.person_outline, size: 20), text: 'Profile'),
+                  Tab(height: 40, icon: Icon(Icons.psychology_outlined, size: 20), text: 'Memories'),
+                  Tab(height: 40, icon: Icon(Icons.manage_accounts_outlined, size: 20), text: 'Account'),
+                ],
+              ),
+            ),
           ),
+          const SizedBox(width: 12),
+          // Close button
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.pop(context),
+            style: IconButton.styleFrom(
+              backgroundColor: cs.surfaceContainerHighest.withAlpha(80),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
           ),
         ],
       ),
