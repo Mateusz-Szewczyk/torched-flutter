@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -16,6 +17,18 @@ import '../widgets/workspace_form_dialog.dart';
 // Configuration constants
 const double kMaxContentWidth = 800.0;
 const double kDesktopBreakpoint = 900.0;
+
+// ============================================================================
+// THEME HELPER - Uses colors from theme.dart (AppTheme)
+// ============================================================================
+class _ThemeHelper {
+  // Accent gradient - using brand orange colors from theme.dart
+  static LinearGradient get accentGradient => const LinearGradient(
+    colors: [Color(0xFFFF8C00), Color(0xFFFF6B00)], // Brand orange
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+}
 
 /// Main Workspace Screen with responsive three-pane layout
 class WorkspaceScreen extends StatefulWidget {
@@ -68,6 +81,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   // UI State
   bool _isChatPanelVisible = true;
+
+  // Key for popup menu positioning
+  final GlobalKey _conversationPillKey = GlobalKey();
 
   @override
   void initState() {
@@ -421,6 +437,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   Widget _buildDesktopLayout(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -430,55 +448,57 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
           Expanded(
             child: Row(
               children: [
-                // Left Panel: Files & Reader
+                // Left Panel: Files & Reader (Focus Zone)
                 Expanded(
-                  child: Column(
-                    children: [
-                      if (_documents.isNotEmpty)
-                        _buildFileTabsBar(context),
-                      Expanded(
-                        child: _selectedDocumentId != null
-                            ? DocumentReaderWidget(
-                                documentId: _selectedDocumentId!,
-                                workspaceId: widget.workspaceId,
-                                workspaceService: _workspaceService,
-                                onHighlightColorSelected: _toggleColorFilter,
-                                onDocumentDeleted: _loadWorkspaceData,
-                              )
-                            : _buildNoDocumentSelected(context),
-                      ),
-                    ],
+                  child: Container(
+                    color: colorScheme.surface,
+                    child: Column(
+                      children: [
+                        if (_documents.isNotEmpty)
+                          _buildFileTabsBar(context),
+                        Expanded(
+                          child: _selectedDocumentId != null
+                              ? DocumentReaderWidget(
+                                  documentId: _selectedDocumentId!,
+                                  workspaceId: widget.workspaceId,
+                                  workspaceService: _workspaceService,
+                                  onHighlightColorSelected: _toggleColorFilter,
+                                  onDocumentDeleted: _loadWorkspaceData,
+                                )
+                              : _buildNoDocumentSelected(context),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 // Right Panel: Chat
-                // We use AnimatedContainer for smooth toggling
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
                   width: _isChatPanelVisible ? 450 : 0,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    border: Border(
-                      left: BorderSide(
-                        color: colorScheme.outlineVariant.withOpacity(0.5),
-                        width: 1,
-                      ),
-                    ),
-                    boxShadow: [
-                      if (_isChatPanelVisible)
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(-4, 0),
-                        ),
-                    ],
-                  ),
                   child: ClipRect(
-                    child: OverflowBox(
-                      minWidth: 450,
-                      maxWidth: 450,
-                      alignment: Alignment.topLeft,
-                      child: _buildChatPanel(context),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(
+                        sigmaX: isDark ? 10.0 : 0,
+                        sigmaY: isDark ? 10.0 : 0,
+                      ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withOpacity(isDark ? 0.9 : 1),
+                          border: Border(
+                            left: BorderSide(
+                              color: colorScheme.outlineVariant.withOpacity(isDark ? 0.1 : 0.3),
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: OverflowBox(
+                          minWidth: 450,
+                          maxWidth: 450,
+                          alignment: Alignment.topLeft,
+                          child: _buildChatPanel(context),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -492,6 +512,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
               onPressed: () => setState(() => _isChatPanelVisible = true),
               icon: const Icon(Icons.auto_awesome),
               label: const Text('AI Assistant'),
+              backgroundColor: colorScheme.tertiary,
+              foregroundColor: colorScheme.onTertiary,
             )
           : null,
     );
@@ -561,106 +583,160 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   Widget _buildHeader(BuildContext context, {required bool isDesktop}) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5))),
-      ),
-      child: Row(
-        children: [
-           Container(
-             padding: const EdgeInsets.all(8),
-             decoration: BoxDecoration(
-               color: colorScheme.primaryContainer,
-               borderRadius: BorderRadius.circular(8),
-             ),
-             child: Icon(Icons.work, size: 20, color: colorScheme.onPrimaryContainer),
-           ),
-           const SizedBox(width: 12),
-           Column(
-             crossAxisAlignment: CrossAxisAlignment.start,
-             children: [
-               Text(_workspace?.name ?? 'Workspace', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-               if (_workspace?.description != null)
-                 Text(_workspace!.description!, style: Theme.of(context).textTheme.bodySmall),
-             ],
-           ),
-           const Spacer(),
-           IconButton(
-             onPressed: () => _showEditCategoriesDialog(context),
-             icon: const Icon(Icons.settings_outlined),
-             tooltip: 'Workspace Settings',
-           ),
-           if (isDesktop && _isChatPanelVisible)
-             IconButton(
-               onPressed: () => setState(() => _isChatPanelVisible = false),
-               icon: const Icon(Icons.close_fullscreen_outlined),
-               tooltip: 'Hide Chat',
-             ),
-        ],
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: isDark ? 8.0 : 0,
+          sigmaY: isDark ? 8.0 : 0,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          decoration: BoxDecoration(
+            color: colorScheme.surface.withOpacity(isDark ? 0.9 : 0.95),
+            // No hard border - use subtle shadow instead
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.tertiary.withOpacity(0.2),
+                      colorScheme.tertiary.withOpacity(0.05),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.work_outline_rounded,
+                  size: 20,
+                  color: colorScheme.tertiary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _workspace?.name ?? 'Workspace',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    if (_workspace?.description != null && _workspace!.description!.isNotEmpty)
+                      Text(
+                        _workspace!.description!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              // Settings button with subtle styling
+              _GhostIconButton(
+                icon: Icons.tune_rounded,
+                tooltip: 'Workspace Settings',
+                onPressed: () => _showEditCategoriesDialog(context),
+                colorScheme: colorScheme,
+              ),
+              if (isDesktop && _isChatPanelVisible) ...[
+                const SizedBox(width: 4),
+                _GhostIconButton(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Hide Chat',
+                  onPressed: () => setState(() => _isChatPanelVisible = false),
+                  colorScheme: colorScheme,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildFileTabsBar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+
     return Container(
-      height: 52,
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      height: 56,
+      margin: const EdgeInsets.only(top: 4),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         child: Row(
           children: _documents.map((doc) {
             final isSelected = doc.id == _selectedDocumentId;
+
             return Padding(
               padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _getFileIcon(doc.title),
-                      size: 14,
-                      color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      doc.title.length > 25
-                          ? '${doc.title.substring(0, 22)}...'
-                          : doc.title,
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        fontSize: 13,
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedDocumentId = doc.id),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.tertiaryContainer.withOpacity(isDark ? 0.2 : 0.5)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: isSelected
+                        ? Border.all(
+                            color: colorScheme.tertiary.withOpacity(0.3),
+                            width: 1,
+                          )
+                        : null,
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: colorScheme.tertiary.withOpacity(0.1),
+                              blurRadius: 12,
+                              spreadRadius: 0,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getFileIcon(doc.title),
+                        size: 14,
+                        color: isSelected
+                            ? colorScheme.tertiary
+                            : colorScheme.onSurfaceVariant.withOpacity(0.6),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        doc.title.length > 20
+                            ? '${doc.title.substring(0, 17)}...'
+                            : doc.title,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          fontSize: 13,
+                          color: isSelected
+                              ? (isDark ? Colors.white : colorScheme.onSurface)
+                              : colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                selected: isSelected,
-                onSelected: (_) => setState(() => _selectedDocumentId = doc.id),
-                visualDensity: VisualDensity.compact,
-                selectedColor: colorScheme.primary,
-                labelStyle: TextStyle(
-                  color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-                ),
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                side: BorderSide.none,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                showCheckmark: false,
               ),
             );
           }).toList(),
@@ -679,7 +755,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
           child: Column(
             children: [
               _buildChatHeader(context),
-              const Divider(height: 1),
+              // Removed divider - using spacing instead
+              const SizedBox(height: 4),
               _buildColorFilters(context),
               Expanded(
                 child: _messages.isEmpty && _streamingText.isEmpty
@@ -687,7 +764,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                     : _buildMessagesList(context),
               ),
               // Spacer to prevent content from being hidden behind the floating input
-              SizedBox(height: isDesktop ? 120 : 100),
+              SizedBox(height: isDesktop ? 130 : 110),
             ],
           ),
         ),
@@ -890,62 +967,85 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
   }
 
   Widget _buildDesktopChatInput(BuildContext context, ColorScheme colorScheme, AppLocalizations? l10n) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Container(
         constraints: const BoxConstraints(maxWidth: kMaxContentWidth),
-        margin: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
+        margin: const EdgeInsets.only(bottom: 28, left: 20, right: 20),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHigh.withOpacity(0.85),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.75),
-              blurRadius: 20,
-              spreadRadius: 0,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: colorScheme.outlineVariant.withOpacity(0.3),
-            width: 1,
-          ),
+          // Gradient border effect using tertiary color
+          gradient: isDark
+              ? LinearGradient(
+                  colors: [
+                    colorScheme.tertiary.withOpacity(0.25),
+                    colorScheme.tertiary.withOpacity(0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          borderRadius: BorderRadius.circular(24),
         ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_selectedTools.isNotEmpty)
-              _buildToolsChipsList(colorScheme),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: _WorkspaceToolsButton(
-                    hasTools: _selectedTools.isNotEmpty,
-                    toolCount: _selectedTools.length,
-                    onPressed: () => _showToolsBottomSheet(context),
-                    colorScheme: colorScheme,
+        padding: const EdgeInsets.all(1), // Border width
+        child: Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHigh.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(23),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
+                blurRadius: 24,
+                spreadRadius: 0,
+                offset: const Offset(0, 8),
+              ),
+              if (isDark)
+                BoxShadow(
+                  color: colorScheme.tertiary.withOpacity(0.1),
+                  blurRadius: 40,
+                  spreadRadius: -10,
+                  offset: const Offset(0, 4),
+                ),
+            ],
+          ),
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_selectedTools.isNotEmpty)
+                _buildToolsChipsList(colorScheme),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: _WorkspaceToolsButton(
+                      hasTools: _selectedTools.isNotEmpty,
+                      toolCount: _selectedTools.length,
+                      onPressed: () => _showToolsBottomSheet(context),
+                      colorScheme: colorScheme,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildChatTextField(l10n, colorScheme, true),
-                ),
-                const SizedBox(width: 12),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: _WorkspaceSendButton(
-                    isSending: _isSending,
-                    onPressed: _sendMessage,
-                    colorScheme: colorScheme,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildChatTextField(l10n, colorScheme, true),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  const SizedBox(width: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: _FuturisticSendButton(
+                      isSending: _isSending,
+                      onPressed: _sendMessage,
+                      colorScheme: colorScheme,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1034,120 +1134,142 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   Widget _buildChatEmptyState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 40),
-          // Animated Icon Container
+          const SizedBox(height: 48),
+          // Animated Icon Container with gradient glow
           Container(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  colorScheme.primaryContainer.withOpacity(isDark ? 0.3 : 0.5),
-                  colorScheme.secondaryContainer.withOpacity(isDark ? 0.2 : 0.3),
+                  colorScheme.tertiary.withOpacity(isDark ? 0.15 : 0.1),
+                  colorScheme.tertiary.withOpacity(isDark ? 0.05 : 0.02),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: colorScheme.primary.withOpacity(0.1),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              boxShadow: isDark
+                  ? [
+                      BoxShadow(
+                        color: colorScheme.tertiary.withOpacity(0.15),
+                        blurRadius: 40,
+                        spreadRadius: 0,
+                      ),
+                    ]
+                  : null,
             ),
             child: Icon(
               Icons.auto_awesome_rounded,
-              size: 40,
-              color: colorScheme.primary,
+              size: 44,
+              color: colorScheme.tertiary,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 32),
 
           // Title
           Text(
             'Ready to study?',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w700,
-              letterSpacing: -0.3,
+              letterSpacing: -0.5,
+              color: colorScheme.onSurface,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // Subtitle
           Text(
             'Highlight text to focus the AI,\nor try a quick action below.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.5,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+              height: 1.6,
               fontSize: 14,
+              letterSpacing: -0.1,
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 32),
 
-          // Quick Actions Grid
+          // Quick Actions Grid - Futuristic Pills
           Wrap(
             spacing: 10,
             runSpacing: 10,
             alignment: WrapAlignment.center,
             children: [
-              _buildEnhancedQuickAction(
-                context,
-                'Summarize',
-                Icons.short_text_rounded,
-                colorScheme.tertiary,
+              _FuturisticQuickAction(
+                label: 'Summarize',
+                icon: Icons.short_text_rounded,
+                color: colorScheme.tertiary,
+                onTap: () {
+                  _messageController.text = 'Summarize this document';
+                  _sendMessage();
+                },
               ),
-              _buildEnhancedQuickAction(
-                context,
-                'Flashcards',
-                Icons.style_rounded,
-                colorScheme.secondary,
+              _FuturisticQuickAction(
+                label: 'Flashcards',
+                icon: Icons.style_rounded,
+                color: colorScheme.tertiary.withOpacity(0.85),
+                onTap: () {
+                  _messageController.text = 'Create flashcards from this document';
+                  _sendMessage();
+                },
               ),
-              _buildEnhancedQuickAction(
-                context,
-                'Quiz Me',
-                Icons.quiz_rounded,
-                colorScheme.primary,
+              _FuturisticQuickAction(
+                label: 'Quiz Me',
+                icon: Icons.quiz_rounded,
+                color: colorScheme.tertiary.withOpacity(0.7),
+                onTap: () {
+                  _messageController.text = 'Create a quiz to test my knowledge';
+                  _sendMessage();
+                },
               ),
             ],
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 36),
 
-          // Hint about color filters
+          // Hint about color filters - Glass card style
           if (_selectedColors.isEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: colorScheme.outlineVariant.withOpacity(0.3),
+                  color: colorScheme.outlineVariant.withOpacity(isDark ? 0.1 : 0.2),
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.lightbulb_outline_rounded,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.tertiary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      Icons.lightbulb_outline_rounded,
+                      size: 16,
+                      color: colorScheme.tertiary,
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Flexible(
                     child: Text(
-                      'Tip: Use color filters above to focus on specific highlights',
+                      'Use color filters above to focus on specific highlights',
                       style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.8),
+                        letterSpacing: -0.1,
                       ),
                     ),
                   ),
@@ -1156,281 +1278,51 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
             ),
         ],
       ),
-    );
-  }
-
-  Widget _buildEnhancedQuickAction(
-    BuildContext context,
-    String label,
-    IconData icon,
-    Color accentColor,
-  ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          _messageController.text = label;
-          _sendMessage();
-        },
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark
-                ? colorScheme.surfaceContainerHigh
-                : colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withOpacity(0.3),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, size: 16, color: accentColor),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(String label, IconData icon) {
-    return ActionChip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
-      onPressed: () {
-        _messageController.text = label;
-        _sendMessage();
-      },
     );
   }
 
   Widget _buildChatHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > kDesktopBreakpoint;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // AI Indicator
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  colorScheme.primary.withOpacity(0.15),
-                  colorScheme.primary.withOpacity(0.05),
-                ],
+          // Centered Context Pill with Add Button
+          Flexible(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: isDesktop ? 400 : screenWidth * 0.85,
               ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              Icons.auto_awesome,
-              size: 16,
-              color: colorScheme.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Title
-          Expanded(
-            child: GestureDetector(
-              onTap: _conversations.length > 1 ? () => _showConversationSelector(context) : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _currentConversation?.title ?? 'New Conversation',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (_conversations.length > 1) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.keyboard_arrow_down_rounded,
-                          size: 16,
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (_workspace != null)
-                    Text(
-                      _workspace!.name,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.6),
-                        fontWeight: FontWeight.w500,
-                      ),
+                  // The Interactive Context Pill
+                  Flexible(
+                    child: _ContextPill(
+                      key: _conversationPillKey,
+                      conversationTitle: _currentConversation?.title ?? 'New Conversation',
+                      workspaceName: _workspace?.name ?? '',
+                      hasMultipleConversations: _conversations.length > 1,
+                      onTap: () => _showConversationSelector(context),
+                      colorScheme: colorScheme,
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Integrated Add Button - subtle circle next to pill
+                  _AddConversationButton(
+                    onPressed: _createNewConversationWithFeedback,
+                    colorScheme: colorScheme,
+                  ),
                 ],
               ),
             ),
-          ),
-          // Action buttons
-          _ChatHeaderAction(
-            icon: Icons.add_rounded,
-            tooltip: 'New Chat',
-            onPressed: _createNewConversationWithFeedback,
-            colorScheme: colorScheme,
-            isPrimary: true,
-          ),
-          _ChatHeaderAction(
-            icon: Icons.history_rounded,
-            tooltip: 'History',
-            onPressed: () => _showHistoryMenu(context),
-            colorScheme: colorScheme,
           ),
         ],
-      ),
-    );
-  }
-
-  void _showHistoryMenu(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
-        ),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Text(
-                    'Chat History',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _createNewConversationWithFeedback();
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('New'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: colorScheme.primary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            // List
-            Flexible(
-              child: _conversations.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Text(
-                        'No conversations yet',
-                        style: TextStyle(color: colorScheme.onSurfaceVariant),
-                      ),
-                    )
-                  : ListView.builder(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _conversations.length,
-                      itemBuilder: (context, index) {
-                        final conv = _conversations[index];
-                        final isSelected = conv.id == _currentConversation?.id;
-                        return ListTile(
-                          onTap: () {
-                            Navigator.pop(context);
-                            _switchConversation(conv);
-                          },
-                          leading: Icon(
-                            isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
-                            size: 20,
-                            color: isSelected
-                                ? colorScheme.primary
-                                : colorScheme.onSurfaceVariant,
-                          ),
-                          title: Text(
-                            conv.title ?? 'Untitled',
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                          selected: isSelected,
-                          selectedTileColor: colorScheme.primaryContainer.withOpacity(0.3),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
-          ],
-        ),
       ),
     );
   }
@@ -1509,111 +1401,424 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
     _loadMessages();
   }
 
-  /// Shows a bottom sheet with conversation selector (for mobile)
+  /// Shows a selector for conversations - uses PopupMenu dropdown on desktop, BottomSheet on mobile
   void _showConversationSelector(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > kDesktopBreakpoint;
 
+    // On desktop, use PopupMenu dropdown positioned under the pill
+    if (isDesktop) {
+      _showDesktopConversationDropdown(context, colorScheme);
+      return;
+    }
+
+    // On mobile, use bottom sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.6,
+          maxHeight: MediaQuery.of(context).size.height * 0.55,
         ),
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: _buildConversationSelectorContent(context, colorScheme, isDesktop: false),
+      ),
+    );
+  }
+
+  /// Shows desktop dropdown using showMenu (like CategoryDropdown)
+  void _showDesktopConversationDropdown(BuildContext context, ColorScheme colorScheme) {
+    final RenderBox? renderBox = _conversationPillKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    final buttonPosition = renderBox.localToGlobal(Offset.zero);
+    final buttonSize = renderBox.size;
+    final screenSize = MediaQuery.of(context).size;
+    final theme = Theme.of(context);
+
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        buttonPosition.dx,
+        buttonPosition.dy + buttonSize.height + 4,
+        screenSize.width - buttonPosition.dx - buttonSize.width,
+        0,
+      ),
+      constraints: BoxConstraints(
+        minWidth: buttonSize.width.clamp(300.0, 420.0),
+        maxWidth: buttonSize.width.clamp(300.0, 420.0),
+        maxHeight: 450,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 8,
+      items: _buildConversationMenuItems(colorScheme, theme),
+    ).then((value) {
+      if (value == '__new__') {
+        _createNewConversationWithFeedback();
+      } else if (value != null) {
+        // Find and switch to conversation
+        final conv = _conversations.firstWhere(
+          (c) => c.id.toString() == value,
+          orElse: () => _conversations.first,
+        );
+        _switchConversation(conv);
+      }
+    });
+  }
+
+  /// Builds menu items for conversation dropdown
+  List<PopupMenuEntry<String>> _buildConversationMenuItems(ColorScheme colorScheme, ThemeData theme) {
+    final List<PopupMenuEntry<String>> items = [];
+
+    // New Conversation Button at the top
+    items.add(PopupMenuItem<String>(
+      value: '__new__',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Handle
             Container(
-              margin: const EdgeInsets.only(top: 12),
-              width: 40,
-              height: 4,
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
+                color: colorScheme.primary,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.add_rounded,
+                size: 16,
+                color: colorScheme.onPrimary,
               ),
             ),
-
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.chat_bubble_outline, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Conversations',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _createNewConversationWithFeedback();
-                    },
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('New'),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1),
-
-            // Conversation List
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: _conversations.length,
-                itemBuilder: (context, index) {
-                  final conv = _conversations[index];
-                  final isSelected = conv.id == _currentConversation?.id;
-
-                  return ListTile(
-                    leading: Icon(
-                      isSelected
-                          ? Icons.chat_bubble_rounded
-                          : Icons.chat_bubble_outline_rounded,
-                      color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      conv.title ?? 'Untitled',
-                      style: TextStyle(
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      _formatConversationDate(conv.createdAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    selected: isSelected,
-                    selectedTileColor: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _switchConversation(conv);
-                    },
-                  );
-                },
+            const SizedBox(width: 10),
+            Text(
+              'New Conversation',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
       ),
+    ));
+
+    if (_conversations.isNotEmpty) {
+      // Divider
+      items.add(const PopupMenuDivider(height: 8));
+
+      // Section header
+      items.add(PopupMenuItem<String>(
+        enabled: false,
+        height: 32,
+        child: Text(
+          'RECENT CONVERSATIONS',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+            fontSize: 10,
+          ),
+        ),
+      ));
+
+      // Conversation items
+      for (final conv in _conversations) {
+        final isSelected = conv.id == _currentConversation?.id;
+        items.add(PopupMenuItem<String>(
+          value: conv.id.toString(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? colorScheme.primaryContainer.withAlpha((255 * 0.5).round())
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? colorScheme.primary.withAlpha((255 * 0.15).round())
+                        : colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 16,
+                    color: isSelected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        conv.title ?? 'Untitled',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          color: isSelected
+                              ? colorScheme.onPrimaryContainer
+                              : colorScheme.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        _formatConversationDate(conv.createdAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isSelected)
+                  Icon(Icons.check_rounded, size: 18, color: colorScheme.primary),
+              ],
+            ),
+          ),
+        ));
+      }
+    }
+
+    return items;
+  }
+
+  /// Builds the shared content for conversation selector (used in BottomSheet for mobile)
+  Widget _buildConversationSelectorContent(BuildContext context, ColorScheme colorScheme, {required bool isDesktop}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Handle bar (only for mobile bottom sheet)
+        if (!isDesktop)
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: colorScheme.outlineVariant.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+
+        // Sticky Header with "New Conversation" button
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Column(
+            children: [
+              // New Conversation Button - Large & Prominent
+              Material(
+                color: colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(14),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _createNewConversationWithFeedback();
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.add_rounded,
+                            color: colorScheme.onPrimary,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Start New Conversation',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Recent Conversations Label
+              if (_conversations.isNotEmpty)
+                Row(
+                  children: [
+                    Text(
+                      'RECENT',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${_conversations.length} conversation${_conversations.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+
+        // Divider
+        Divider(
+          height: 1,
+          color: colorScheme.outlineVariant.withOpacity(0.3),
+        ),
+
+        // Conversation List
+        Flexible(
+          child: _conversations.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 40,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No conversations yet',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  itemCount: _conversations.length,
+                  itemBuilder: (context, index) {
+                    final conv = _conversations[index];
+                    final isSelected = conv.id == _currentConversation?.id;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Material(
+                        color: isSelected
+                            ? colorScheme.primaryContainer.withOpacity(0.4)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.pop(context);
+                            _switchConversation(conv);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            child: Row(
+                              children: [
+                                // Selection indicator
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isSelected
+                                        ? colorScheme.primary
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Title & Date
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        conv.title ?? 'Untitled',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: isSelected
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _formatConversationDate(conv.createdAt),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Arrow indicator
+                                if (isSelected)
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: colorScheme.primary,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+
+        // Safe area padding (only for mobile)
+        SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+      ],
     );
   }
 
@@ -1640,33 +1845,44 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
 
   Widget _buildColorFilters(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
 
+    // Neon-inspired color palette for dark mode
     final colorMap = {
-      'red': isDark ? Colors.red[400]! : Colors.red[500]!,
-      'yellow': isDark ? Colors.amber[400]! : Colors.amber[600]!,
-      'green': isDark ? Colors.green[400]! : Colors.green[500]!,
-      'blue': isDark ? Colors.blue[400]! : Colors.blue[500]!,
-      'purple': isDark ? Colors.purple[300]! : Colors.purple[500]!,
+      'red': isDark ? const Color(0xFFFF6B6B) : Colors.red[500]!,
+      'yellow': isDark ? const Color(0xFFFFD93D) : Colors.amber[600]!,
+      'green': isDark ? const Color(0xFF6BCB77) : Colors.green[500]!,
+      'blue': isDark ? const Color(0xFF4D96FF) : Colors.blue[500]!,
+      'purple': isDark ? const Color(0xFFB983FF) : Colors.purple[500]!,
     };
 
     const double chipSize = 28.0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
-          // Label
-          Text(
-            'Focus',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+          // Label with subtle styling
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withOpacity(0.03)
+                  : colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Focus',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+              ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           // Color chips
           Expanded(
             child: Row(
@@ -1674,7 +1890,7 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                 final isSelected = _selectedColors.contains(color);
                 final colorValue = colorMap[color]!;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: const EdgeInsets.only(right: 10),
                   child: GestureDetector(
                     onTap: () => _toggleColorFilter(color),
                     child: AnimatedContainer(
@@ -1685,19 +1901,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                       decoration: BoxDecoration(
                         color: isSelected
                             ? colorValue
-                            : colorValue.withOpacity(isDark ? 0.15 : 0.12),
+                            : colorValue.withOpacity(isDark ? 0.12 : 0.1),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: isSelected
-                              ? colorValue
-                              : colorValue.withOpacity(isDark ? 0.4 : 0.3),
-                          width: isSelected ? 0 : 1.5,
+                              ? Colors.transparent
+                              : colorValue.withOpacity(isDark ? 0.35 : 0.25),
+                          width: 1.5,
                         ),
-                        boxShadow: isSelected
+                        boxShadow: isSelected && isDark
                             ? [
                                 BoxShadow(
-                                  color: colorValue.withOpacity(0.4),
-                                  blurRadius: 8,
+                                  color: colorValue.withOpacity(0.5),
+                                  blurRadius: 12,
                                   spreadRadius: 0,
                                 ),
                               ]
@@ -1707,11 +1923,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                         child: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 150),
                           child: isSelected
-                              ? const Icon(
+                              ? Icon(
                                   Icons.check_rounded,
                                   size: 16,
-                                  color: Colors.white,
-                                  key: ValueKey('check'),
+                                  color: isDark ? Colors.white : Colors.white,
+                                  key: const ValueKey('check'),
                                 )
                               : const SizedBox.shrink(key: ValueKey('empty')),
                         ),
@@ -1734,12 +1950,19 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                       onTap: () => setState(() => _selectedColors.clear()),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
+                          horizontal: 12,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
+                          color: isDark
+                              ? Colors.white.withOpacity(0.05)
+                              : colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isDark
+                                ? Colors.white.withOpacity(0.08)
+                                : colorScheme.outlineVariant.withOpacity(0.2),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -2137,7 +2360,7 @@ class _WorkspaceChatAvatar extends StatelessWidget {
   }
 }
 
-/// Minimal message bubble - identical style to chat_screen.dart
+/// Minimal message bubble - clean, no-background style for bot messages
 class _MinimalMessageBubble extends StatelessWidget {
   final WorkspaceMessage message;
   final bool isUser;
@@ -2159,8 +2382,8 @@ class _MinimalMessageBubble extends StatelessWidget {
       padding: EdgeInsets.only(
         top: 16,
         bottom: 8,
-        left: isUser ? 40 : 0,
-        right: isUser ? 0 : 20,
+        left: isUser ? 48 : 0,
+        right: isUser ? 0 : 24,
       ),
       child: Row(
         mainAxisAlignment:
@@ -2176,47 +2399,67 @@ class _MinimalMessageBubble extends StatelessWidget {
           // Message Content
           Flexible(
             child: Container(
-              padding: isUser
-                  ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
-                  : const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(isUser ? 20 : 0),
+              padding: EdgeInsets.symmetric(
+                horizontal: isUser ? 16 : 4,
+                vertical: isUser ? 12 : 4,
               ),
+              decoration: isUser
+                  ? BoxDecoration(
+                      // User messages: Match chat_screen.dart style
+                      color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(20),
+                    )
+                  : null, // No background for bot messages - clean look
               child: MarkdownBody(
                 data: message.text + (isStreaming ? ' ▌' : ''),
                 styleSheet: MarkdownStyleSheet(
                   p: TextStyle(
-                    color: colorScheme.onSurface,
+                    color: colorScheme.onSurface, // Same for both user and bot
                     fontSize: isMobile ? 15 : 16,
                     height: 1.6,
                   ),
                   h1: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22),
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 22,
+                    letterSpacing: -0.5,
+                  ),
                   h2: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20),
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20,
+                    letterSpacing: -0.4,
+                  ),
                   h3: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18),
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    letterSpacing: -0.3,
+                  ),
                   strong: const TextStyle(fontWeight: FontWeight.w700),
+                  listBullet: TextStyle(
+                    color: colorScheme.tertiary,
+                  ),
                   code: TextStyle(
                     backgroundColor: colorScheme.surfaceContainerHighest,
-                    color: colorScheme.onSurface,
+                    color: colorScheme.tertiary,
                     fontFamily: 'monospace',
                     fontSize: 14,
                   ),
                   codeblockDecoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8),
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: colorScheme.outline.withOpacity(0.2)),
+                      color: colorScheme.outlineVariant,
+                    ),
+                  ),
+                  blockquoteDecoration: BoxDecoration(
+                    border: Border(
+                      left: BorderSide(
+                        color: colorScheme.tertiary,
+                        width: 3,
+                      ),
+                    ),
                   ),
                 ),
                 selectable: true,
@@ -2238,17 +2481,20 @@ class _MinimalStepsPanel extends StatefulWidget {
 }
 
 class _MinimalStepsPanelState extends State<_MinimalStepsPanel> {
-  bool _isExpanded = true;
+  // Default to collapsed
+  bool _isExpanded = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isMobile = MediaQuery.of(context).size.width < kDesktopBreakpoint;
+    final isDark = theme.brightness == Brightness.dark;
 
     // Determine if we are still processing
     final bool isThinking =
         widget.steps.any((step) => step.status == 'loading');
+    final int completedCount = widget.steps.where((s) => s.status == 'complete').length;
 
     return Container(
       margin: EdgeInsets.only(
@@ -2262,9 +2508,16 @@ class _MinimalStepsPanelState extends State<_MinimalStepsPanel> {
         children: [
           InkWell(
             onTap: () => setState(() => _isExpanded = !_isExpanded),
-            borderRadius: BorderRadius.circular(6),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withOpacity(0.2),
+                ),
+              ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -2274,30 +2527,33 @@ class _MinimalStepsPanelState extends State<_MinimalStepsPanel> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: colorScheme.primary,
+                        color: colorScheme.tertiary,
                       ),
                     )
                   else
-                    const Icon(
+                    Icon(
                       Icons.check_circle_rounded,
                       size: 16,
-                      color: Colors.green,
+                      color: colorScheme.tertiary,
                     ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   Text(
-                    isThinking ? 'Thinking...' : 'Thought Process',
+                    isThinking
+                        ? 'Reasoning...'
+                        : 'Processed $completedCount step${completedCount == 1 ? '' : 's'}',
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
+                      letterSpacing: -0.1,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Icon(
                     _isExpanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
-                    size: 16,
-                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant.withOpacity(0.6),
                   ),
                 ],
               ),
@@ -2306,7 +2562,7 @@ class _MinimalStepsPanelState extends State<_MinimalStepsPanel> {
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
             secondChild: Padding(
-              padding: const EdgeInsets.only(top: 8, left: 24),
+              padding: const EdgeInsets.only(top: 12, left: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: widget.steps
@@ -2340,35 +2596,36 @@ class _WorkspaceStepItem extends StatelessWidget {
     final isComplete = step.status == 'complete';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(
-              isLoading
-                  ? Icons.circle_outlined
-                  : (isComplete
-                      ? Icons.check_circle_outline_rounded
-                      : Icons.circle_outlined),
-              size: 14,
-              color: isLoading
-                  ? colorScheme.primary
-                  : (isComplete
-                      ? Colors.green
-                      : colorScheme.onSurfaceVariant),
+            padding: const EdgeInsets.only(top: 3),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isLoading
+                    ? colorScheme.tertiary
+                    : (isComplete
+                        ? colorScheme.tertiary
+                        : colorScheme.onSurfaceVariant.withOpacity(0.4)),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               step.content,
               style: TextStyle(
                 fontSize: 13,
+                height: 1.5,
                 color: isLoading
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
+                    ? colorScheme.tertiary
+                    : colorScheme.onSurfaceVariant.withOpacity(0.8),
+                letterSpacing: -0.1,
               ),
             ),
           ),
@@ -2601,47 +2858,357 @@ class _WorkspaceToolChip extends StatelessWidget {
   }
 }
 
-/// Minimal header action button for the chat header
-class _ChatHeaderAction extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
+/// Interactive Context Pill - Shows conversation title and workspace name in a styled container
+class _ContextPill extends StatelessWidget {
+  final String conversationTitle;
+  final String workspaceName;
+  final bool hasMultipleConversations;
+  final VoidCallback onTap;
+  final ColorScheme colorScheme;
+
+  const _ContextPill({
+    super.key,
+    required this.conversationTitle,
+    required this.workspaceName,
+    required this.hasMultipleConversations,
+    required this.onTap,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // AI Icon
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      colorScheme.primary.withOpacity(0.2),
+                      colorScheme.primary.withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  Icons.auto_awesome,
+                  size: 14,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              // Title
+              Flexible(
+                child: Text(
+                  conversationTitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              // Separator & Workspace Name (if available)
+              if (workspaceName.isNotEmpty) ...[
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  width: 1,
+                  height: 14,
+                  color: colorScheme.outlineVariant.withOpacity(0.5),
+                ),
+                Flexible(
+                  child: Text(
+                    workspaceName,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+              // Dropdown indicator
+              const SizedBox(width: 6),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Subtle circular add button that sits next to the Context Pill
+class _AddConversationButton extends StatelessWidget {
   final VoidCallback onPressed;
   final ColorScheme colorScheme;
-  final bool isPrimary;
 
-  const _ChatHeaderAction({
-    required this.icon,
-    required this.tooltip,
+  const _AddConversationButton({
     required this.onPressed,
     required this.colorScheme,
-    this.isPrimary = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: tooltip,
+      message: 'New Conversation',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(10),
           child: Container(
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: isPrimary
-                  ? colorScheme.primary.withOpacity(0.1)
-                  : Colors.transparent,
+              color: colorScheme.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.primary.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              Icons.add_rounded,
+              size: 18,
+              color: colorScheme.primary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+// =============================================================================
+// FUTURISTIC HELPER WIDGETS
+// =============================================================================
+
+/// Ghost icon button - subtle, transparent styling for header actions
+class _GhostIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+
+  const _GhostIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(10),
+          hoverColor: isDark
+              ? Colors.white.withOpacity(0.05)
+              : colorScheme.onSurface.withOpacity(0.05),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
               size: 20,
-              color: isPrimary
-                  ? colorScheme.primary
-                  : colorScheme.onSurfaceVariant.withOpacity(0.7),
+              color: colorScheme.onSurfaceVariant.withOpacity(0.7),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Futuristic send button with gradient accent and hover animation
+class _FuturisticSendButton extends StatefulWidget {
+  final bool isSending;
+  final VoidCallback onPressed;
+  final ColorScheme colorScheme;
+
+  const _FuturisticSendButton({
+    required this.isSending,
+    required this.onPressed,
+    required this.colorScheme,
+  });
+
+  @override
+  State<_FuturisticSendButton> createState() => _FuturisticSendButtonState();
+}
+
+class _FuturisticSendButtonState extends State<_FuturisticSendButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.isSending ? null : widget.onPressed,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          width: 40,
+          height: 40,
+          transform: Matrix4.identity()
+            ..scale(_isHovered && !widget.isSending ? 1.08 : 1.0),
+          transformAlignment: Alignment.center,
+          decoration: BoxDecoration(
+            gradient: widget.isSending
+                ? null
+                : LinearGradient(
+                    colors: _isHovered
+                        ? [const Color(0xFFFFAA00), const Color(0xFFFF8C00)] // Brighter on hover
+                        : [const Color(0xFFFF8C00), const Color(0xFFFF6B00)], // Brand orange
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+            color: widget.isSending ? widget.colorScheme.surfaceContainerHighest : null,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: widget.isSending
+                ? null
+                : [
+                    BoxShadow(
+                      color: const Color(0xFFFF8C00).withOpacity(_isHovered ? 0.5 : 0.3),
+                      blurRadius: _isHovered ? 16 : 12,
+                      spreadRadius: _isHovered ? 2 : 0,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+          ),
+          child: Center(
+            child: widget.isSending
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: widget.colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                : AnimatedRotation(
+                    duration: const Duration(milliseconds: 200),
+                    turns: _isHovered ? -0.05 : 0,
+                    child: const Icon(
+                      Icons.arrow_upward_rounded,
+                      size: 22,
+                      color: Colors.white,
+                    ),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Futuristic quick action button for empty state
+class _FuturisticQuickAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FuturisticQuickAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withOpacity(0.03)
+                : colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isDark
+                  ? color.withOpacity(0.2)
+                  : colorScheme.outlineVariant.withOpacity(0.2),
+            ),
+            boxShadow: isDark
+                ? [
+                    BoxShadow(
+                      color: color.withOpacity(0.05),
+                      blurRadius: 12,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(isDark ? 0.15 : 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 16, color: color),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: colorScheme.onSurface,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
           ),
         ),
       ),

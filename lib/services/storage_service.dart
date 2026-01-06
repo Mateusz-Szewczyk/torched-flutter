@@ -124,6 +124,28 @@ class StorageService {
     return _prefs?.getString('user_email');
   }
 
+  // ============================================================================
+  // GENERIC KEY-VALUE STORAGE (for app data like reading progress)
+  // ============================================================================
+
+  /// Get a string value by key
+  Future<String?> get(String key) async {
+    final prefs = await _getPrefs();
+    return prefs.getString(key);
+  }
+
+  /// Set a string value by key
+  Future<void> set(String key, String value) async {
+    final prefs = await _getPrefs();
+    await prefs.setString(key, value);
+  }
+
+  /// Remove a value by key
+  Future<void> remove(String key) async {
+    final prefs = await _getPrefs();
+    await prefs.remove(key);
+  }
+
   // Clear all user data
   Future<void> clearUserData() async {
     await deleteToken();

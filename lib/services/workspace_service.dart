@@ -424,6 +424,7 @@ class WorkspaceService {
         highlights: highlights,
         totalSections: response.data['section_count'] as int? ?? sections.length,
         hasMore: false, // Page-based fetch doesn't use hasMore
+        pageStartSectionIndex: response.data['page_start_section_index'] as int?,
       );
     } catch (e) {
       print('[WorkspaceService] Error fetching sections by page: $e');
@@ -826,12 +827,14 @@ class SectionsWithHighlights {
   final List<Highlight> highlights;
   final int totalSections;
   final bool hasMore;
+  final int? pageStartSectionIndex; // The section index that starts the requested page
 
   SectionsWithHighlights({
     required this.sections,
     required this.highlights,
     required this.totalSections,
     required this.hasMore,
+    this.pageStartSectionIndex,
   });
 
   factory SectionsWithHighlights.fromJson(Map<String, dynamic> json) {
@@ -844,6 +847,7 @@ class SectionsWithHighlights {
           .toList(),
       totalSections: json['total_sections'] as int,
       hasMore: json['has_more'] as bool,
+      pageStartSectionIndex: json['page_start_section_index'] as int?,
     );
   }
 }

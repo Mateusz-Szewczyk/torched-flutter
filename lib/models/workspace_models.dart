@@ -27,12 +27,12 @@ class WorkspaceDocument with _$WorkspaceDocument {
 class DocumentSection with _$DocumentSection {
   const factory DocumentSection({
     required String id,
-    required int sectionIndex,
-    required String contentText,
-    @Default([]) List<TextStyleSpan> baseStyles,
-    @Default({}) Map<String, dynamic> sectionMetadata,
-    @Default(0) int charStart,
-    @Default(0) int charEnd,
+    @JsonKey(name: 'section_index') required int sectionIndex,
+    @JsonKey(name: 'content_text') required String contentText,
+    @JsonKey(name: 'base_styles') @Default([]) List<TextStyleSpan> baseStyles,
+    @JsonKey(name: 'section_metadata') @Default({}) Map<String, dynamic> sectionMetadata,
+    @JsonKey(name: 'char_start') @Default(0) int charStart,
+    @JsonKey(name: 'char_end') @Default(0) int charEnd,
   }) = _DocumentSection;
 
   factory DocumentSection.fromJson(Map<String, dynamic> json) =>
@@ -59,13 +59,13 @@ class TextStyleSpan with _$TextStyleSpan {
 class UserHighlight with _$UserHighlight {
   const factory UserHighlight({
     required String id,
-    required String documentId,
-    required String sectionId,
-    required int startOffset,
-    required int endOffset,
-    required String colorCode,
-    String? annotationText,
-    required String createdAt,
+    @JsonKey(name: 'document_id') required String documentId,
+    @JsonKey(name: 'section_id') required String sectionId,
+    @JsonKey(name: 'start_offset') required int startOffset,
+    @JsonKey(name: 'end_offset') required int endOffset,
+    @JsonKey(name: 'color_code') required String colorCode,
+    @JsonKey(name: 'annotation_text') String? annotationText,
+    @JsonKey(name: 'created_at') required String createdAt,
   }) = _UserHighlight;
 
   factory UserHighlight.fromJson(Map<String, dynamic> json) =>
@@ -98,6 +98,7 @@ class SectionsWithHighlights with _$SectionsWithHighlights {
     required List<UserHighlight> highlights,
     required int totalSections,
     required bool hasMore,
+    @JsonKey(name: 'page_start_section_index') int? pageStartSectionIndex, // The section index that starts the requested page
   }) = _SectionsWithHighlights;
 
   factory SectionsWithHighlights.fromJson(Map<String, dynamic> json) =>

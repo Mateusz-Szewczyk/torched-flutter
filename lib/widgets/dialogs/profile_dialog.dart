@@ -1,3 +1,4 @@
+import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -8,17 +9,148 @@ import '../../services/auth_service.dart';
 import '../profile/memories_section.dart';
 import '../profile/subscription_section.dart';
 
+// --- Reusable Glass Components ---
+
+/// A container that applies a blur, semi-transparent background, and subtle border
+class GlassTile extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
+  final double blur;
+  final double opacity;
+  final Color? color;
+  final BoxBorder? border;
+  final List<BoxShadow>? shadows;
+  final Gradient? gradient;
+
+  const GlassTile({
+    super.key,
+    required this.child,
+    this.padding,
+    this.margin,
+    this.blur = 15,
+    this.opacity = 0.05,
+    this.color,
+    this.border,
+    this.shadows,
+    this.gradient,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        boxShadow: shadows ?? [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            spreadRadius: 0,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+          child: Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              color: color ?? cs.surface.withOpacity(opacity),
+              gradient: gradient,
+              borderRadius: BorderRadius.circular(24),
+              border: border ?? Border.all(
+                color: cs.onSurface.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A text field with no solid fill, just a glowing outline when focused
+class GhostTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String label;
+  final bool obscureText;
+  final Widget? suffixIcon;
+  final Widget? prefixIcon;
+  final String? Function(String?)? validator;
+  final void Function(String)? onSubmitted;
+  final bool autofocus;
+  final String? errorText;
+
+  const GhostTextField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.obscureText = false,
+    this.suffixIcon,
+    this.prefixIcon,
+    this.validator,
+    this.onSubmitted,
+    this.autofocus = false,
+    this.errorText,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      autofocus: autofocus,
+      onFieldSubmitted: onSubmitted,
+      validator: validator,
+      style: TextStyle(color: cs.onSurface),
+      decoration: InputDecoration(
+        labelText: label,
+        errorText: errorText,
+        labelStyle: TextStyle(color: cs.onSurfaceVariant),
+        prefixIcon: prefixIcon,
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: cs.surface.withOpacity(0.02),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: cs.outline.withOpacity(0.3)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: cs.outline.withOpacity(0.3)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: cs.primary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: cs.error.withOpacity(0.5)),
+        ),
+      ),
+    );
+  }
+}
+
+// --- Main Implementation ---
+
 /// Shows the profile dialog as a full-screen modal
 void showProfileDialog(BuildContext context) {
   final isMobile = MediaQuery.of(context).size.width < 768;
 
   if (isMobile) {
-    // Full screen modal for mobile
     Navigator.of(context).push(
       PageRouteBuilder(
-        opaque: false,
+        opaque: false, // Crucial for glassmorphism
         barrierDismissible: true,
-        barrierColor: Colors.black54,
+        barrierColor: Colors.black.withOpacity(0.6),
         pageBuilder: (context, animation, secondaryAnimation) {
           return const ProfileScreen();
         },
@@ -29,7 +161,7 @@ void showProfileDialog(BuildContext context) {
               end: Offset.zero,
             ).animate(CurvedAnimation(
               parent: animation,
-              curve: Curves.easeOutCubic,
+              curve: Curves.easeOutQuart,
             )),
             child: child,
           );
@@ -37,9 +169,9 @@ void showProfileDialog(BuildContext context) {
       ),
     );
   } else {
-    // Regular dialog for desktop
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) => const ProfileDialog(),
     );
   }
@@ -62,7 +194,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    // Fetch subscription stats when profile is opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SubscriptionProvider>().fetchStats();
     });
@@ -114,40 +245,55 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         curve: Curves.easeOut,
         transform: Matrix4.translationValues(0, _dragOffset, 0),
         child: Scaffold(
-          backgroundColor: cs.surface,
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Drag handle indicator
-                _buildDragHandle(cs),
-
-                // Header with close button
-                _buildHeader(context, cs),
-
-                // Tab bar
-                _buildTabBar(cs),
-
-                // Content
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _ProfileContent(
-                        user: user,
-                        subscriptionStats: subscriptionProvider.stats,
-                        onUpgradeTap: () => _showSubscriptionSheet(context),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: MemoriesSection(),
-                      ),
-                      const _PasswordContent(),
-                      _AccountContent(user: user),
-                    ],
+          backgroundColor: Colors.transparent, // Transparent for Glass effect
+          body: Stack(
+            children: [
+              // 1. The Blur Layer
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    color: cs.surface.withOpacity(0.75),
                   ),
                 ),
-              ],
-            ),
+              ),
+
+              // 2. The Content
+              SafeArea(
+                child: Column(
+                  children: [
+                    // Glowing Drag handle
+                    _buildDragHandle(cs),
+
+                    // Header
+                    _buildHeader(context, cs),
+
+                    // Segmented Glass Tabs
+                    _buildTabBar(cs),
+
+                    // Tab View
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _ProfileContent(
+                            user: user,
+                            subscriptionStats: subscriptionProvider.stats,
+                            onUpgradeTap: () => _showSubscriptionSheet(context),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: MemoriesSection(),
+                          ),
+                          const _PasswordContent(),
+                          _AccountContent(user: user),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -155,6 +301,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _showSubscriptionSheet(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -165,48 +312,52 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         maxChildSize: 0.95,
         builder: (context, scrollController) => Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            color: cs.surface.withOpacity(0.9),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
           ),
-          child: Column(
-            children: [
-              // Handle
-              Container(
-                margin: const EdgeInsets.only(top: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(80),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              // Header
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Text(
-                      'Subscription Plans',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+          child: ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
                     ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Subscription Plans',
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      child: const SubscriptionSection(),
+                    ),
+                  ),
+                ],
               ),
-              // Plans
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  child: const SubscriptionSection(),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -221,14 +372,21 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       onVerticalDragEnd: _handleDragEnd,
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Center(
           child: Container(
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: cs.onSurfaceVariant.withAlpha(80),
-              borderRadius: BorderRadius.circular(2),
+              color: cs.primary,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: cs.primary.withOpacity(0.6),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
           ),
         ),
@@ -238,33 +396,39 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Widget _buildHeader(BuildContext context, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 8, 8),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'My Profile',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'My Profile',
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 28,
+                  letterSpacing: -0.5,
                 ),
-                Text(
-                  'Manage your account settings',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+              ),
+              Text(
+                'Settings & Preferences',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  letterSpacing: 0.5,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
-            style: IconButton.styleFrom(
-              backgroundColor: cs.surfaceContainerHighest,
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: cs.surfaceContainerHighest.withOpacity(0.3),
+            ),
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
+              color: cs.onSurface,
             ),
           ),
         ],
@@ -274,27 +438,37 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Widget _buildTabBar(ColorScheme cs) {
     return Container(
+      height: 50,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withAlpha(100),
-        borderRadius: BorderRadius.circular(12),
+        color: cs.surface.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: cs.outline.withOpacity(0.1)),
       ),
       child: TabBar(
         controller: _tabController,
         indicator: BoxDecoration(
           color: cs.primaryContainer,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+              color: cs.primaryContainer.withOpacity(0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: cs.onPrimaryContainer,
         unselectedLabelColor: cs.onSurfaceVariant,
         dividerColor: Colors.transparent,
-        labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        padding: const EdgeInsets.all(4),
         tabs: const [
-          Tab(icon: Icon(Icons.person_outline, size: 20), text: 'Profile'),
-          Tab(icon: Icon(Icons.psychology_outlined, size: 20), text: 'Memory'),
-          Tab(icon: Icon(Icons.lock_outline, size: 20), text: 'Password'),
-          Tab(icon: Icon(Icons.settings_outlined, size: 20), text: 'Account'),
+          Tab(text: 'Profile'),
+          Tab(text: 'Memory'),
+          Tab(text: 'Security'),
+          Tab(text: 'Account'),
         ],
       ),
     );
@@ -316,7 +490,6 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
-    // Fetch subscription stats when profile is opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SubscriptionProvider>().fetchStats();
     });
@@ -332,31 +505,32 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 550, maxHeight: 700),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Row(
-                  children: [
-                    Text(
-                      'Subscription Plans',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+        backgroundColor: Colors.transparent,
+        child: GlassTile(
+          opacity: 0.9,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 550, maxHeight: 700),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Subscription Plans',
+                        style: Theme.of(context).textTheme.headlineSmall,
                       ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Expanded(child: SubscriptionSection()),
-            ],
+                const Expanded(child: SubscriptionSection()),
+              ],
+            ),
           ),
         ),
       ),
@@ -368,65 +542,102 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
     final authProvider = context.watch<AuthProvider>();
     final subscriptionProvider = context.watch<SubscriptionProvider>();
     final user = authProvider.currentUser;
+    final cs = Theme.of(context).colorScheme;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 650, maxHeight: 750),
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'My Profile',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+        constraints: const BoxConstraints(maxWidth: 700, maxHeight: 800),
+        child: GlassTile(
+          opacity: 0.85,
+          blur: 25,
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                     Column(
+                       crossAxisAlignment: CrossAxisAlignment.start,
+                       children: [
+                         Text(
+                          'My Profile',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                         ),
+                         Text(
+                           'Manage your digital identity',
+                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                             color: cs.onSurfaceVariant
+                           ),
+                         )
+                       ],
+                     ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            // Tab bar
-            TabBar(
-              controller: _tabController,
-              tabs: const [
-                Tab(text: 'Profile', icon: Icon(Icons.person_outline)),
-                Tab(text: 'Memories', icon: Icon(Icons.psychology_outlined)),
-                Tab(text: 'Password', icon: Icon(Icons.lock_outline)),
-                Tab(text: 'Account', icon: Icon(Icons.manage_accounts_outlined)),
-              ],
-            ),
-
-            // Tab views
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _ProfileContent(
-                    user: user,
-                    subscriptionStats: subscriptionProvider.stats,
-                    onUpgradeTap: () => _showSubscriptionDialog(context),
+              // Glass Capsule Tabs
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: BoxDecoration(
+                  color: cs.surface.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: cs.outline.withOpacity(0.1)),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(color: cs.primaryContainer.withOpacity(0.3), blurRadius: 8),
+                    ],
                   ),
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: MemoriesSection(),
-                  ),
-                  const _PasswordContent(),
-                  _AccountContent(user: user),
-                ],
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelColor: cs.onPrimaryContainer,
+                  unselectedLabelColor: cs.onSurfaceVariant,
+                  dividerColor: Colors.transparent,
+                  padding: const EdgeInsets.all(4),
+                  tabs: const [
+                    Tab(icon: Icon(Icons.person_outline), text: 'Profile'),
+                    Tab(icon: Icon(Icons.psychology_outlined), text: 'Memories'),
+                    Tab(icon: Icon(Icons.lock_outline), text: 'Security'),
+                    Tab(icon: Icon(Icons.manage_accounts_outlined), text: 'Account'),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 16),
+
+              // Tab views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _ProfileContent(
+                      user: user,
+                      subscriptionStats: subscriptionProvider.stats,
+                      onUpgradeTap: () => _showSubscriptionDialog(context),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: MemoriesSection(),
+                    ),
+                    const _PasswordContent(),
+                    _AccountContent(user: user),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -475,7 +686,6 @@ class _ProfileContentState extends State<_ProfileContent> {
   }
 
   String _getDisplayRole() {
-    // Priority: subscriptionStats role > user role > default
     final statsRole = widget.subscriptionStats?.displayRole;
     final userRole = widget.user?.role;
 
@@ -485,15 +695,11 @@ class _ProfileContentState extends State<_ProfileContent> {
 
     if (userRole != null && userRole.isNotEmpty) {
       switch (userRole.toLowerCase()) {
-        case 'expert':
-          return 'Expert';
-        case 'pro':
-          return 'Pro';
-        default:
-          return 'Free';
+        case 'expert': return 'Expert';
+        case 'pro': return 'Pro';
+        default: return 'Free';
       }
     }
-
     return 'Free';
   }
 
@@ -503,15 +709,11 @@ class _ProfileContentState extends State<_ProfileContent> {
   }
 
   String? _getFormattedExpiry() {
-    // Use subscriptionStats expiry as priority
     if (widget.subscriptionStats?.formattedExpiry != null) {
       return widget.subscriptionStats!.formattedExpiry;
     }
-
-    // Try to format user's roleExpiry if available
     final expiry = widget.user?.roleExpiry;
     if (expiry == null) return null;
-
     try {
       final date = DateTime.parse(expiry);
       return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
@@ -532,101 +734,108 @@ class _ProfileContentState extends State<_ProfileContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // User avatar card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [cs.primaryContainer, cs.primaryContainer.withAlpha(150)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
+          // HUD Avatar & Identity
+          Center(
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: cs.primary.withAlpha(30),
-                  child: Icon(
-                    Icons.person,
-                    size: 40,
-                    color: cs.primary,
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.primary, width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: cs.primary.withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 50,
+                    backgroundColor: cs.surfaceContainerHighest,
+                    child: Text(
+                      widget.user?.name?.substring(0, 1).toUpperCase() ?? 'U',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  widget.user?.name ?? widget.user?.email ?? 'User',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  widget.user?.name ?? 'User',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: cs.onPrimaryContainer,
                   ),
                 ),
-                if (widget.user?.email != null)
-                  Text(
-                    widget.user!.email,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onPrimaryContainer.withAlpha(180),
-                    ),
+                Text(
+                  widget.user?.email ?? '',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
+                ),
               ],
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
 
-          // Subscription Card
+          // Subscription Card (Glass)
           _buildSubscriptionCard(context, role, isPremium, roleExpiry, cs),
+
+          const SizedBox(height: 20),
+
+          // Edit Nickname Glass Tile
+          _buildEditableNicknameCard(context, cs),
 
           const SizedBox(height: 16),
 
-          // Editable Nickname card
-          _buildEditableNicknameCard(context, cs),
-
-          const SizedBox(height: 12),
-
-          _buildInfoCard(
-            context,
-            icon: Icons.workspace_premium_outlined,
-            label: 'Role',
-            value: role,
+          // Info Tiles
+          Row(
+            children: [
+              Expanded(
+                child: _buildInfoGlassTile(
+                  context,
+                  icon: Icons.workspace_premium_outlined,
+                  label: 'Current Role',
+                  value: role,
+                  color: isPremium ? Colors.amber : cs.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildInfoGlassTile(
+                  context,
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Joined',
+                  value: '2024', // Placeholder or add to model
+                  color: cs.secondary,
+                ),
+              ),
+            ],
           ),
-
-          const SizedBox(height: 12),
-
-          _buildInfoCard(
-            context,
-            icon: Icons.email_outlined,
-            label: 'E-mail',
-            value: widget.user?.email ?? 'Not available',
-          ),
-
-          const SizedBox(height: 12),
-
-          // Role Expiry - only show for premium users
-          if (isPremium && roleExpiry != null) ...[
-            _buildInfoCard(
-              context,
-              icon: Icons.event_outlined,
-              label: 'Role Expiry',
-              value: roleExpiry,
-            ),
-            const SizedBox(height: 12),
-          ],
 
           const SizedBox(height: 32),
 
-          // Logout button
+          // Neon Logout Button
           SizedBox(
             width: double.infinity,
             height: 56,
             child: FilledButton.icon(
               onPressed: () => _handleLogout(context),
               icon: const Icon(Icons.logout),
-              label: const Text('Logout', style: TextStyle(fontSize: 16)),
+              label: const Text('Logout', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               style: FilledButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                backgroundColor: cs.surfaceContainerHighest.withOpacity(0.5),
+                foregroundColor: cs.onSurface,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: cs.outline.withOpacity(0.2)),
+                ),
               ),
             ),
           ),
@@ -635,7 +844,6 @@ class _ProfileContentState extends State<_ProfileContent> {
     );
   }
 
-
   Widget _buildSubscriptionCard(
     BuildContext context,
     String role,
@@ -643,44 +851,37 @@ class _ProfileContentState extends State<_ProfileContent> {
     String? roleExpiry,
     ColorScheme cs,
   ) {
-    return Container(
-      width: double.infinity,
+    return GlassTile(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: isPremium
-          ? LinearGradient(
-              colors: [
-                Colors.amber.shade700.withAlpha(40),
-                Colors.orange.shade600.withAlpha(30),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            )
-          : null,
-        color: isPremium ? null : cs.surfaceContainerHighest.withAlpha(100),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isPremium ? Colors.amber.shade600.withAlpha(80) : cs.outlineVariant.withAlpha(50),
-          width: isPremium ? 2 : 1,
-        ),
-      ),
+      // Premium gets golden gradient border, Free gets standard
+      border: isPremium
+        ? Border.all(color: Colors.amber.withOpacity(0.5), width: 1.5)
+        : null,
+      shadows: isPremium
+        ? [BoxShadow(color: Colors.amber.withOpacity(0.15), blurRadius: 25, spreadRadius: -5)]
+        : null,
+      gradient: isPremium
+        ? LinearGradient(
+            colors: [Colors.amber.withOpacity(0.1), Colors.orange.withOpacity(0.05)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row with icon, role and badge
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: isPremium
-                    ? Colors.amber.shade600.withAlpha(30)
-                    : cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(14),
+                  color: isPremium ? Colors.amber.withOpacity(0.2) : cs.surfaceContainerHighest.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: isPremium ? Border.all(color: Colors.amber.withOpacity(0.3)) : null,
                 ),
                 child: Icon(
-                  isPremium ? Icons.workspace_premium : Icons.person_outline,
-                  color: isPremium ? Colors.amber.shade600 : cs.onSurfaceVariant,
+                  isPremium ? Icons.auto_awesome : Icons.person_outline,
+                  color: isPremium ? Colors.amber : cs.onSurfaceVariant,
                   size: 24,
                 ),
               ),
@@ -690,110 +891,87 @@ class _ProfileContentState extends State<_ProfileContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Subscription',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      'Subscription Status',
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Text(
-                          role,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isPremium ? Colors.amber.shade700 : cs.onSurface,
-                          ),
-                        ),
-                        if (isPremium) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withAlpha(30),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Active',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
+                    Text(
+                      role.toUpperCase(),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: isPremium ? Colors.amber : cs.onSurface,
+                      ),
                     ),
                   ],
                 ),
               ),
+              if (isPremium)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'ACTIVE',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
             ],
           ),
 
-          // Expiry info for premium users
           if (isPremium && roleExpiry != null) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            Text(
+              'Valid until $roleExpiry',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+          ],
+
+          if (!isPremium && onUpgradeTap != null) ...[
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: cs.surface.withAlpha(150),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.event_outlined, size: 16, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Valid until: $roleExpiry',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withOpacity(0.4),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-            ),
-          ],
-
-          // Upgrade button for non-premium users
-          if (!isPremium && onUpgradeTap != null) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton.icon(
+              child: FilledButton(
                 onPressed: onUpgradeTap,
-                icon: const Icon(Icons.upgrade, size: 20),
-                label: const Text('Upgrade Plan'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: cs.primary,
-                  foregroundColor: cs.onPrimary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                child: const Text('UPGRADE TO PRO'),
               ),
             ),
           ],
 
-          // Manage subscription for premium users
           if (isPremium && onUpgradeTap != null) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                onPressed: onUpgradeTap,
-                icon: const Icon(Icons.settings_outlined, size: 20),
-                label: const Text('Manage Subscription'),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.amber.shade600.withAlpha(100)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
+             const SizedBox(height: 20),
+             OutlinedButton(
+               onPressed: onUpgradeTap,
+               style: OutlinedButton.styleFrom(
+                 minimumSize: const Size(double.infinity, 48),
+                 foregroundColor: cs.onSurface,
+                 side: BorderSide(color: cs.outline.withOpacity(0.3)),
+                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+               ),
+               child: const Text('Manage Subscription'),
+             ),
           ],
         ],
       ),
@@ -801,64 +979,33 @@ class _ProfileContentState extends State<_ProfileContent> {
   }
 
   Widget _buildEditableNicknameCard(BuildContext context, ColorScheme cs) {
-    return Container(
+    return GlassTile(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withAlpha(100),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isEditingUsername
-              ? cs.primary.withAlpha(100)
-              : cs.outlineVariant.withAlpha(50),
-        ),
-      ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: cs.primary.withAlpha(20),
-              borderRadius: BorderRadius.circular(12),
+              color: cs.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(Icons.badge_outlined, size: 20, color: cs.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: _isEditingUsername
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Nickname',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      TextField(
-                        controller: _usernameController,
-                        decoration: InputDecoration(
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          errorText: _usernameError,
-                          hintText: 'Enter nickname',
-                        ),
-                        autofocus: true,
-                        onSubmitted: (_) => _saveUsername(),
-                      ),
-                    ],
+                ? GhostTextField(
+                    controller: _usernameController,
+                    label: 'Nickname',
+                    autofocus: true,
+                    errorText: _usernameError,
+                    onSubmitted: (_) => _saveUsername(),
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nickname',
+                        'Display Name',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
@@ -867,7 +1014,7 @@ class _ProfileContentState extends State<_ProfileContent> {
                       Text(
                         widget.user?.name ?? 'Not set',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -875,19 +1022,21 @@ class _ProfileContentState extends State<_ProfileContent> {
           ),
           if (_isEditingUsername) ...[
             if (_isSaving)
-              const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                ),
               )
             else ...[
               IconButton(
-                icon: Icon(Icons.check, color: cs.primary),
+                icon: Icon(Icons.check_circle, color: cs.primary),
                 onPressed: _saveUsername,
-                tooltip: 'Save',
               ),
               IconButton(
-                icon: Icon(Icons.close, color: cs.error),
+                icon: Icon(Icons.cancel, color: cs.error),
                 onPressed: () {
                   setState(() {
                     _isEditingUsername = false;
@@ -895,19 +1044,58 @@ class _ProfileContentState extends State<_ProfileContent> {
                     _usernameError = null;
                   });
                 },
-                tooltip: 'Cancel',
               ),
-            ],
+            ]
           ] else
             IconButton(
-              icon: Icon(Icons.edit_outlined, color: cs.onSurfaceVariant),
+              icon: Icon(Icons.edit_outlined, color: cs.onSurfaceVariant.withOpacity(0.7)),
               onPressed: () {
                 setState(() {
                   _isEditingUsername = true;
                 });
               },
-              tooltip: 'Edit nickname',
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoGlassTile(BuildContext context, {
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? color,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    final iconColor = color ?? cs.primary;
+
+    return GlassTile(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -917,23 +1105,12 @@ class _ProfileContentState extends State<_ProfileContent> {
     final newUsername = _usernameController.text.trim();
 
     if (newUsername.isEmpty) {
-      setState(() {
-        _usernameError = 'Nickname cannot be empty';
-      });
+      setState(() => _usernameError = 'Nickname cannot be empty');
       return;
     }
 
     if (newUsername.length < 3) {
-      setState(() {
-        _usernameError = 'Nickname must be at least 3 characters';
-      });
-      return;
-    }
-
-    if (newUsername.length > 50) {
-      setState(() {
-        _usernameError = 'Nickname must be less than 50 characters';
-      });
+      setState(() => _usernameError = 'Min 3 characters');
       return;
     }
 
@@ -947,24 +1124,20 @@ class _ProfileContentState extends State<_ProfileContent> {
       final (success, error) = await authProvider.updateUsername(newUsername);
 
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
+        setState(() => _isSaving = false);
 
         if (success) {
-          setState(() {
-            _isEditingUsername = false;
-          });
+          setState(() => _isEditingUsername = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Nickname updated successfully'),
+            SnackBar(
+              content: const Text('Identity updated'),
+              backgroundColor: Theme.of(context).colorScheme.primary,
               behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
         } else {
-          setState(() {
-            _usernameError = error ?? 'Failed to update nickname';
-          });
+          setState(() => _usernameError = error ?? 'Failed to update');
         }
       }
     } catch (e) {
@@ -979,72 +1152,46 @@ class _ProfileContentState extends State<_ProfileContent> {
 
   VoidCallback? get onUpgradeTap => widget.onUpgradeTap;
 
-  Widget _buildInfoCard(BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withAlpha(100),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant.withAlpha(50)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: cs.primary.withAlpha(20),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 20, color: cs.primary),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _handleLogout(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        content: GlassTile(
+          opacity: 0.9,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.logout, size: 48, color: cs.primary),
+              const SizedBox(height: 16),
+              const Text('Disconnect?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Are you sure you want to log out?', textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Logout'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout'),
-          ),
-        ],
+        ),
       ),
     );
 
@@ -1095,19 +1242,17 @@ class _PasswordContentState extends State<_PasswordContent> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
+            GlassTile(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer.withAlpha(50),
-                borderRadius: BorderRadius.circular(16),
-              ),
+              color: cs.primary.withOpacity(0.05),
+              border: Border.all(color: cs.primary.withOpacity(0.2)),
               child: Row(
                 children: [
-                  Icon(Icons.security, color: cs.primary),
+                  Icon(Icons.shield_outlined, color: cs.primary),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Change your password regularly to keep your account secure.',
+                      'Keep your account secure with a strong password.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: cs.onSurface,
                       ),
@@ -1119,87 +1264,81 @@ class _PasswordContentState extends State<_PasswordContent> {
 
             const SizedBox(height: 24),
 
-            _buildPasswordField(
+            GhostTextField(
               controller: _currentPasswordController,
               label: 'Current Password',
-              obscure: _obscureCurrentPassword,
-              onToggle: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
+              obscureText: _obscureCurrentPassword,
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureCurrentPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                onPressed: () => setState(() => _obscureCurrentPassword = !_obscureCurrentPassword),
+              ),
+              validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
 
             const SizedBox(height: 16),
 
-            _buildPasswordField(
+            GhostTextField(
               controller: _newPasswordController,
               label: 'New Password',
-              obscure: _obscureNewPassword,
-              onToggle: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+              obscureText: _obscureNewPassword,
+              prefixIcon: const Icon(Icons.key_outlined),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureNewPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                onPressed: () => setState(() => _obscureNewPassword = !_obscureNewPassword),
+              ),
+              validator: (v) => v!.isEmpty ? 'Required' : null,
             ),
 
             const SizedBox(height: 16),
 
-            _buildPasswordField(
+            GhostTextField(
               controller: _confirmPasswordController,
-              label: 'Confirm New Password',
-              obscure: _obscureConfirmPassword,
-              onToggle: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+              label: 'Confirm Password',
+              obscureText: _obscureConfirmPassword,
+              prefixIcon: const Icon(Icons.check_circle_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+              ),
               validator: (value) {
-                if (value != _newPasswordController.text) {
-                  return 'Passwords do not match';
-                }
+                if (value != _newPasswordController.text) return 'Passwords do not match';
                 return null;
               },
             ),
 
             const SizedBox(height: 32),
 
-            SizedBox(
+            Container(
               width: double.infinity,
               height: 56,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.primary.withOpacity(0.3),
+                    blurRadius: 20,
+                    offset: const Offset(0, 5),
+                  )
+                ]
+              ),
               child: FilledButton(
                 onPressed: _isLoading ? null : _handleChangePassword,
                 style: FilledButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 ),
                 child: _isLoading
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: cs.onPrimary),
                       )
-                    : const Text('Update Password', style: TextStyle(fontSize: 16)),
+                    : const Text('Update Credentials', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPasswordField({
-    required TextEditingController controller,
-    required String label,
-    required bool obscure,
-    required VoidCallback onToggle,
-    String? Function(String?)? validator,
-  }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscure,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        prefixIcon: const Icon(Icons.lock_outline),
-        suffixIcon: IconButton(
-          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-          onPressed: onToggle,
-        ),
-      ),
-      validator: validator ?? (value) {
-        if (value == null || value.isEmpty) {
-          return '$label is required';
-        }
-        return null;
-      },
     );
   }
 
@@ -1218,15 +1357,15 @@ class _PasswordContentState extends State<_PasswordContent> {
       if (!mounted) return;
 
       if (success) {
-        // Clear form
         _currentPasswordController.clear();
         _newPasswordController.clear();
         _confirmPasswordController.clear();
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Password changed successfully'),
+            content: Text('Password updated successfully'),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       } else {
@@ -1261,37 +1400,42 @@ class _AccountContent extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Danger zone
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: cs.errorContainer.withAlpha(50),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: cs.error.withAlpha(50)),
-            ),
+          GlassTile(
+            padding: const EdgeInsets.all(24),
+            color: cs.error.withOpacity(0.05),
+            border: Border.all(color: cs.error.withOpacity(0.3)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: cs.error),
-                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cs.error.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.warning_amber_rounded, color: cs.error),
+                    ),
+                    const SizedBox(width: 16),
                     Text(
                       'Danger Zone',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: cs.error,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 Text(
                   'Deleting your account is permanent. All your data including flashcards, exams, and study progress will be permanently removed.',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurface,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface.withOpacity(0.8),
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -1301,7 +1445,7 @@ class _AccountContent extends StatelessWidget {
                     label: const Text('Delete Account'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: cs.error,
-                      side: BorderSide(color: cs.error),
+                      side: BorderSide(color: cs.error.withOpacity(0.5)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -1315,37 +1459,57 @@ class _AccountContent extends StatelessWidget {
   }
 
   Future<void> _handleDeleteAccount(BuildContext context) async {
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.7),
       builder: (context) => AlertDialog(
-        title: const Text('Delete Account'),
-        content: const Text(
-          'Are you absolutely sure? This action cannot be undone. '
-          'All your data will be permanently deleted.',
+        backgroundColor: Colors.transparent,
+        contentPadding: EdgeInsets.zero,
+        content: GlassTile(
+          opacity: 0.95,
+          padding: const EdgeInsets.all(24),
+          border: Border.all(color: cs.error.withOpacity(0.3)),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.delete_forever, size: 48, color: cs.error),
+              const SizedBox(height: 16),
+              const Text('Delete Account?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text(
+                'Are you absolutely sure? This action cannot be undone. All your data will be permanently deleted.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(backgroundColor: cs.error),
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Delete'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
       ),
     );
 
     if (confirmed == true && context.mounted) {
-      // TODO: Implement account deletion
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Account deletion not yet implemented')),
       );
     }
   }
 }
-
-

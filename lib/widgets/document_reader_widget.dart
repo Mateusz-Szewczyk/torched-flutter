@@ -144,6 +144,20 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
   // Page tracking - stores first section index for each page
   final Map<int, List<String>> _pageSections = {};
 
+  // GlobalKeys for page separator widgets - used for precise page jumping
+  final Map<int, GlobalKey> _pageKeys = {};
+
+  // Track loaded section range for proper page navigation
+  // This ensures we know which section indices are currently loaded
+  int? _loadedSectionIndexStart;
+  int? _loadedSectionIndexEnd;
+
+  // Flag to indicate we're loading sections backward (scrolling up)
+  bool _isLoadingPrevious = false;
+
+  // Storage key for reading progress persistence
+  String get _readingProgressKey => 'doc_progress_${widget.documentId}';
+
   @override
   void initState() {
     super.initState();
@@ -180,6 +194,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       _isLoadingMore = false;
       _isLoadingMoreDebounced = false;
       _isLoadingPageSections = false;
+      _isLoadingPrevious = false;
       _pendingPageNavigation = null;
       _mergedText = '';
       _sectionRanges = [];
@@ -194,7 +209,10 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       _totalPages = 0;
       _pageSections.clear();
       _pagesBeingLoaded.clear();
+      _pageKeys.clear();
       _lastScrollUpdate = null;
+      _loadedSectionIndexStart = null;
+      _loadedSectionIndexEnd = null;
     });
     // Jump to top
     if (_scrollController.hasClients) {
@@ -209,6 +227,14 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       final storageService = StorageService();
       _cachedToken = await storageService.getToken();
 
+      // Check for saved reading progress
+      final savedPageStr = await storageService.get(_readingProgressKey);
+      int? savedPage;
+      if (savedPageStr != null) {
+        savedPage = int.tryParse(savedPageStr);
+        debugPrint('[ReaderProgress] Found saved page: $savedPage');
+      }
+
       // Parallel fetch for metadata, first sections, and pages
       final doc = await widget.workspaceService.getDocument(widget.documentId);
       if (!mounted) return;
@@ -218,15 +244,25 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       });
 
       // Load pages info
-      _loadPages();
+      await _loadPages();
 
       // Load document images in background (token is already cached)
       _loadDocumentImages();
 
-      await _loadMoreSections();
-      
-      if (mounted) {
-        setState(() => _isLoading = false);
+      // If we have a saved page and it's valid, start from there
+      if (savedPage != null && savedPage > 1 && savedPage <= _totalPages) {
+        debugPrint('[ReaderProgress] Restoring to saved page: $savedPage');
+        _currentPage = savedPage;
+        await _resetToPage(savedPage);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      } else {
+        // Start from beginning
+        await _loadMoreSections();
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -286,7 +322,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
           _totalPages = pagesResponse.totalPages;
           _isLoadingPages = false;
           // Set current page based on first visible section
-          if (_pages.isNotEmpty) {
+          if (_pages.isNotEmpty && _currentPage == null) {
             _currentPage = _pages.first.pageNumber;
           }
         });
@@ -298,17 +334,34 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     }
   }
 
+  /// Saves the current reading progress to persistent storage
+  Future<void> _saveReadingProgress(int pageNumber) async {
+    if (pageNumber < 1 || pageNumber > _totalPages) return;
+
+    try {
+      final storageService = StorageService();
+      await storageService.set(_readingProgressKey, pageNumber.toString());
+      debugPrint('[ReaderProgress] Saved progress: page $pageNumber');
+    } catch (e) {
+      debugPrint('[ReaderProgress] Failed to save progress: $e');
+    }
+  }
+
   Future<void> _loadMoreSections() async {
     if (_isLoadingMore || (_document != null && _sectionOrder.length >= _document!.totalSections)) return;
+
+    // If we have a defined range, load from the end of that range
+    final startFrom = _loadedSectionIndexEnd != null
+        ? _loadedSectionIndexEnd! + 1
+        : _sectionOrder.length;
 
     setState(() => _isLoadingMore = true);
 
     try {
-      final currentCount = _sectionOrder.length;
       final result = await widget.workspaceService.getSections(
         widget.documentId,
-        startSection: currentCount,
-        endSection: currentCount + 5,
+        startSection: startFrom,
+        endSection: startFrom + 5,
       );
 
       if (mounted) {
@@ -317,6 +370,14 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
             if (!_sectionsMap.containsKey(section.id)) {
               _sectionsMap[section.id] = section;
               _sectionOrder.add(section.id);
+
+              // Track loaded section index range
+              if (_loadedSectionIndexStart == null || section.sectionIndex < _loadedSectionIndexStart!) {
+                _loadedSectionIndexStart = section.sectionIndex;
+              }
+              if (_loadedSectionIndexEnd == null || section.sectionIndex > _loadedSectionIndexEnd!) {
+                _loadedSectionIndexEnd = section.sectionIndex;
+              }
 
               // Build page-to-sections mapping
               final pageNum = section.sectionMetadata['page_number'] as int? ?? 1;
@@ -341,6 +402,100 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     } catch (e) {
       if (mounted) setState(() => _isLoadingMore = false);
       // Don't show error on lazy load failure to avoid nagging, just log or retry silently
+    }
+  }
+
+  /// Loads sections that come BEFORE currently loaded sections
+  /// This is used when user scrolls up after jumping to a later page
+  /// ROBUST: Uses precise calculation and scroll offset preservation
+  Future<void> _loadPreviousSections() async {
+    if (_isLoadingPrevious || _loadedSectionIndexStart == null || _loadedSectionIndexStart! <= 0) {
+      debugPrint('[PageNav] _loadPreviousSections skipped: isLoading=$_isLoadingPrevious, start=$_loadedSectionIndexStart');
+      return;
+    }
+
+    setState(() => _isLoadingPrevious = true);
+
+    try {
+      // Calculate the range to load (5 sections before current start)
+      final endSection = _loadedSectionIndexStart! - 1;
+      final startSection = (endSection - 4).clamp(0, endSection);
+
+      debugPrint('[PageNav] Loading previous sections: $startSection to $endSection (current start: $_loadedSectionIndexStart)');
+
+      final result = await widget.workspaceService.getSections(
+        widget.documentId,
+        startSection: startSection,
+        endSection: endSection + 1, // +1 because end is exclusive
+      );
+
+      if (mounted && result.sections.isNotEmpty) {
+        // CRITICAL: Remember current scroll position and content height BEFORE adding new sections
+        final scrollBefore = _scrollController.hasClients ? _scrollController.position.pixels : 0.0;
+        final maxExtentBefore = _scrollController.hasClients ? _scrollController.position.maxScrollExtent : 0.0;
+        final sectionCountBefore = _sectionOrder.length;
+
+        debugPrint('[PageNav] Before prepend: scrollPos=$scrollBefore, maxExtent=$maxExtentBefore, sections=$sectionCountBefore');
+
+        setState(() {
+          // Collect new sections and sort them by sectionIndex
+          final newSections = <DocumentSection>[];
+
+          for (var section in result.sections) {
+            if (!_sectionsMap.containsKey(section.id)) {
+              _sectionsMap[section.id] = section;
+              newSections.add(section);
+
+              // Update range tracking
+              if (section.sectionIndex < _loadedSectionIndexStart!) {
+                _loadedSectionIndexStart = section.sectionIndex;
+              }
+
+              // Build page-to-sections mapping
+              final pageNum = section.sectionMetadata['page_number'] as int? ?? 1;
+              _pageSections[pageNum] ??= [];
+              if (!_pageSections[pageNum]!.contains(section.id)) {
+                _pageSections[pageNum]!.add(section.id);
+              }
+            }
+          }
+
+          // Sort new sections by sectionIndex
+          newSections.sort((a, b) => a.sectionIndex.compareTo(b.sectionIndex));
+
+          // Prepend section IDs at the beginning of _sectionOrder
+          final newSectionIds = newSections.map((s) => s.id).toList();
+          _sectionOrder.insertAll(0, newSectionIds);
+
+          debugPrint('[PageNav] Prepended ${newSections.length} sections, new total: ${_sectionOrder.length}');
+
+          final existingIds = _highlights.map((h) => h.id).toSet();
+          _highlights.addAll(result.highlights.where((h) => !existingIds.contains(h.id)));
+
+          _cachedSpans.clear();
+          _rebuildMergedText();
+          _isLoadingPrevious = false;
+        });
+
+        // CRITICAL: Adjust scroll position to compensate for added content
+        // This prevents the view from jumping when prepending sections
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _scrollController.hasClients) {
+            final maxExtentAfter = _scrollController.position.maxScrollExtent;
+            final addedHeight = maxExtentAfter - maxExtentBefore;
+            final newScrollPos = scrollBefore + addedHeight;
+
+            debugPrint('[PageNav] After prepend: maxExtent=$maxExtentAfter, addedHeight=$addedHeight, newScrollPos=$newScrollPos');
+
+            if (addedHeight > 0) {
+              _scrollController.jumpTo(newScrollPos.clamp(0.0, maxExtentAfter));
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[PageNav] Error loading previous sections: $e');
+      if (mounted) setState(() => _isLoadingPrevious = false);
     }
   }
 
@@ -408,6 +563,15 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     final result = _searchResults[resultIndex];
     setState(() => _currentSearchResultIndex = resultIndex);
 
+    // Calculate average section height based on current scroll state
+    double avgSectionHeight = 300.0;
+    if (_scrollController.hasClients && _sectionOrder.isNotEmpty) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        avgSectionHeight = maxScroll / _sectionOrder.length;
+      }
+    }
+
     // First check if we have sections for the page containing this result
     final existingSections = _sectionOrder.where((sectionId) {
       final section = _sectionsMap[sectionId];
@@ -432,7 +596,6 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
 
       final sectionIndex = _sectionOrder.indexOf(targetSectionId);
       if (sectionIndex != -1) {
-        const double avgSectionHeight = 300.0;
         final approximateOffset = sectionIndex * avgSectionHeight;
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -470,9 +633,19 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
   // Track which pages are currently being loaded to prevent duplicates
   final Set<int> _pagesBeingLoaded = {};
 
+  // Store the page_start_section_index for the last loaded page
+  int? _lastLoadedPageStartIndex;
+
   Future<void> _loadSectionsForPage(int pageNumber) async {
     // Guard against multiple simultaneous calls for the same page
     if (_isLoadingPageSections || _pagesBeingLoaded.contains(pageNumber)) return;
+
+    // Check if this is a far jump - if so, reset the view
+    if (_isPageFar(pageNumber)) {
+      debugPrint('[PageNav] _loadSectionsForPage: Page $pageNumber is far, using reset');
+      await _resetToPage(pageNumber);
+      return;
+    }
 
     _pagesBeingLoaded.add(pageNumber);
     _isLoadingPageSections = true;
@@ -483,20 +656,44 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
         pageNumber: pageNumber,
       );
 
+      // Store the page start section index for precise navigation
+      _lastLoadedPageStartIndex = result.pageStartSectionIndex;
+      debugPrint('[PageNav] Loaded page $pageNumber, page_start_section_index: $_lastLoadedPageStartIndex');
+
       if (mounted) {
         setState(() {
+          // Determine if we need to prepend (page is before current) or append (page is after)
+          final isPageBefore = _loadedSectionIndexStart != null &&
+              result.sections.isNotEmpty &&
+              result.sections.first.sectionIndex < _loadedSectionIndexStart!;
+
           for (var section in result.sections) {
             if (!_sectionsMap.containsKey(section.id)) {
               _sectionsMap[section.id] = section;
-              // Insert in correct order based on section_index
-              final insertIndex = _sectionOrder.indexWhere((id) {
-                final s = _sectionsMap[id];
-                return s != null && s.sectionIndex > section.sectionIndex;
-              });
-              if (insertIndex == -1) {
-                _sectionOrder.add(section.id);
+
+              // Insert in correct position
+              if (isPageBefore) {
+                // Prepend - insert at the beginning, maintaining order
+                final insertIndex = _sectionOrder.indexWhere((id) {
+                  final s = _sectionsMap[id];
+                  return s != null && s.sectionIndex > section.sectionIndex;
+                });
+                if (insertIndex == -1) {
+                  _sectionOrder.add(section.id);
+                } else {
+                  _sectionOrder.insert(insertIndex, section.id);
+                }
               } else {
-                _sectionOrder.insert(insertIndex, section.id);
+                // Append - add to end
+                _sectionOrder.add(section.id);
+              }
+
+              // Update range tracking
+              if (_loadedSectionIndexStart == null || section.sectionIndex < _loadedSectionIndexStart!) {
+                _loadedSectionIndexStart = section.sectionIndex;
+              }
+              if (_loadedSectionIndexEnd == null || section.sectionIndex > _loadedSectionIndexEnd!) {
+                _loadedSectionIndexEnd = section.sectionIndex;
               }
 
               // Build page-to-sections mapping
@@ -519,17 +716,19 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
         // Handle pending navigation after sections are loaded
         if (_pendingPageNavigation != null) {
           final pendingPage = _pendingPageNavigation!;
+          final pageStartIndex = _lastLoadedPageStartIndex;
           _pendingPageNavigation = null;
           // Schedule navigation for next frame to ensure state is updated
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              _scrollToPageAfterLoad(pendingPage);
+              _scrollToPageAfterLoad(pendingPage, pageStartSectionIndex: pageStartIndex);
             }
           });
         }
       }
     } catch (e) {
       // Error loading sections for page - silently ignore
+      debugPrint('[PageNav] Error loading sections for page $pageNumber: $e');
     } finally {
       if (mounted) {
         _isLoadingPageSections = false;
@@ -539,8 +738,58 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
   }
 
   /// Scrolls to page content after sections have been loaded
-  void _scrollToPageAfterLoad(int pageNumber) {
-    // Find sections for this page
+  /// Uses pageStartSectionIndex if provided for precise navigation
+  void _scrollToPageAfterLoad(int pageNumber, {int? pageStartSectionIndex}) {
+    debugPrint('[PageNav] scrollToPageAfterLoad($pageNumber, startIndex: $pageStartSectionIndex)');
+
+    // Calculate average section height based on current scroll state
+    double avgSectionHeight = 300.0;
+    if (_scrollController.hasClients && _sectionOrder.isNotEmpty) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        // Better estimate based on actual content - add some padding
+        avgSectionHeight = (maxScroll / _sectionOrder.length) * 1.1;
+      }
+    }
+
+    // If we have the exact page start section index, use it
+    if (pageStartSectionIndex != null) {
+      // Find the section with this section_index in our loaded sections
+      final targetSectionId = _sectionOrder.firstWhere(
+        (sectionId) {
+          final section = _sectionsMap[sectionId];
+          return section != null && section.sectionIndex == pageStartSectionIndex;
+        },
+        orElse: () => '',
+      );
+
+      if (targetSectionId.isNotEmpty) {
+        final targetIndex = _sectionOrder.indexOf(targetSectionId);
+        debugPrint('[PageNav] Using page_start_section_index: $pageStartSectionIndex, found at list index $targetIndex');
+
+        if (targetIndex != -1) {
+          final approximateOffset = targetIndex * avgSectionHeight;
+          debugPrint('[PageNav] Scrolling to offset $approximateOffset (avgHeight: $avgSectionHeight)');
+
+          if (_scrollController.hasClients) {
+            // Use a small delay to ensure layout is complete after loading new sections
+            Future.delayed(const Duration(milliseconds: 50), () {
+              if (mounted && _scrollController.hasClients) {
+                _scrollController.animateTo(
+                  approximateOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOut,
+                );
+              }
+            });
+          }
+          setState(() => _currentPage = pageNumber);
+          return;
+        }
+      }
+    }
+
+    // Fallback: Find sections for this page using metadata
     final pageSections = _sectionOrder.where((sectionId) {
       final section = _sectionsMap[sectionId];
       if (section == null) return false;
@@ -549,18 +798,174 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     }).toList();
 
     if (pageSections.isNotEmpty) {
-      final firstSectionIndex = _sectionOrder.indexOf(pageSections.first);
-      if (firstSectionIndex != -1) {
-        const double avgSectionHeight = 300.0;
-        final approximateOffset = firstSectionIndex * avgSectionHeight;
+      // Try to find the section marked as page start
+      String? pageStartSectionId;
+      for (final sectionId in pageSections) {
+        final section = _sectionsMap[sectionId];
+        if (section != null) {
+          final isPageStart = section.sectionMetadata['is_page_start'] as bool? ?? false;
+          if (isPageStart) {
+            pageStartSectionId = sectionId;
+            break;
+          }
+        }
+      }
+
+      // Use page start section if found, otherwise use first section of the page
+      final targetSectionId = pageStartSectionId ?? pageSections.first;
+      final targetIndex = _sectionOrder.indexOf(targetSectionId);
+
+      debugPrint('[PageNav] Found ${pageSections.length} sections for page $pageNumber, using ${pageStartSectionId != null ? "page start" : "first"} section at index $targetIndex');
+
+      if (targetIndex != -1) {
+        final approximateOffset = targetIndex * avgSectionHeight;
+        debugPrint('[PageNav] Scrolling to offset $approximateOffset (avgHeight: $avgSectionHeight)');
+
         if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            approximateOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
-          );
+          // Use a small delay to ensure layout is complete after loading new sections
+          Future.delayed(const Duration(milliseconds: 50), () {
+            if (mounted && _scrollController.hasClients) {
+              _scrollController.animateTo(
+                approximateOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+              );
+            }
+          });
         }
         setState(() => _currentPage = pageNumber);
+      }
+    } else {
+      debugPrint('[PageNav] No sections found for page $pageNumber after load');
+    }
+  }
+
+  /// Determines if the target page is "far" from currently loaded sections
+  /// A page is considered far if we'd need to load more than 3 intermediate pages
+  bool _isPageFar(int targetPageNumber) {
+    if (_sectionOrder.isEmpty) return false;
+
+    // Get the range of currently loaded pages
+    int? minLoadedPage;
+    int? maxLoadedPage;
+
+    for (final sectionId in _sectionOrder) {
+      final section = _sectionsMap[sectionId];
+      if (section != null) {
+        final pageNum = section.sectionMetadata['page_number'] as int? ?? 1;
+        if (minLoadedPage == null || pageNum < minLoadedPage) {
+          minLoadedPage = pageNum;
+        }
+        if (maxLoadedPage == null || pageNum > maxLoadedPage) {
+          maxLoadedPage = pageNum;
+        }
+      }
+    }
+
+    if (minLoadedPage == null || maxLoadedPage == null) return false;
+
+    // Consider it "far" if target is more than 3 pages away from loaded range
+    const threshold = 3;
+    return targetPageNumber < minLoadedPage - threshold ||
+           targetPageNumber > maxLoadedPage + threshold;
+  }
+
+  /// Resets the document view and starts fresh from a specific page
+  /// This is used when jumping to a "far" page to avoid section ordering issues
+  /// STRATEGY: Full reset ensures no ordering problems occur
+  Future<void> _resetToPage(int pageNumber) async {
+    debugPrint('[PageNav] === FULL RESET to page $pageNumber ===');
+
+    // Save reading progress
+    _saveReadingProgress(pageNumber);
+
+    setState(() {
+      _isLoadingPageSections = true;
+      _isLoading = true; // Show full loading indicator
+      // COMPLETE state reset
+      _sectionsMap.clear();
+      _sectionOrder.clear();
+      _highlights.clear();
+      _cachedSpans.clear();
+      _pageSections.clear();
+      _pageKeys.clear();
+      _mergedText = '';
+      _sectionRanges = [];
+      _selectionStart = null;
+      _selectionEnd = null;
+      _selectedText = null;
+      _loadedSectionIndexStart = null;
+      _loadedSectionIndexEnd = null;
+      _pendingPageNavigation = null;
+      _pagesBeingLoaded.clear();
+    });
+
+    // Jump to top immediately to show loading indicator clearly
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+
+    try {
+      final result = await widget.workspaceService.getSectionsByPage(
+        documentId: widget.documentId,
+        pageNumber: pageNumber,
+      );
+
+      debugPrint('[PageNav] Reset loaded ${result.sections.length} sections for page $pageNumber');
+
+      if (mounted) {
+        setState(() {
+          for (var section in result.sections) {
+            _sectionsMap[section.id] = section;
+            _sectionOrder.add(section.id);
+
+            // Track loaded section index range
+            if (_loadedSectionIndexStart == null || section.sectionIndex < _loadedSectionIndexStart!) {
+              _loadedSectionIndexStart = section.sectionIndex;
+            }
+            if (_loadedSectionIndexEnd == null || section.sectionIndex > _loadedSectionIndexEnd!) {
+              _loadedSectionIndexEnd = section.sectionIndex;
+            }
+
+            // Build page-to-sections mapping
+            final pageNum = section.sectionMetadata['page_number'] as int? ?? 1;
+            _pageSections[pageNum] ??= [];
+            if (!_pageSections[pageNum]!.contains(section.id)) {
+              _pageSections[pageNum]!.add(section.id);
+            }
+          }
+
+          final existingIds = _highlights.map((h) => h.id).toSet();
+          _highlights.addAll(result.highlights.where((h) => !existingIds.contains(h.id)));
+
+          _cachedSpans.clear();
+          _rebuildMergedText();
+          _currentPage = pageNumber;
+          _isLoadingPageSections = false;
+          _isLoading = false;
+        });
+
+        debugPrint('[PageNav] Reset complete. Loaded range: $_loadedSectionIndexStart - $_loadedSectionIndexEnd');
+
+        // Show informational snackbar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Jumped to page $pageNumber'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[PageNav] Error resetting to page $pageNumber: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingPageSections = false;
+          _isLoading = false;
+        });
+        _showError('Failed to load page $pageNumber');
       }
     }
   }
@@ -568,6 +973,28 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
   void _goToPage(int pageNumber) {
     if (pageNumber < 1 || pageNumber > _totalPages) return;
     if (_isLoadingPageSections) return; // Prevent multiple calls during loading
+
+    debugPrint('[PageNav] goToPage($pageNumber), totalSections=${_sectionOrder.length}, loadedRange: $_loadedSectionIndexStart - $_loadedSectionIndexEnd');
+
+    // Always save reading progress when user explicitly navigates
+    _saveReadingProgress(pageNumber);
+
+    // Check if this is a far jump - if so, reset the view entirely
+    if (_isPageFar(pageNumber)) {
+      debugPrint('[PageNav] Page $pageNumber is far from current view, performing FULL RESET');
+      _resetToPage(pageNumber);
+      return;
+    }
+
+    // Calculate average section height based on current scroll state
+    double avgSectionHeight = 300.0;
+    if (_scrollController.hasClients && _sectionOrder.isNotEmpty) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        // Better estimate based on actual content
+        avgSectionHeight = maxScroll / _sectionOrder.length;
+      }
+    }
 
     // First check if we already have sections for this page
     final existingSections = _sectionOrder.where((sectionId) {
@@ -578,11 +1005,26 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     }).toList();
 
     if (existingSections.isNotEmpty) {
-      // We have sections for this page - scroll to them directly
-      final firstSectionIndex = _sectionOrder.indexOf(existingSections.first);
-      if (firstSectionIndex != -1) {
-        const double avgSectionHeight = 300.0;
-        final approximateOffset = firstSectionIndex * avgSectionHeight;
+      // We have sections for this page - find the one marked as page start
+      String? pageStartSectionId;
+      for (final sectionId in existingSections) {
+        final section = _sectionsMap[sectionId];
+        if (section != null) {
+          final isPageStart = section.sectionMetadata['is_page_start'] as bool? ?? false;
+          if (isPageStart) {
+            pageStartSectionId = sectionId;
+            break;
+          }
+        }
+      }
+
+      // Use page start section if found, otherwise use first section of the page
+      final targetSectionId = pageStartSectionId ?? existingSections.first;
+      final targetIndex = _sectionOrder.indexOf(targetSectionId);
+
+      if (targetIndex != -1) {
+        final approximateOffset = targetIndex * avgSectionHeight;
+        debugPrint('[PageNav] Found sections for page $pageNumber, using ${pageStartSectionId != null ? "page start" : "first"} section at index $targetIndex (offset: $approximateOffset)');
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
             approximateOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
@@ -595,18 +1037,122 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       return;
     }
 
-    // Need to load sections for this page
+    // Page not loaded yet - need to load sections for this page
+    // Since it's not a "far" jump, we can safely add adjacent sections
+    debugPrint('[PageNav] Page $pageNumber not loaded, triggering adjacent load');
     _pendingPageNavigation = pageNumber;
-    _loadSectionsForPage(pageNumber);
+    _loadSectionsForPageAdjacent(pageNumber);
+  }
+
+  /// Loads sections for a page that is adjacent to currently loaded content
+  /// This inserts sections in the correct order without breaking the view
+  Future<void> _loadSectionsForPageAdjacent(int pageNumber) async {
+    if (_isLoadingPageSections || _pagesBeingLoaded.contains(pageNumber)) return;
+
+    _pagesBeingLoaded.add(pageNumber);
+    _isLoadingPageSections = true;
+
+    try {
+      final result = await widget.workspaceService.getSectionsByPage(
+        documentId: widget.documentId,
+        pageNumber: pageNumber,
+      );
+
+      _lastLoadedPageStartIndex = result.pageStartSectionIndex;
+      debugPrint('[PageNav] Loaded adjacent page $pageNumber, page_start_section_index: $_lastLoadedPageStartIndex');
+
+      if (mounted) {
+        setState(() {
+          // Determine if we need to prepend (page is before current) or append (page is after)
+          final isPageBefore = _loadedSectionIndexStart != null &&
+              result.sections.isNotEmpty &&
+              result.sections.first.sectionIndex < _loadedSectionIndexStart!;
+
+          for (var section in result.sections) {
+            if (!_sectionsMap.containsKey(section.id)) {
+              _sectionsMap[section.id] = section;
+
+              // Insert in correct position
+              if (isPageBefore) {
+                // Prepend - insert at the beginning, maintaining order
+                final insertIndex = _sectionOrder.indexWhere((id) {
+                  final s = _sectionsMap[id];
+                  return s != null && s.sectionIndex > section.sectionIndex;
+                });
+                if (insertIndex == -1) {
+                  _sectionOrder.add(section.id);
+                } else {
+                  _sectionOrder.insert(insertIndex, section.id);
+                }
+              } else {
+                // Append - add to end
+                _sectionOrder.add(section.id);
+              }
+
+              // Update range tracking
+              if (_loadedSectionIndexStart == null || section.sectionIndex < _loadedSectionIndexStart!) {
+                _loadedSectionIndexStart = section.sectionIndex;
+              }
+              if (_loadedSectionIndexEnd == null || section.sectionIndex > _loadedSectionIndexEnd!) {
+                _loadedSectionIndexEnd = section.sectionIndex;
+              }
+
+              // Build page-to-sections mapping
+              final pageNum = section.sectionMetadata['page_number'] as int? ?? 1;
+              _pageSections[pageNum] ??= [];
+              if (!_pageSections[pageNum]!.contains(section.id)) {
+                _pageSections[pageNum]!.add(section.id);
+              }
+            }
+          }
+
+          final existingIds = _highlights.map((h) => h.id).toSet();
+          _highlights.addAll(result.highlights.where((h) => !existingIds.contains(h.id)));
+
+          _cachedSpans.clear();
+          _rebuildMergedText();
+          _currentPage = pageNumber;
+        });
+
+        // Handle pending navigation after sections are loaded
+        if (_pendingPageNavigation != null) {
+          final pendingPage = _pendingPageNavigation!;
+          final pageStartIndex = _lastLoadedPageStartIndex;
+          _pendingPageNavigation = null;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _scrollToPageAfterLoad(pendingPage, pageStartSectionIndex: pageStartIndex);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('[PageNav] Error loading adjacent page $pageNumber: $e');
+    } finally {
+      if (mounted) {
+        _isLoadingPageSections = false;
+        _pagesBeingLoaded.remove(pageNumber);
+      }
+    }
   }
 
   void _showPageSelector() {
+    // Determine which pages are currently loaded
+    final loadedPages = <int>{};
+    for (final sectionId in _sectionOrder) {
+      final section = _sectionsMap[sectionId];
+      if (section != null) {
+        final pageNum = section.sectionMetadata['page_number'] as int? ?? 1;
+        loadedPages.add(pageNum);
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
         child: Container(
-          height: 400,
+          height: 450,
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,11 +1161,12 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
                 children: [
                   Icon(Icons.menu_book, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
-                  Text(
-                    'Go to Page',
-                    style: Theme.of(context).textTheme.titleLarge,
+                  Expanded(
+                    child: Text(
+                      'Go to Page',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                   ),
-                  const Spacer(),
                   Text(
                     '$_totalPages pages',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -628,7 +1175,36 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              // Show info about loaded pages
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        loadedPages.isEmpty
+                            ? 'No pages loaded yet'
+                            : 'Pages ${loadedPages.reduce((a, b) => a < b ? a : b)}-${loadedPages.reduce((a, b) => a > b ? a : b)} loaded • Tap far pages to jump',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               Expanded(
                 child: _isLoadingPages
                     ? const Center(child: CircularProgressIndicator())
@@ -650,14 +1226,17 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
                             itemBuilder: (context, index) {
                               final pageNum = index + 1;
                               final isCurrentPage = pageNum == _currentPage;
+                              final isLoaded = loadedPages.contains(pageNum);
                               final hasContent = _pages.any((p) => p.pageNumber == pageNum);
 
                               return Material(
                                 color: isCurrentPage
                                     ? Theme.of(context).colorScheme.primaryContainer
-                                    : hasContent
-                                        ? Theme.of(context).colorScheme.surfaceContainerHighest
-                                        : Theme.of(context).colorScheme.surfaceContainerLow,
+                                    : isLoaded
+                                        ? Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.5)
+                                        : hasContent
+                                            ? Theme.of(context).colorScheme.surfaceContainerHighest
+                                            : Theme.of(context).colorScheme.surfaceContainerLow,
                                 borderRadius: BorderRadius.circular(8),
                                 child: InkWell(
                                   onTap: () {
@@ -734,6 +1313,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
 
   // Prevent excessive loading calls
   bool _isLoadingMoreDebounced = false;
+  bool _isLoadingPreviousDebounced = false;
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
@@ -746,6 +1326,21 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
           // Reset debounce after a short delay
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) _isLoadingMoreDebounced = false;
+          });
+        });
+      }
+    }
+
+    // Load previous sections when approaching top - with debouncing
+    // Only if we have loaded sections that don't start from the beginning
+    if (_scrollController.position.pixels <= 300 &&
+        _loadedSectionIndexStart != null &&
+        _loadedSectionIndexStart! > 0) {
+      if (!_isLoadingPreviousDebounced && !_isLoadingPrevious) {
+        _isLoadingPreviousDebounced = true;
+        _loadPreviousSections().then((_) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted) _isLoadingPreviousDebounced = false;
           });
         });
       }
@@ -765,6 +1360,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
 
   /// Updates the current page number based on visible content during scroll
   /// Uses section index to determine which page is currently visible
+  /// Also saves reading progress for session persistence
   void _updateCurrentPageFromScroll() {
     if (_sectionOrder.isEmpty) return;
 
@@ -775,8 +1371,12 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     // Calculate the section index at the middle of the viewport for better accuracy
     final targetOffset = scrollOffset + (viewportHeight / 3);
 
-    // Use estimated section height
-    const double avgSectionHeight = 300.0;
+    // Calculate dynamic average section height based on actual content
+    double avgSectionHeight = 300.0;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    if (maxScroll > 0 && _sectionOrder.isNotEmpty) {
+      avgSectionHeight = maxScroll / _sectionOrder.length;
+    }
 
     // Estimate which section index we're looking at
     int estimatedIndex = (targetOffset / avgSectionHeight).floor();
@@ -794,6 +1394,8 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
         setState(() {
           _currentPage = pageNum;
         });
+        // Save reading progress when page changes
+        _saveReadingProgress(pageNum);
       }
     }
   }
@@ -1479,13 +2081,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
                   tooltip: 'Reading appearance',
                   onPressed: _showAppearanceMenu,
                 ),
-                // Page selector
-                IconButton(
-                  icon: const Icon(Icons.menu_book_outlined),
-                  tooltip: 'Go to page',
-                  onPressed: _showPageSelector,
-                ),
-                // More options
+                // More options (removed duplicate page selector - kept in color bar)
                 IconButton(
                   icon: const Icon(Icons.more_vert),
                   tooltip: 'Document Options',
@@ -1554,17 +2150,39 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
                           _buildTopBarColorCircle(context, 'blue', Colors.blue),
                           _buildTopBarColorCircle(context, 'purple', Colors.purple),
                           const Spacer(),
-                          // Quick page navigation
+                          // Quick page navigation with loading indicator
                           if (_totalPages > 1)
-                            TextButton.icon(
-                              onPressed: _showPageSelector,
-                              icon: const Icon(Icons.layers, size: 16),
-                              label: Text('Page ${_currentPage ?? 1}'),
-                              style: TextButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                              ),
-                            ),
+                            _isLoadingPageSections
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Loading page...',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : TextButton.icon(
+                                    onPressed: _showPageSelector,
+                                    icon: const Icon(Icons.layers, size: 16),
+                                    label: Text('Page ${_currentPage ?? 1}'),
+                                    style: TextButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                    ),
+                                  ),
                         ],
                       ),
                     ),

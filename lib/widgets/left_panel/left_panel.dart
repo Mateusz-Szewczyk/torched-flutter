@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -83,58 +84,85 @@ class _LeftPanelState extends State<LeftPanel> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final isAuthenticated = authProvider.isAuthenticated;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Panel content - MainLayout handles positioning and toggle buttons
-    return Container(
-      color: Theme.of(context).cardColor,
-      child: Column(
-        children: [
-          // Panel header
-          _buildHeader(context),
-
-          // Main navigation
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Primary navigation
-                  _buildPrimaryNavigation(context, isAuthenticated),
-
-                  // Workspaces section (only if authenticated)
-                  if (isAuthenticated) ...[
-                    const SizedBox(height: 16),
-                    _buildWorkspacesSection(context),
-                  ],
-
-                  // Conversations section (only if authenticated)
-                  if (isAuthenticated) ...[
-                    const SizedBox(height: 16),
-                    _buildConversationsSection(context),
-                  ],
-                ],
+    // Glassmorphism panel
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          decoration: BoxDecoration(
+            // Subtle gradient background for glass effect
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: isDark
+                  ? [
+                      colorScheme.surface.withOpacity(0.85),
+                      colorScheme.surfaceContainerLow.withOpacity(0.75),
+                    ]
+                  : [
+                      colorScheme.surface.withOpacity(0.92),
+                      colorScheme.surfaceContainerLow.withOpacity(0.88),
+                    ],
+            ),
+            // Subtle inner glow / border for glass effect
+            border: Border(
+              right: BorderSide(
+                color: isDark
+                    ? Colors.white.withOpacity(0.04)
+                    : Colors.black.withOpacity(0.03),
+                width: 1,
               ),
             ),
           ),
+          child: Column(
+            children: [
+              // Panel header
+              _buildHeader(context),
 
-          // Footer section
-          _buildFooter(context, isAuthenticated),
-        ],
+              // Main navigation
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Primary navigation
+                      _buildPrimaryNavigation(context, isAuthenticated),
+
+                      // Workspaces section (only if authenticated)
+                      if (isAuthenticated) ...[
+                        const SizedBox(height: 20),
+                        _buildWorkspacesSection(context),
+                      ],
+
+                      // Conversations section (only if authenticated)
+                      if (isAuthenticated) ...[
+                        const SizedBox(height: 20),
+                        _buildConversationsSection(context),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+
+              // Footer section
+              _buildFooter(context, isAuthenticated),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildHeader(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: Theme.of(context).dividerColor.withAlpha(100),
-          ),
-        ),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      // No harsh border - use subtle color shift instead
       child: widget.isPanelVisible
           ? Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -145,32 +173,45 @@ class _LeftPanelState extends State<LeftPanel> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 32,
-                        height: 32,
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withAlpha(25),
-                          borderRadius: BorderRadius.circular(8),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              colorScheme.tertiary.withOpacity(0.2),
+                              colorScheme.tertiary.withOpacity(0.1),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: colorScheme.tertiary.withOpacity(0.3),
+                            width: 1,
+                          ),
                         ),
                         child: Center(
                           child: Image.asset(
                             'assets/images/favicon.png',
-                            width: 20,
-                            height: 20,
+                            width: 22,
+                            height: 22,
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stackTrace) => Icon(
-                              Icons.broken_image,
+                              Icons.local_fire_department_rounded,
                               size: 20,
-                              color: Theme.of(context).primaryColor,
+                              color: colorScheme.tertiary,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      const Text(
+                      const SizedBox(width: 12),
+                      Text(
                         'TorchED',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
+                          letterSpacing: -0.3,
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -181,46 +222,38 @@ class _LeftPanelState extends State<LeftPanel> {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Home button
-                    Tooltip(
-                      message: 'Home',
-                      child: IconButton(
-                        icon: const Icon(Icons.home_outlined, size: 20),
-                        onPressed: () {
-                          context.go('/');
-                          // Auto-close panel on mobile after navigation
-                          if (widget.isMobile) widget.togglePanel();
-                        },
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(),
-                      ),
+                    // Home button - pill style on hover
+                    _HeaderIconButton(
+                      icon: Icons.home_rounded,
+                      tooltip: 'Home',
+                      onPressed: () {
+                        context.go('/');
+                        if (widget.isMobile) widget.togglePanel();
+                      },
                     ),
 
                     // Close button (mobile only)
-                    if (widget.isMobile)
-                      IconButton(
-                        icon: const Icon(Icons.close, size: 20),
+                    if (widget.isMobile) ...[
+                      const SizedBox(width: 4),
+                      _HeaderIconButton(
+                        icon: Icons.close_rounded,
+                        tooltip: 'Close',
                         onPressed: widget.togglePanel,
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(),
                       ),
+                    ],
                   ],
                 ),
               ],
             )
           : Center(
               // Collapsed view - only Home button
-              child: Tooltip(
-                message: 'Home',
-                child: IconButton(
-                  icon: const Icon(Icons.home_outlined, size: 20),
-                  onPressed: () {
-                    context.go('/');
-                    if (widget.isMobile) widget.togglePanel();
-                  },
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(),
-                ),
+              child: _HeaderIconButton(
+                icon: Icons.home_rounded,
+                tooltip: 'Home',
+                onPressed: () {
+                  context.go('/');
+                  if (widget.isMobile) widget.togglePanel();
+                },
               ),
             ),
     );
@@ -228,27 +261,18 @@ class _LeftPanelState extends State<LeftPanel> {
 
   Widget _buildPrimaryNavigation(BuildContext context, bool isAuthenticated) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Subtle section header
           if (widget.isPanelVisible)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Text(
-                'NAVIGATION',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                ),
-              ),
-            ),
+            _SectionHeader(label: 'Navigation'),
 
           // Show authenticated menu items
           if (isAuthenticated) ...[
             _NavItem(
-              icon: Icons.style_outlined,
+              icon: Icons.style_rounded,
               label: 'Flashcards',
               route: '/flashcards',
               isPanelVisible: widget.isPanelVisible,
@@ -260,7 +284,7 @@ class _LeftPanelState extends State<LeftPanel> {
               },
             ),
             _NavItem(
-              icon: Icons.quiz_outlined,
+              icon: Icons.quiz_rounded,
               label: 'Tests',
               route: '/tests',
               isPanelVisible: widget.isPanelVisible,
@@ -271,7 +295,7 @@ class _LeftPanelState extends State<LeftPanel> {
               },
             ),
             _NavItem(
-              icon: Icons.folder_outlined,
+              icon: Icons.folder_rounded,
               label: 'My Files',
               isPanelVisible: widget.isPanelVisible,
               isMobile: widget.isMobile,
@@ -289,40 +313,26 @@ class _LeftPanelState extends State<LeftPanel> {
     final workspaceProvider = context.watch<WorkspaceProvider>();
     final workspaces = workspaceProvider.workspaces;
     final isLoading = workspaceProvider.isLoadingWorkspaces;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (widget.isPanelVisible) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'WORKSPACES',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).textTheme.bodySmall?.color,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _showCreateWorkspaceDialog(context),
-                    borderRadius: BorderRadius.circular(4),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.add,
-                        size: 18,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            // Subtle section header with add button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _SectionHeader(label: 'Workspaces'),
+                _HeaderIconButton(
+                  icon: Icons.add_rounded,
+                  tooltip: 'New workspace',
+                  size: 18,
+                  onPressed: () => _showCreateWorkspaceDialog(context),
+                ),
+              ],
             ),
 
             // Workspaces list
@@ -339,33 +349,43 @@ class _LeftPanelState extends State<LeftPanel> {
               )
             else if (workspaces.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.work_outline,
-                      size: 32,
-                      color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.5),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withOpacity(0.3),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'No workspaces yet',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Theme.of(context).textTheme.bodySmall?.color,
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.workspaces_outline,
+                        size: 28,
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: () => _showCreateWorkspaceDialog(context),
-                      icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Create workspace'),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 12),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No workspaces yet',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      TextButton.icon(
+                        onPressed: () => _showCreateWorkspaceDialog(context),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Create workspace'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
@@ -393,7 +413,7 @@ class _LeftPanelState extends State<LeftPanel> {
             Tooltip(
               message: 'Workspaces',
               child: IconButton(
-                icon: const Icon(Icons.work_outline),
+                icon: const Icon(Icons.workspaces_rounded),
                 onPressed: widget.togglePanel,
               ),
             ),
@@ -458,22 +478,12 @@ class _LeftPanelState extends State<LeftPanel> {
 
   Widget _buildConversationsSection(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (widget.isPanelVisible) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              child: Text(
-                'CONVERSATIONS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(context).textTheme.bodySmall?.color,
-                ),
-              ),
-            ),
+            _SectionHeader(label: 'Conversations'),
             ConversationList(
               onConversationClick: (id) {
                 // Use deep linking for better UX and URL sharing
@@ -491,7 +501,7 @@ class _LeftPanelState extends State<LeftPanel> {
             Tooltip(
               message: 'Conversations',
               child: IconButton(
-                icon: const Icon(Icons.chat_bubble_outline),
+                icon: const Icon(Icons.chat_bubble_rounded),
                 onPressed: () {
                   widget.togglePanel();
                 },
@@ -504,23 +514,37 @@ class _LeftPanelState extends State<LeftPanel> {
 
   Widget _buildFooter(BuildContext context, bool isAuthenticated) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // Mobile-first: use SafeArea to respect system UI
     return SafeArea(
       top: false,
       child: Container(
+        // Glass card effect for footer
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: widget.isMobile
-              ? colorScheme.surfaceContainerLow
-              : null,
-          border: Border(
-            top: BorderSide(
-              color: Theme.of(context).dividerColor.withAlpha(100),
-            ),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: isDark
+                ? [
+                    colorScheme.surfaceContainerHigh.withOpacity(0.6),
+                    colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                  ]
+                : [
+                    colorScheme.surfaceContainerHigh.withOpacity(0.7),
+                    colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withOpacity(0.06)
+                : Colors.black.withOpacity(0.04),
+            width: 1,
           ),
         ),
-        // Mobile-first: consistent padding - equal distance from edges
-        padding: EdgeInsets.all(widget.isMobile ? 12 : 12),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -531,67 +555,47 @@ class _LeftPanelState extends State<LeftPanel> {
                 isMobile: widget.isMobile,
               ),
 
-            // Profile / Login button - FIRST for mobile accessibility
-            // Bigger tap target on mobile
-            if (isAuthenticated)
-              Container(
-                margin: EdgeInsets.only(bottom: widget.isMobile ? 8 : 6),
-                child: _NavItem(
-                  icon: Icons.person_outline,
-                  label: 'My Profile',
-                  isPanelVisible: widget.isPanelVisible,
-                  isMobile: widget.isMobile,
-                  onTap: () {
-                    showProfileDialog(context);
-                    if (widget.isMobile) widget.togglePanel();
-                  },
-                ),
-              )
-            else
-              Container(
-                margin: EdgeInsets.only(bottom: widget.isMobile ? 8 : 6),
-                child: _NavItem(
-                  icon: Icons.person_outline,
-                  label: 'Login / Register',
-                  isPanelVisible: widget.isPanelVisible,
-                  isMobile: widget.isMobile,
-                  variant: _NavItemVariant.filled,
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => const LoginRegisterDialog(),
-                    );
-                    if (widget.isMobile) widget.togglePanel();
-                  },
-                ),
-              ),
+            if (isAuthenticated && widget.isPanelVisible)
+              const SizedBox(height: 12),
 
-            // Settings button
-            Container(
-              margin: EdgeInsets.only(bottom: widget.isMobile ? 8 : 6),
-              child: _NavItem(
-                icon: Icons.settings_outlined,
-                label: 'Settings',
+            // Profile / Login button
+            if (isAuthenticated)
+              _NavItem(
+                icon: Icons.person_rounded,
+                label: 'My Profile',
                 isPanelVisible: widget.isPanelVisible,
                 isMobile: widget.isMobile,
                 onTap: () {
-                  showSettingsDialog(context);
+                  showProfileDialog(context);
+                  if (widget.isMobile) widget.togglePanel();
+                },
+              )
+            else
+              _NavItem(
+                icon: Icons.person_rounded,
+                label: 'Login / Register',
+                isPanelVisible: widget.isPanelVisible,
+                isMobile: widget.isMobile,
+                variant: _NavItemVariant.filled,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => const LoginRegisterDialog(),
+                  );
                   if (widget.isMobile) widget.togglePanel();
                 },
               ),
-            ),
 
-            // Feedback button
+            const SizedBox(height: 4),
+
+            // Settings button
             _NavItem(
-              icon: Icons.mail_outline,
-              label: 'Send Feedback',
+              icon: Icons.settings_rounded,
+              label: 'Settings',
               isPanelVisible: widget.isPanelVisible,
               isMobile: widget.isMobile,
               onTap: () {
-                // TODO: Open feedback dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Feedback dialog - TODO')),
-                );
+                showSettingsDialog(context);
                 if (widget.isMobile) widget.togglePanel();
               },
             ),
@@ -602,8 +606,92 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 }
 
+// =============================================================================
+// HELPER WIDGETS
+// =============================================================================
+
+/// Subtle section header with letter-spacing
+class _SectionHeader extends StatelessWidget {
+  final String label;
+
+  const _SectionHeader({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, right: 8, top: 4, bottom: 8),
+      child: Text(
+        label.toUpperCase(),
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+        ),
+      ),
+    );
+  }
+}
+
+/// Modern icon button with hover effect
+class _HeaderIconButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final double size;
+
+  const _HeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.size = 20,
+  });
+
+  @override
+  State<_HeaderIconButton> createState() => _HeaderIconButtonState();
+}
+
+class _HeaderIconButtonState extends State<_HeaderIconButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _isHovered
+                  ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              widget.icon,
+              size: widget.size,
+              color: _isHovered
+                  ? colorScheme.onSurface
+                  : colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // Workspace item widget
-class _WorkspaceItem extends StatelessWidget {
+class _WorkspaceItem extends StatefulWidget {
   final WorkspaceModel workspace;
   final bool isPanelVisible;
   final bool isMobile;
@@ -621,116 +709,158 @@ class _WorkspaceItem extends StatelessWidget {
   });
 
   @override
+  State<_WorkspaceItem> createState() => _WorkspaceItemState();
+}
+
+class _WorkspaceItemState extends State<_WorkspaceItem> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    if (!isPanelVisible) {
+    if (!widget.isPanelVisible) {
       return Tooltip(
-        message: workspace.name,
+        message: widget.workspace.name,
         child: IconButton(
-          icon: const Icon(Icons.folder_outlined, size: 20),
-          onPressed: onTap,
+          icon: const Icon(Icons.folder_rounded, size: 20),
+          onPressed: widget.onTap,
         ),
       );
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
-        child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 12 : 10,
-            vertical: isMobile ? 12 : 8,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: isMobile ? 36 : 32,
-                height: isMobile ? 36 : 32,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.work_outline,
-                  size: isMobile ? 18 : 16,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      workspace.name,
-                      style: TextStyle(
-                        fontSize: isMobile ? 14 : 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: EdgeInsets.symmetric(
+              horizontal: widget.isMobile ? 12 : 10,
+              vertical: widget.isMobile ? 12 : 10,
+            ),
+            decoration: BoxDecoration(
+              color: _isHovered
+                  ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: _isHovered
+                  ? Border.all(
+                      color: colorScheme.outline.withOpacity(0.1),
+                      width: 1,
+                    )
+                  : null,
+            ),
+            child: Row(
+              children: [
+                // Workspace icon with gradient
+                Container(
+                  width: widget.isMobile ? 36 : 32,
+                  height: widget.isMobile ? 36 : 32,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colorScheme.tertiary.withOpacity(0.15),
+                        colorScheme.tertiary.withOpacity(0.08),
+                      ],
                     ),
-                    if (workspace.categories.isNotEmpty)
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: colorScheme.tertiary.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.workspaces_rounded,
+                    size: widget.isMobile ? 18 : 16,
+                    color: colorScheme.tertiary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '${workspace.categories.length} ${workspace.categories.length == 1 ? 'category' : 'categories'}',
+                        widget.workspace.name,
                         style: TextStyle(
-                          fontSize: isMobile ? 11 : 10,
-                          color: colorScheme.onSurfaceVariant,
+                          fontSize: widget.isMobile ? 14 : 13,
+                          fontWeight: FontWeight.w500,
+                          color: colorScheme.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.more_vert,
-                  size: isMobile ? 20 : 18,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'edit':
-                      onEdit();
-                      break;
-                    case 'delete':
-                      onDelete();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 18),
-                        SizedBox(width: 8),
-                        Text('Edit Details'),
-                      ],
-                    ),
+                      if (widget.workspace.categories.isNotEmpty)
+                        Text(
+                          '${widget.workspace.categories.length} ${widget.workspace.categories.length == 1 ? 'category' : 'categories'}',
+                          style: TextStyle(
+                            fontSize: widget.isMobile ? 11 : 10,
+                            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
-                  PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
-                        const SizedBox(width: 8),
-                        const Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
+                ),
+                // Show menu only on hover (desktop) or always (mobile)
+                AnimatedOpacity(
+                  opacity: _isHovered || widget.isMobile ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 150),
+                  child: PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_horiz_rounded,
+                      size: widget.isMobile ? 20 : 18,
+                      color: colorScheme.onSurfaceVariant,
                     ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'edit':
+                          widget.onEdit();
+                          break;
+                        case 'delete':
+                          widget.onDelete();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_rounded, size: 18, color: colorScheme.onSurface),
+                            const SizedBox(width: 8),
+                            const Text('Edit Details'),
+                          ],
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_rounded, size: 18, color: colorScheme.error),
+                            const SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: colorScheme.error)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -741,7 +871,7 @@ class _WorkspaceItem extends StatelessWidget {
 // Navigation item widget
 enum _NavItemVariant { ghost, filled, outline }
 
-class _NavItem extends StatelessWidget {
+class _NavItem extends StatefulWidget {
   final IconData icon;
   final String label;
   final String? route;
@@ -763,26 +893,50 @@ class _NavItem extends StatelessWidget {
   });
 
   @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final isFilledVariant = widget.variant == _NavItemVariant.filled;
+
     final content = Row(
-      mainAxisSize: isPanelVisible ? MainAxisSize.max : MainAxisSize.min,
+      mainAxisSize: widget.isPanelVisible ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment:
-          isPanelVisible ? MainAxisAlignment.start : MainAxisAlignment.center,
+          widget.isPanelVisible ? MainAxisAlignment.start : MainAxisAlignment.center,
       children: [
         Icon(
-          icon,
-          size: isMobile ? 22 : 20,
-          color: isActive ? Theme.of(context).primaryColor : null,
+          widget.icon,
+          size: widget.isMobile ? 22 : 20,
+          color: isFilledVariant
+              ? colorScheme.onPrimary
+              : widget.isActive
+                  ? colorScheme.tertiary
+                  : _isHovered
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant,
         ),
-        if (isPanelVisible) ...[
-          SizedBox(width: isMobile ? 14 : 12),
+        if (widget.isPanelVisible) ...[
+          SizedBox(width: widget.isMobile ? 14 : 12),
           Expanded(
             child: Text(
-              label,
+              widget.label,
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                fontSize: isMobile ? 15 : 14,
-                color: isActive ? Theme.of(context).primaryColor : null,
+                fontSize: widget.isMobile ? 14 : 13,
+                color: isFilledVariant
+                    ? colorScheme.onPrimary
+                    : widget.isActive
+                        ? colorScheme.tertiary
+                        : _isHovered
+                            ? colorScheme.onSurface
+                            : colorScheme.onSurfaceVariant,
               ),
               overflow: TextOverflow.ellipsis,
             ),
@@ -791,43 +945,52 @@ class _NavItem extends StatelessWidget {
       ],
     );
 
-    final button = InkWell(
-      onTap: onTap ?? (route != null ? () => context.go(route!) : null),
-      borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
-      child: Container(
-        padding: isPanelVisible
-            ? EdgeInsets.symmetric(
-                horizontal: isMobile ? 14 : 12,
-                vertical: isMobile ? 14 : 10,
-              )
-            : EdgeInsets.all(isMobile ? 10 : 8),
-        decoration: BoxDecoration(
-          color: variant == _NavItemVariant.filled
-              ? Theme.of(context).primaryColor
-              : isActive
-                  ? Theme.of(context).primaryColor.withAlpha(25)
-                  : null,
-          borderRadius: BorderRadius.circular(isMobile ? 10 : 8),
+    final button = MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap ?? (widget.route != null ? () => context.go(widget.route!) : null),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: widget.isPanelVisible
+              ? EdgeInsets.symmetric(
+                  horizontal: widget.isMobile ? 14 : 12,
+                  vertical: widget.isMobile ? 12 : 10,
+                )
+              : EdgeInsets.all(widget.isMobile ? 10 : 8),
+          decoration: BoxDecoration(
+            // Filled variant uses tertiary (orange) color
+            color: isFilledVariant
+                ? colorScheme.tertiary
+                : widget.isActive
+                    ? colorScheme.tertiary.withOpacity(0.12)
+                    : _isHovered
+                        ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7)
+                        : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            // Active indicator - left border
+            border: widget.isActive && !isFilledVariant
+                ? Border(
+                    left: BorderSide(
+                      color: colorScheme.tertiary,
+                      width: 3,
+                    ),
+                  )
+                : _isHovered && !isFilledVariant
+                    ? Border.all(
+                        color: colorScheme.outline.withOpacity(0.1),
+                        width: 1,
+                      )
+                    : null,
+          ),
+          child: content,
         ),
-        child: variant == _NavItemVariant.filled
-            ? DefaultTextStyle(
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: isMobile ? 15 : 14,
-                ),
-                child: IconTheme(
-                  data: IconThemeData(
-                      color: Theme.of(context).colorScheme.onPrimary),
-                  child: content,
-                ),
-              )
-            : content,
       ),
     );
 
-    if (!isPanelVisible) {
+    if (!widget.isPanelVisible) {
       return Tooltip(
-        message: label,
+        message: widget.label,
         child: button,
       );
     }
@@ -938,14 +1101,16 @@ class _SubscriptionInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final subscriptionProvider = context.watch<SubscriptionProvider>();
     final stats = subscriptionProvider.stats;
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     if (stats == null) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 8.0),
         child: Center(
           child: SizedBox(
-            height: 24,
-            width: 24,
+            height: 20,
+            width: 20,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
@@ -956,70 +1121,121 @@ class _SubscriptionInfo extends StatelessWidget {
     final limits = stats.limits;
     final usage = stats.usage;
 
-    double _calcProgress(num? used, num? limit) {
-      if (used == null || limit == null) return 0.0;
-      if (_isUnlimited(limit)) return 0.0;
-      if (limit == 0) return 1.0;
-      return (used / limit).clamp(0.0, 1.0).toDouble();
-    }
-
-    final filesProgress = _calcProgress(usage?['files'] as num?, limits?['max_files'] as num?);
-    final decksProgress = _calcProgress(usage?['decks'] as num?, limits?['max_decks'] as num?);
-    final questionsProgress = _calcProgress(usage?['questions_period'] as num?, limits?['max_questions_period'] as num?);
-
- return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              (role == 'user'.toLowerCase()) ? 'free'.toUpperCase() : role.toUpperCase(),
-              style: TextStyle(
-                fontSize: isMobile ? 12 : 11,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).primaryColor,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Role badge row
+        Row(
+          children: [
+            // Futuristic capsule badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: role.toLowerCase() == 'user'
+                      ? [
+                          colorScheme.surfaceContainerHighest,
+                          colorScheme.surfaceContainerHigh,
+                        ]
+                      : [
+                          colorScheme.tertiary.withOpacity(0.2),
+                          colorScheme.tertiary.withOpacity(0.1),
+                        ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: role.toLowerCase() == 'user'
+                      ? colorScheme.outline.withOpacity(0.2)
+                      : colorScheme.tertiary.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                role.toLowerCase() == 'user' ? 'FREE' : role.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                  color: role.toLowerCase() == 'user'
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.tertiary,
+                ),
               ),
             ),
+            const Spacer(),
+            // Upgrade button
+            if (role.toLowerCase() == 'user')
+              TextButton(
+                onPressed: () => _showSubscriptionView(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  backgroundColor: colorScheme.tertiary.withOpacity(0.1),
+                  foregroundColor: colorScheme.tertiary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: colorScheme.tertiary.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                ),
+                child: const Text(
+                  'Upgrade',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+
+        if (isPanelVisible) ...[
+          const SizedBox(height: 12),
+          // Ultra-slim usage bars
+          _buildUsageBar(
+            context,
+            'Files',
+            usage?['files']?.toString() ?? '0',
+            limits?['max_files'],
           ),
-          // Uses Spacer to push the Upgrade button to the far right
-          const Spacer(),
-          if (role.toLowerCase() == 'user')
-            TextButton(
-              onPressed: () => _showSubscriptionView(context),
-              style: TextButton.styleFrom(
-                // Adds the custom border color
-                side: const BorderSide(color: Color(0xFFed8838)),
-                // Optional: sets the text color to match the border (remove if you prefer default theme color)
-                foregroundColor: const Color(0xFFed8838),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              child: const Text('Upgrade'),
-            ),
+          const SizedBox(height: 8),
+          _buildUsageBar(
+            context,
+            'Decks',
+            usage?['decks']?.toString() ?? '0',
+            limits?['max_decks'],
+          ),
+          const SizedBox(height: 8),
+          _buildUsageBar(
+            context,
+            'Questions',
+            usage?['questions_period']?.toString() ?? '0',
+            limits?['max_questions_period'],
+          ),
         ],
-      ),
-      const SizedBox(height: 8),
-      if (isPanelVisible) ...[
-        _buildUsageRow(context, 'Files', usage?['files']?.toString() ?? '0', limits?['max_files']),
-        const SizedBox(height: 6),
-        _buildUsageRow(context, 'Decks', usage?['decks']?.toString() ?? '0', limits?['max_decks']),
-        const SizedBox(height: 6),
-        _buildUsageRow(context, 'Questions (period)', usage?['questions_period']?.toString() ?? '0', limits?['max_questions_period']),
       ],
-    ],
-  );
+    );
   }
 
-  Widget _buildUsageRow(BuildContext context, String label, String usedText, dynamic limit) {
+  Widget _buildUsageBar(BuildContext context, String label, String usedText, dynamic limit) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final used = int.tryParse(usedText) ?? 0;
     final isUnlimited = _isUnlimited(limit);
     final limitText = isUnlimited ? '∞' : (limit?.toString() ?? '-');
     final progress = isUnlimited ? 0.0 : (limit is num ? (used / (limit as num)).clamp(0.0, 1.0).toDouble() : 0.0);
+
+    // Color based on usage level
+    Color progressColor;
+    if (progress < 0.5) {
+      progressColor = colorScheme.tertiary;
+    } else if (progress < 0.8) {
+      progressColor = Colors.amber;
+    } else {
+      progressColor = colorScheme.error;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1027,18 +1243,45 @@ class _SubscriptionInfo extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
-            Text('$used/$limitText', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+              ),
+            ),
+            Text(
+              '$used / $limitText',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: progress,
-            minHeight: 6,
-            backgroundColor: Theme.of(context).dividerColor.withOpacity(0.08),
-            valueColor: AlwaysStoppedAnimation(Theme.of(context).primaryColor),
+        // Ultra-slim progress bar
+        Container(
+          height: 4,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: progress,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    progressColor,
+                    progressColor.withOpacity(0.7),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
         ),
       ],
