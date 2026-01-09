@@ -293,9 +293,9 @@ class _ProfileContentState extends State<_ProfileContent> {
                     border: Border.all(color: cs.primary, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: cs.primary.withOpacity(0.3),
-                        blurRadius: 15,
-                        spreadRadius: 2,
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 8,
+                        spreadRadius: 0,
                       ),
                     ],
                   ),
@@ -368,7 +368,7 @@ class _ProfileContentState extends State<_ProfileContent> {
 
           const SizedBox(height: 32),
 
-          // Neon Logout Button
+          // Logout Button
           SizedBox(
             width: double.infinity,
             height: 56,
@@ -479,9 +479,9 @@ class _ProfileContentState extends State<_ProfileContent> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: cs.primary.withOpacity(0.4),
-                    blurRadius: 15,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
@@ -852,9 +852,9 @@ class _PasswordContentState extends State<_PasswordContent> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: cs.primary.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 5),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   )
                 ]
               ),

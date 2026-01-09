@@ -132,13 +132,6 @@ class _CalendarCellState extends State<_CalendarCell> {
                         fontWeight: FontWeight.w600,
                         color: textColor,
                         height: 1,
-                        shadows: [
-                          Shadow(
-                            blurRadius: 2,
-                            color: Colors.black.withOpacity(0.3),
-                            offset: const Offset(0, 0),
-                          )
-                        ],
                       ),
                     ),
                   ),

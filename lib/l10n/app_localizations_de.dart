@@ -869,4 +869,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get newChat => 'New';
+
+  @override
+  String get exitExam => 'Exit Exam?';
+
+  @override
+  String get exitExamWarning =>
+      'Your progress will be lost. Are you sure you want to exit?';
 }

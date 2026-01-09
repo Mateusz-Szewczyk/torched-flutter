@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../common/glass_components.dart';
 import 'base_glass_dialog.dart';
 
@@ -181,6 +182,7 @@ class SettingsDialog extends StatelessWidget {
 
   Widget _buildLanguageSection(BuildContext context, ColorScheme cs) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final localeProvider = context.watch<LocaleProvider>();
 
     const languages = [
       {'code': 'en', 'name': 'English', 'flag': '🇬🇧'},
@@ -194,10 +196,10 @@ class SettingsDialog extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: languages.map((lang) {
-        final isSelected = lang['code'] == 'pl';
+        final isSelected = localeProvider.isSelected(lang['code']!);
 
         return GestureDetector(
-          onTap: () => debugPrint('Language changed to: ${lang['code']}'),
+          onTap: () => localeProvider.setLocale(lang['code']!),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(

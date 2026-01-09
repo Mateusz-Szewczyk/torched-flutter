@@ -479,9 +479,9 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
         border: Border.all(color: cs.outlineVariant.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           )
         ],
       ),

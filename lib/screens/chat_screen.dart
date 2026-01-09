@@ -405,9 +405,9 @@ class _ChatScreenState extends State<ChatScreen> {
           color: colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
+              offset: const Offset(0, -1),
             ),
           ],
         ),
@@ -491,10 +491,10 @@ class _ChatScreenState extends State<ChatScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.75),
-              blurRadius: 20,
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 8,
               spreadRadius: 0,
-              offset: const Offset(0, 4),
+              offset: const Offset(0, 2),
             ),
           ],
           border: Border.all(
@@ -1378,9 +1378,9 @@ class _ToolsBottomSheetState extends State<_ToolsBottomSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            spreadRadius: 5,
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            spreadRadius: 0,
           ),
         ],
       ),

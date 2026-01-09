@@ -5,6 +5,7 @@ import 'config/theme.dart';
 import 'config/router.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/locale_provider.dart';
 import 'providers/conversation_provider.dart';
 import 'providers/flashcards_provider.dart';
 import 'providers/exams_provider.dart';
@@ -46,6 +47,7 @@ class TorchEdApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..init()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()..init()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()..init()),
         ChangeNotifierProvider(create: (_) => ConversationProvider()),
         ChangeNotifierProvider(create: (_) => FlashcardsProvider()),
         ChangeNotifierProvider(create: (_) => ExamsProvider()),
@@ -63,6 +65,7 @@ class _AppContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
+    final localeProvider = context.watch<LocaleProvider>();
     final authProvider = context.watch<AuthProvider>();
 
     final router = AppRouter(authProvider).router;
@@ -93,7 +96,7 @@ class _AppContent extends StatelessWidget {
         Locale('es'),
         Locale('fr'),
       ],
-      locale: const Locale('pl'), // Default locale
+      locale: localeProvider.locale,
     );
   }
 }

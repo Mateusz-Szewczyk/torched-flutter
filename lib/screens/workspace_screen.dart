@@ -703,8 +703,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                     boxShadow: isSelected
                         ? [
                             BoxShadow(
-                              color: colorScheme.tertiary.withOpacity(0.1),
-                              blurRadius: 12,
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 6,
                               spreadRadius: 0,
                             ),
                           ]
@@ -904,8 +904,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
           color: colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 6,
               offset: const Offset(0, -2),
             ),
           ],
@@ -996,18 +996,11 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
             borderRadius: BorderRadius.circular(23),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
-                blurRadius: 24,
+                color: Colors.black.withOpacity(isDark ? 0.15 : 0.06),
+                blurRadius: 8,
                 spreadRadius: 0,
-                offset: const Offset(0, 8),
+                offset: const Offset(0, 4),
               ),
-              if (isDark)
-                BoxShadow(
-                  color: colorScheme.tertiary.withOpacity(0.1),
-                  blurRadius: 40,
-                  spreadRadius: -10,
-                  offset: const Offset(0, 4),
-                ),
             ],
           ),
           padding: const EdgeInsets.all(14),
@@ -1156,15 +1149,6 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                 end: Alignment.bottomRight,
               ),
               shape: BoxShape.circle,
-              boxShadow: isDark
-                  ? [
-                      BoxShadow(
-                        color: colorScheme.tertiary.withOpacity(0.15),
-                        blurRadius: 40,
-                        spreadRadius: 0,
-                      ),
-                    ]
-                  : null,
             ),
             child: Icon(
               Icons.auto_awesome_rounded,
@@ -1429,9 +1413,9 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
             ),
           ],
         ),
@@ -1912,8 +1896,8 @@ class _WorkspaceScreenState extends State<WorkspaceScreen>
                         boxShadow: isSelected && isDark
                             ? [
                                 BoxShadow(
-                                  color: colorValue.withOpacity(0.5),
-                                  blurRadius: 12,
+                                  color: Colors.black.withOpacity(0.08),
+                                  blurRadius: 6,
                                   spreadRadius: 0,
                                 ),
                               ]
@@ -3180,8 +3164,8 @@ class _FuturisticQuickAction extends StatelessWidget {
             boxShadow: isDark
                 ? [
                     BoxShadow(
-                      color: color.withOpacity(0.05),
-                      blurRadius: 12,
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 6,
                       spreadRadius: 0,
                     ),
                   ]

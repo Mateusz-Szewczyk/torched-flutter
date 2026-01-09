@@ -120,8 +120,8 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: cs.primaryContainer.withValues(alpha: 0.3),
-                  blurRadius: 12,
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 6,
                 ),
               ],
             ),
@@ -380,7 +380,7 @@ class _UploadFormState extends State<_UploadForm> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                    color: cs.primary.withValues(alpha: 0.2), blurRadius: 20),
+                    color: Colors.black.withOpacity(0.06), blurRadius: 8),
               ],
             ),
             child: Icon(Icons.add_rounded, size: 32, color: cs.primary),
@@ -502,6 +502,23 @@ class _FilesList extends StatefulWidget {
 class _FilesListState extends State<_FilesList> {
   final TextEditingController _searchController = TextEditingController();
   final FileService _fileService = FileService();
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    setState(() {}); // Triggers rebuild with new filter
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
 
   List<UploadedFileInfo> get _filteredFiles {
     final query = _searchController.text.toLowerCase();

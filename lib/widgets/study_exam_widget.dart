@@ -195,6 +195,41 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     });
   }
 
+  /// Shows confirmation dialog before exiting an active exam.
+  /// Exits directly if exam hasn't started or is already completed.
+  Future<void> _confirmExit() async {
+    // If exam hasn't started or is completed, exit directly
+    if (_isSelectionStep || _isExamCompleted) {
+      widget.onExit();
+      return;
+    }
+
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n?.exitExam ?? 'Exit Exam?'),
+        content: Text(l10n?.exitExamWarning ??
+            'Your progress will be lost. Are you sure you want to exit?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n?.cancel ?? 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n?.exit ?? 'Exit'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _timer?.cancel();
+      widget.onExit();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDesktop = MediaQuery.of(context).size.width > _kMaxContentWidth;
@@ -208,16 +243,15 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
             child: Container(
               constraints: const BoxConstraints(maxWidth: _kMaxContentWidth),
               margin: const EdgeInsets.symmetric(vertical: 24),
-              // On desktop, add a subtle border/shadow to separate from background
               decoration: isDesktop
                   ? BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     )
@@ -788,7 +822,7 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
           ),
           IconButton(
             icon: const Icon(Icons.close),
-            onPressed: widget.onExit,
+            onPressed: _confirmExit,
             tooltip: 'Close',
           ),
         ],
@@ -844,7 +878,7 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: widget.onExit,
+                  onPressed: _confirmExit,
                 ),
               ],
             ),

@@ -456,132 +456,132 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get testsDescription =>
-      'Create and take practice exams to test your knowledge';
+      'Twórz i rozwiązuj testy, aby sprawdzić swoją wiedzę';
 
   @override
-  String get searchExams => 'Search exams...';
+  String get searchExams => 'Szukaj egzaminów...';
 
   @override
-  String get welcomeTests => 'Welcome to Tests';
+  String get welcomeTests => 'Witaj w Testach';
 
   @override
   String get getStartedCreateTest =>
-      'Create your first exam or add one using a share code';
+      'Utwórz swój pierwszy egzamin lub dodaj go kodem';
 
   @override
-  String get createExam => 'Create Exam';
+  String get createExam => 'Utwórz Egzamin';
 
   @override
-  String get editExam => 'Edit Exam';
+  String get editExam => 'Edytuj Egzamin';
 
   @override
-  String get deleteExam => 'Delete Exam';
+  String get deleteExam => 'Usuń Egzamin';
 
   @override
-  String get examDeleted => 'Exam deleted';
+  String get examDeleted => 'Egzamin usunięty';
 
   @override
-  String get examName => 'Exam Name';
+  String get examName => 'Nazwa Egzaminu';
 
   @override
-  String get questions => 'Questions';
+  String get questions => 'Pytania';
 
   @override
-  String get addQuestion => 'Add Question';
+  String get addQuestion => 'Dodaj Pytanie';
 
   @override
-  String get questionText => 'Question text';
+  String get questionText => 'Treść pytania';
 
   @override
-  String get answers => 'Answers';
+  String get answers => 'Odpowiedzi';
 
   @override
-  String get selectNumberOfQuestions => 'Select Number of Questions';
+  String get selectNumberOfQuestions => 'Wybierz Liczbę Pytań';
 
   @override
-  String get estimatedTime => 'Est. Time';
+  String get estimatedTime => 'Szac. Czas';
 
   @override
-  String get startExam => 'Start Exam';
+  String get startExam => 'Rozpocznij Egzamin';
 
   @override
-  String get examComplete => 'Exam Complete!';
+  String get examComplete => 'Egzamin Zakończony!';
 
   @override
-  String get congratulationsPassed => 'Congratulations! You passed!';
+  String get congratulationsPassed => 'Gratulacje! Zdałeś!';
 
   @override
-  String get keepPracticing => 'Keep practicing!';
+  String get keepPracticing => 'Ćwicz dalej!';
 
   @override
-  String get correct => 'Correct';
+  String get correct => 'Poprawne';
 
   @override
-  String get correctAnswers => 'Correct';
+  String get correctAnswers => 'Poprawne';
 
   @override
-  String get incorrectAnswers => 'Incorrect';
+  String get incorrectAnswers => 'Niepoprawne';
 
   @override
-  String get timeTaken => 'Time';
+  String get timeTaken => 'Czas';
 
   @override
-  String get submittingResults => 'Submitting results...';
+  String get submittingResults => 'Zapisywanie wyników...';
 
   @override
-  String get resultsSaved => 'Results saved!';
+  String get resultsSaved => 'Wyniki zapisane!';
 
   @override
-  String get backToExams => 'Back to Exams';
+  String get backToExams => 'Powrót do Egzaminów';
 
   @override
-  String get previous => 'Previous';
+  String get previous => 'Poprzedni';
 
   @override
-  String get next => 'Next';
+  String get next => 'Następny';
 
   @override
-  String get addExamByCode => 'Add Exam by Code';
+  String get addExamByCode => 'Dodaj Egzamin Kodem';
 
   @override
-  String get examAddedSuccessfully => 'Exam added successfully';
+  String get examAddedSuccessfully => 'Egzamin dodany pomyślnie';
 
   @override
-  String get noSharedExams => 'No shared exams yet';
+  String get noSharedExams => 'Brak udostępnionych egzaminów';
 
   @override
-  String get removeSharedExam => 'Remove Shared Exam';
+  String get removeSharedExam => 'Usuń Udostępniony Egzamin';
 
   @override
   String get removeSharedExamConfirm =>
-      'Are you sure you want to remove this shared exam from your library?';
+      'Czy na pewno chcesz usunąć ten udostępniony egzamin z biblioteki?';
 
   @override
-  String get examHasNoQuestions => 'This exam has no questions.';
+  String get examHasNoQuestions => 'Ten egzamin nie zawiera pytań.';
 
   @override
-  String get selectConversation => 'Select a conversation';
+  String get selectConversation => 'Wybierz konwersację';
 
   @override
-  String get orCreateNew => 'or create a new one from the sidebar';
+  String get orCreateNew => 'lub utwórz nową z panelu bocznego';
 
   @override
-  String get startChatting => 'Start chatting';
+  String get startChatting => 'Rozpocznij rozmowę';
 
   @override
-  String get askAnything => 'Ask me anything!';
+  String get askAnything => 'Zapytaj mnie o cokolwiek!';
 
   @override
-  String get tools => 'Tools';
+  String get tools => 'Narzędzia';
 
   @override
-  String get selectTools => 'Select Tools';
+  String get selectTools => 'Wybierz Narzędzia';
 
   @override
-  String get clearAll => 'Clear All';
+  String get clearAll => 'Wyczyść Wszystko';
 
   @override
-  String get done => 'Done';
+  String get done => 'Gotowe';
 
   @override
   String get dashboardTitle => 'Twój Panel Nauki';
@@ -853,20 +853,27 @@ class AppLocalizationsPl extends AppLocalizations {
       'Wybierz dokument z panelu bocznego, aby rozpocząć czytanie';
 
   @override
-  String get read => 'Read';
+  String get read => 'Czytaj';
 
   @override
-  String get newConversation => 'New Conversation';
+  String get newConversation => 'Nowa Konwersacja';
 
   @override
-  String get conversations => 'Conversations';
+  String get conversations => 'Konwersacje';
 
   @override
-  String get conversationCreated => 'New conversation started';
+  String get conversationCreated => 'Rozpoczęto nową konwersację';
 
   @override
-  String get history => 'History';
+  String get history => 'Historia';
 
   @override
-  String get newChat => 'New';
+  String get newChat => 'Nowy';
+
+  @override
+  String get exitExam => 'Wyjść z egzaminu?';
+
+  @override
+  String get exitExamWarning =>
+      'Twój postęp zostanie utracony. Czy na pewno chcesz wyjść?';
 }

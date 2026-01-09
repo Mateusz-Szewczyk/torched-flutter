@@ -302,5 +302,7 @@
   "conversations": "Conversations",
   "conversationCreated": "New conversation started",
   "history": "History",
-  "newChat": "New"
+  "newChat": "New",
+  "exitExam": "Exit Exam?",
+  "exitExamWarning": "Your progress will be lost. Are you sure you want to exit?"
 }

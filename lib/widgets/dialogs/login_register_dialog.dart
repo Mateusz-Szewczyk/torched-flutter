@@ -387,13 +387,7 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.3),
-                        blurRadius: 12,
-                        spreadRadius: -2,
-                      ),
-                    ],
+
                   ),
                   child: Icon(
                     icon,
@@ -600,9 +594,9 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.4),
-                      blurRadius: 8,
-                      spreadRadius: -2,
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      spreadRadius: 0,
                     ),
                   ]
                 : null,
@@ -950,9 +944,9 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: strengthColor.withOpacity(0.4),
-                        blurRadius: 6,
-                        spreadRadius: -1,
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 4,
+                        spreadRadius: 0,
                       ),
                     ],
                   ),
@@ -1019,10 +1013,10 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: colorScheme.primary.withOpacity(0.35),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-              spreadRadius: -4,
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+              spreadRadius: 0,
             ),
           ],
         ),
@@ -1074,9 +1068,9 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
-                      blurRadius: 24,
-                      spreadRadius: -4,
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      spreadRadius: 0,
                     ),
                   ],
                 ),
@@ -1142,9 +1136,9 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: colorScheme.primary.withOpacity(0.3),
-                      blurRadius: 24,
-                      spreadRadius: -4,
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 8,
+                      spreadRadius: 0,
                     ),
                   ],
                 ),
@@ -1351,9 +1345,9 @@ class _GlassTextFieldState extends State<_GlassTextField> {
         boxShadow: _isFocused
             ? [
                 BoxShadow(
-                  color: widget.colorScheme.primary.withOpacity(0.15),
-                  blurRadius: 12,
-                  spreadRadius: -2,
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  spreadRadius: 0,
                 ),
               ]
             : null,

@@ -1765,6 +1765,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'New'**
   String get newChat;
+
+  /// No description provided for @exitExam.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit Exam?'**
+  String get exitExam;
+
+  /// No description provided for @exitExamWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Your progress will be lost. Are you sure you want to exit?'**
+  String get exitExamWarning;
 }
 
 class _AppLocalizationsDelegate

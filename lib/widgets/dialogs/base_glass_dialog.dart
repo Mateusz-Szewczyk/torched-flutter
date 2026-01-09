@@ -161,23 +161,7 @@ class BaseGlassDialog extends StatelessWidget {
           alignment: Alignment.center,
           children: [
             // Subtle depth shadow/glow (neutral, not colored)
-            if (showGlow)
-              Container(
-                width: (maxWidth ?? 600) + 80,
-                height: (maxHeight ?? 500) + 80,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(50),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark 
-                          ? Colors.white.withOpacity(0.02) 
-                          : Colors.black.withOpacity(0.04),
-                      blurRadius: 60,
-                      spreadRadius: 20,
-                    ),
-                  ],
-                ),
-              ),
+            // Glow removed per request
             // Main dialog
             ConstrainedBox(
               constraints: BoxConstraints(
@@ -200,9 +184,9 @@ class BaseGlassDialog extends StatelessWidget {
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.4 : 0.15),
-                          blurRadius: 40,
-                          spreadRadius: -5,
+                          color: Colors.black.withOpacity(isDark ? 0.15 : 0.08),
+                          blurRadius: 8,
+                          spreadRadius: 0,
                         ),
                       ],
                     ),
