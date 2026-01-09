@@ -562,22 +562,28 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
       child: Material(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: isAnswered ? null : () => _handleAnswerSelect(answer.id ?? 0),
-          borderRadius: BorderRadius.circular(12),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: borderColor,
-                width: isSelected || (showResult && isCorrect) ? 2 : 1,
+        child: Semantics(
+          label: 'Option ${String.fromCharCode(65 + index)}. ${answer.text}.'
+                 '${showResult ? (isCorrect ? ' Correct answer.' : ' Incorrect.') : ''}',
+          selected: isSelected,
+          button: true,
+          enabled: !isAnswered, // Disable if already answered
+          child: InkWell(
+            onTap: isAnswered ? null : () => _handleAnswerSelect(answer.id ?? 0),
+            borderRadius: BorderRadius.circular(12),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: borderColor,
+                  width: isSelected || (showResult && isCorrect) ? 2 : 1,
+                ),
+                borderRadius: BorderRadius.circular(12),
               ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
+              child: Row(
+                children: [
+                  Container(
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
@@ -618,6 +624,7 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -854,25 +861,28 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
                     ],
                   ),
                 ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.timer_outlined, size: 16, color: cs.primary),
-                      const SizedBox(width: 6),
-                      Text(_elapsedTime,
-                          style: TextStyle(
-                              color: cs.onSurface,
-                              fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures()
-                              ])),
-                    ],
+                Semantics(
+                  label: 'Elapsed time: $_elapsedTime',
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.timer_outlined, size: 16, color: cs.primary),
+                        const SizedBox(width: 6),
+                        Text(_elapsedTime,
+                            style: TextStyle(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w600,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
+                                ])),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),

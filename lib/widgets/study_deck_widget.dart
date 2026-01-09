@@ -569,11 +569,11 @@ class _StudyDeckWidgetState extends State<StudyDeckWidget>
             SizedBox(
               width: double.infinity,
               height: 56,
-              child: FilledButton(
+              child: FilledButton.tonal(
                 onPressed: _isSubmitting ? null : _handleFinish,
                 child: _isSubmitting
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Save & Exit'),
+                    : Text('Save & Exit', style: TextStyle(color: cs.primary)),
               ),
             ),
             const SizedBox(height: 16),
@@ -914,14 +914,14 @@ class _BottomActionsBar extends StatelessWidget {
                 key: const ValueKey('flip'),
                 width: double.infinity,
                 height: 56,
-                child: FilledButton(
+                child: FilledButton.tonal(
                   onPressed: onFlip,
                   style: FilledButton.styleFrom(
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16))),
-                  child: const Text('Show Answer',
+                  child: Text('Show Answer',
                       style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: cs.primary)),
                 ),
               ),
       ),

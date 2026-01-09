@@ -95,7 +95,7 @@ class GlassTile extends StatelessWidget {
 /// A clean, minimal text field with subtle styling.
 /// 
 /// Uses simple container styling instead of GlassTile for performance.
-class GhostTextField extends StatelessWidget {
+class GhostTextField extends StatefulWidget {
   final TextEditingController? controller;
   final String? hintText;
   final String? labelText;
@@ -103,16 +103,18 @@ class GhostTextField extends StatelessWidget {
   final String? initialValue;
   final String? errorText;
   final IconData? prefixIcon;
-  final Widget? suffixIcon;
+  final Widget? suffixIcon; // Change to Widget to match usage
   final int maxLines;
   final int? maxLength;
   final bool autofocus;
   final bool obscureText;
   final bool enabled;
+  final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final String? Function(String?)? validator;
+  final VoidCallback? onSuffixTap;
 
   const GhostTextField({
     super.key,
@@ -129,72 +131,117 @@ class GhostTextField extends StatelessWidget {
     this.autofocus = false,
     this.obscureText = false,
     this.enabled = true,
+    this.keyboardType,
     this.textInputAction,
     this.onChanged,
     this.onSubmitted,
     this.validator,
+    this.onSuffixTap, // Add callback
   });
+
+  @override
+  State<GhostTextField> createState() => _GhostTextFieldState();
+}
+
+class _GhostTextFieldState extends State<GhostTextField> {
+  bool _isFocused = false;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final effectiveLabel = labelText ?? label;
-    
+    final effectiveLabel = widget.labelText ?? widget.label;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7),
-            borderRadius: BorderRadius.circular(12),
+            color: cs.surfaceContainerHighest.withOpacity(isDark ? 0.3 : 0.5), // Slightly more transparent
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: errorText != null 
+              color: widget.errorText != null
                   ? cs.error.withOpacity(0.5)
-                  : (isDark 
-                      ? Colors.white.withOpacity(0.06) 
-                      : Colors.black.withOpacity(0.04)),
-              width: 1,
+                  : _isFocused
+                      ? cs.primary.withOpacity(0.6)
+                      : (isDark
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.black.withOpacity(0.08)),
+              width: _isFocused ? 1.5 : 1,
             ),
+            boxShadow: _isFocused
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 6,
+                      spreadRadius: 0,
+                    ),
+                  ]
+                : null,
           ),
-          child: TextFormField(
-            controller: controller,
-            initialValue: controller == null ? initialValue : null,
-            maxLines: maxLines,
-            maxLength: maxLength,
-            autofocus: autofocus,
-            obscureText: obscureText,
-            enabled: enabled,
-            textInputAction: textInputAction,
-            onChanged: onChanged,
-            onFieldSubmitted: onSubmitted,
-            validator: validator,
-            style: TextStyle(color: cs.onSurface, fontSize: 15),
-            decoration: InputDecoration(
-              hintText: hintText,
-              labelText: effectiveLabel,
-              prefixIcon: prefixIcon != null 
-                  ? Icon(prefixIcon, size: 20, color: cs.onSurfaceVariant) 
-                  : null,
-              suffixIcon: suffixIcon,
-              hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
-              labelStyle: TextStyle(color: cs.onSurfaceVariant),
-              border: InputBorder.none,
-              counterText: '',
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16, 
-                vertical: 14,
+          child: Focus(
+            onFocusChange: (focused) => setState(() => _isFocused = focused),
+            child: TextFormField(
+              controller: widget.controller,
+              initialValue: widget.controller == null ? widget.initialValue : null,
+              maxLines: widget.maxLines,
+              maxLength: widget.maxLength,
+              autofocus: widget.autofocus,
+              obscureText: widget.obscureText,
+              enabled: widget.enabled,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              onChanged: widget.onChanged,
+              onFieldSubmitted: widget.onSubmitted,
+              validator: widget.validator,
+              style: TextStyle(color: cs.onSurface, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                labelText: effectiveLabel,
+                prefixIcon: widget.prefixIcon != null
+                    ? Icon(
+                        widget.prefixIcon,
+                        size: 18,
+                        color: _isFocused
+                            ? cs.primary
+                            : cs.onSurfaceVariant.withOpacity(0.7),
+                      )
+                    : null,
+                suffixIcon: widget.suffixIcon is IconData 
+                    ? GestureDetector(
+                        onTap: widget.onSuffixTap,
+                        child: Icon(widget.suffixIcon as IconData, size: 18, color: cs.onSurfaceVariant),
+                      )
+                    : widget.suffixIcon, // Support widget or convert icon data if needed
+                hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
+                labelStyle: TextStyle(
+                  color: _isFocused
+                      ? cs.primary
+                      : cs.onSurfaceVariant,
+                  fontSize: 13,
+                  letterSpacing: 0.3,
+                ),
+                border: InputBorder.none,
+                counterText: '',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                // match _GlassTextField feel
+                filled: true,
+                fillColor: Colors.transparent, // Handled by container
               ),
             ),
           ),
         ),
-        if (errorText != null) ...[
+        if (widget.errorText != null) ...[
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 12),
             child: Text(
-              errorText!,
+              widget.errorText!,
               style: TextStyle(color: cs.error, fontSize: 12),
             ),
           ),

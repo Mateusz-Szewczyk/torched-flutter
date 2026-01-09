@@ -175,12 +175,17 @@ class _ExamsScreenState extends State<ExamsScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                FilledButton.icon(
+                FilledButton.tonal(
                   onPressed: () => _showCreateExamDialog(context, provider),
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n?.createExam ?? 'Create Exam'),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add),
+                      const SizedBox(width: 8),
+                      Text(l10n?.createExam ?? 'Create Exam'),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -555,7 +560,7 @@ class _ExamsScreenState extends State<ExamsScreen> {
 // EXAM CARD WIDGET
 // ============================================================================
 
-class _ExamCard extends StatelessWidget {
+class _ExamCard extends StatefulWidget {
   final ExamInfo examInfo;
   final VoidCallback onStudy;
   final VoidCallback onEdit;
@@ -573,174 +578,216 @@ class _ExamCard extends StatelessWidget {
   });
 
   @override
+  State<_ExamCard> createState() => _ExamCardState();
+}
+
+class _ExamCardState extends State<_ExamCard> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final isShared = examInfo.accessType == 'shared' || examInfo.isOwn == false;
+    final isShared = widget.examInfo.accessType == 'shared' || widget.examInfo.isOwn == false;
+    
+    // Exam cards use purple/blue accent color
+    final accentColor = colorScheme.primary;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onStudy,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        transform: _isHovered 
+          ? (Matrix4.identity()..translate(0.0, -2.0))
+          : Matrix4.identity(),
+        child: Card(
+          elevation: _isHovered ? 4 : 0,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: _isHovered ? accentColor.withValues(alpha: 0.5) : colorScheme.outlineVariant,
+              width: 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.onStudy,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: accentColor, width: 4),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Row: Title & Menu
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          examInfo.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.examInfo.name,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Exam · ${widget.examInfo.questionCount} ${l10n?.questions ?? 'questions'}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  if (widget.examInfo.lastScore != null) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: (widget.examInfo.lastScore! >= 80)
+                                            ? Colors.green.withValues(alpha: 0.1)
+                                            : (widget.examInfo.lastScore! >= 50)
+                                                ? Colors.orange.withValues(alpha: 0.1)
+                                                : Colors.red.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: (widget.examInfo.lastScore! >= 80)
+                                              ? Colors.green.withValues(alpha: 0.5)
+                                              : (widget.examInfo.lastScore! >= 50)
+                                                  ? Colors.orange.withValues(alpha: 0.5)
+                                                  : Colors.red.withValues(alpha: 0.5),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '${widget.examInfo.lastScore!.toInt()}%',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: (widget.examInfo.lastScore! >= 80)
+                                              ? Colors.green.shade700
+                                              : (widget.examInfo.lastScore! >= 50)
+                                                  ? Colors.orange.shade800
+                                                  : Colors.red.shade700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        if (examInfo.description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            examInfo.description,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        _buildMenuButton(context, isShared, l10n, colorScheme),
                       ],
                     ),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'edit':
-                          onEdit();
-                          break;
-                        case 'delete':
-                          onDelete();
-                          break;
-                        case 'share':
-                          onShare();
-                          break;
-                        case 'remove_shared':
-                          onRemoveShared();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (!isShared) ...[
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.edit, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n?.edit ?? 'Edit'),
-                            ],
+                    
+                    const Spacer(),
+                    
+                    // Status Row (Shared indicator if applicable)
+                    if (isShared) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.people, color: colorScheme.tertiary, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            l10n?.shared ?? 'Shared',
+                            style: TextStyle(fontSize: 12, color: colorScheme.tertiary),
                           ),
-                        ),
-                        PopupMenuItem(
-                          value: 'share',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.share, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n?.share ?? 'Share'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, size: 18, color: colorScheme.error),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n?.delete ?? 'Delete',
-                                style: TextStyle(color: colorScheme.error),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ] else
-                        PopupMenuItem(
-                          value: 'remove_shared',
-                          child: Row(
-                            children: [
-                              Icon(Icons.remove_circle, size: 18, color: colorScheme.error),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n?.removeFromLibrary ?? 'Remove',
-                                style: TextStyle(color: colorScheme.error),
-                              ),
-                            ],
-                          ),
-                        ),
+                        ],
+                      ),
                     ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Badges
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _Badge(
-                    icon: Icons.quiz,
-                    label: '${examInfo.questionCount}',
-                    color: colorScheme.secondary,
-                    bgColor: colorScheme.secondaryContainer,
-                    textColor: colorScheme.onSecondaryContainer,
-                  ),
-                  if (isShared)
-                    _Badge(
-                      icon: Icons.people,
-                      label: l10n?.shared ?? 'Shared',
-                      color: colorScheme.tertiary,
-                      bgColor: colorScheme.tertiaryContainer,
-                      textColor: colorScheme.onTertiaryContainer,
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Full-width Start Exam Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        onPressed: widget.onStudy,
+                        icon: const Icon(Icons.play_arrow, size: 20),
+                        label: Text(
+                          l10n?.startExam ?? 'Start Exam',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          foregroundColor: colorScheme.primary, // Orange text/icon
+                          backgroundColor: colorScheme.surfaceContainerHighest, // Neutral background
+                        ),
+                      ),
                     ),
-                ],
+                  ],
+                ),
               ),
-
-              const Spacer(),
-              const Divider(height: 24),
-
-              // Footer
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  FilledButton.icon(
-                    onPressed: onStudy,
-                    icon: const Icon(Icons.play_arrow, size: 18),
-                    label: Text(l10n?.startExam ?? 'Start'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+  
+  Widget _buildMenuButton(BuildContext context, bool isShared, AppLocalizations? l10n, ColorScheme colorScheme) {
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
+      onSelected: (value) {
+        switch (value) {
+          case 'edit': widget.onEdit(); break;
+          case 'delete': widget.onDelete(); break;
+          case 'share': widget.onShare(); break;
+          case 'remove_shared': widget.onRemoveShared(); break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (!isShared) ...[
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(children: [
+              const Icon(Icons.edit, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n?.edit ?? 'Edit'),
+            ]),
+          ),
+          PopupMenuItem(
+            value: 'share',
+            child: Row(children: [
+              const Icon(Icons.share, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n?.share ?? 'Share'),
+            ]),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(children: [
+              Icon(Icons.delete, size: 18, color: colorScheme.error),
+              const SizedBox(width: 8),
+              Text(l10n?.delete ?? 'Delete', style: TextStyle(color: colorScheme.error)),
+            ]),
+          ),
+        ] else
+          PopupMenuItem(
+            value: 'remove_shared',
+            child: Row(children: [
+              Icon(Icons.remove_circle, size: 18, color: colorScheme.error),
+              const SizedBox(width: 8),
+              Text(l10n?.removeFromLibrary ?? 'Remove', style: TextStyle(color: colorScheme.error)),
+            ]),
+          ),
+      ],
     );
   }
 }

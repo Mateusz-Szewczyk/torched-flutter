@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '../services/dashboard_service.dart';
+import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
+import '../providers/flashcards_provider.dart';
+import '../models/models.dart';
 
 /// Learning Calendar Widget - GitHub-style contribution graph
 /// Shows study history and scheduled flashcard reviews
@@ -1188,6 +1192,30 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               color: isOverdue ? Colors.red.shade700 : colorScheme.onSurfaceVariant,
             ),
           ),
+          if (deck.id != null) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.play_arrow_rounded),
+              iconSize: 20,
+              color: colorScheme.primary,
+              tooltip: 'Study ${deck.name}',
+              onPressed: () {
+                // Close dialog
+                Navigator.of(context).pop();
+                // Start study session
+                context.read<FlashcardsProvider>().startStudy(
+                  DeckInfo(
+                    id: deck.id!,
+                    name: deck.name,
+                    flashcardCount: deck.count,
+                    createdAt: DateTime.now().toIso8601String(),
+                  ),
+                );
+                // Navigate to flashcards
+                context.go('/flashcards');
+              },
+            ),
+          ],
         ],
       ),
     );

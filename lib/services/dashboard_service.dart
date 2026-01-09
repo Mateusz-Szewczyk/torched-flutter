@@ -146,13 +146,19 @@ class CalendarDay {
 
 /// Deck count for a day
 class DeckCount {
+  final int? id;
   final String name;
   final int count;
 
-  DeckCount({required this.name, required this.count});
+  DeckCount({
+    this.id,
+    required this.name,
+    required this.count,
+  });
 
   factory DeckCount.fromJson(Map<String, dynamic> json) {
     return DeckCount(
+      id: json['id'] as int?,
       name: json['name'] as String? ?? 'Unknown',
       count: json['count'] as int? ?? 0,
     );

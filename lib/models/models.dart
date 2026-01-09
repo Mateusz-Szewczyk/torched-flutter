@@ -55,6 +55,8 @@ class Exam with _$Exam {
     @JsonKey(name: 'added_at') String? addedAt,
     @JsonKey(name: 'code_used') String? codeUsed,
     @JsonKey(name: 'access_type') String? accessType,
+    @JsonKey(name: 'last_score') double? lastScore,
+    @JsonKey(name: 'average_score') double? averageScore,
   }) = _Exam;
 
   factory Exam.fromJson(Map<String, dynamic> json) => _$ExamFromJson(json);
@@ -79,6 +81,8 @@ class ExamInfo with _$ExamInfo {
     @JsonKey(name: 'added_at') String? addedAt,
     @JsonKey(name: 'code_used') String? codeUsed,
     @JsonKey(name: 'access_type') String? accessType,
+    @JsonKey(name: 'last_score') double? lastScore,
+    @JsonKey(name: 'average_score') double? averageScore,
   }) = _ExamInfo;
 
   factory ExamInfo.fromJson(Map<String, dynamic> json) =>

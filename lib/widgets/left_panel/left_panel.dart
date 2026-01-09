@@ -930,42 +930,47 @@ class _NavItemState extends State<_NavItem> {
     final button = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap ?? (widget.route != null ? () => context.go(widget.route!) : null),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: widget.isPanelVisible
-              ? EdgeInsets.symmetric(
-                  horizontal: widget.isMobile ? 14 : 12,
-                  vertical: widget.isMobile ? 12 : 10,
-                )
-              : EdgeInsets.all(widget.isMobile ? 10 : 8),
-          decoration: BoxDecoration(
-            // Filled variant uses tertiary (orange) color
-            color: isFilledVariant
-                ? colorScheme.tertiary
-                : widget.isActive
-                    ? colorScheme.tertiary.withOpacity(0.12)
-                    : _isHovered
-                        ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7)
-                        : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            // Active indicator - left border
-            border: widget.isActive && !isFilledVariant
-                ? Border(
-                    left: BorderSide(
-                      color: colorScheme.tertiary,
-                      width: 3,
-                    ),
+      child: Semantics(
+        label: widget.label,
+        button: true,
+        selected: widget.isActive,
+        child: GestureDetector(
+          onTap: widget.onTap ?? (widget.route != null ? () => context.go(widget.route!) : null),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: widget.isPanelVisible
+                ? EdgeInsets.symmetric(
+                    horizontal: widget.isMobile ? 14 : 12,
+                    vertical: widget.isMobile ? 12 : 10,
                   )
-                : _isHovered && !isFilledVariant
-                    ? Border.all(
-                        color: colorScheme.outline.withOpacity(0.1),
-                        width: 1,
-                      )
-                    : null,
+                : EdgeInsets.all(widget.isMobile ? 10 : 8),
+            decoration: BoxDecoration(
+              // Filled variant uses tertiary (orange) color
+              color: isFilledVariant
+                  ? colorScheme.tertiary
+                  : widget.isActive
+                      ? colorScheme.tertiary.withOpacity(0.12)
+                      : _isHovered
+                          ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7)
+                          : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              // Active indicator - left border
+              border: widget.isActive && !isFilledVariant
+                  ? Border(
+                      left: BorderSide(
+                        color: colorScheme.tertiary,
+                        width: 3,
+                      ),
+                    )
+                  : _isHovered && !isFilledVariant
+                      ? Border.all(
+                          color: colorScheme.outline.withOpacity(0.1),
+                          width: 1,
+                        )
+                      : null,
+            ),
+            child: content,
           ),
-          child: content,
         ),
       ),
     );

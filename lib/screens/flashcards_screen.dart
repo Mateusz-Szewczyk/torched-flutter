@@ -185,13 +185,18 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                FilledButton.icon(
+                FilledButton.tonal(
                   onPressed: () => _showCreateDeckDialog(context, provider),
-                  icon: const Icon(Icons.add),
-                  label: Text(l10n?.createDeck ?? 'Create Deck'),
                   style: FilledButton.styleFrom(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: Row(
+                    children: [
+                       const Icon(Icons.add),
+                       const SizedBox(width: 8),
+                       Text(l10n?.createDeck ?? 'Create Deck'),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -661,6 +666,7 @@ class _DeckCard extends StatefulWidget {
 class _DeckCardState extends State<_DeckCard> {
   OverdueStats? _overdueStats;
   bool _isLoadingStats = false;
+  bool _isHovered = false;
 
   @override
   void initState() {
@@ -696,210 +702,288 @@ class _DeckCardState extends State<_DeckCard> {
     final isShared =
         widget.deckInfo.accessType == 'shared' || widget.deckInfo.isOwn == false;
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant, width: 1),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: widget.onStudy,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top Row: Title & Menu
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
+    // Calculate status color for left border
+    final statusColor = _getStatusColor(colorScheme);
+    
+    // Calculate mastery
+    final totalCards = _overdueStats?.totalCards ?? widget.deckInfo.flashcardCount;
+    final overdueCards = _overdueStats?.overdueCards ?? 0;
+    final dueToday = _overdueStats?.dueToday ?? 0;
+    final masteredCards = totalCards - overdueCards - dueToday;
+    final masteryProgress = totalCards > 0 ? (masteredCards / totalCards).clamp(0.0, 1.0) : 0.0;
+    final masteryPercent = (masteryProgress * 100).toInt();
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        transform: _isHovered 
+          ? (Matrix4.identity()..translate(0.0, -2.0))
+          : Matrix4.identity(),
+        child: Card(
+          elevation: _isHovered ? 4 : 0,
+          shadowColor: Colors.black26,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: _isHovered ? statusColor.withValues(alpha: 0.5) : colorScheme.outlineVariant,
+              width: 1,
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.onStudy,
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: statusColor, width: 4),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Row: Title & Menu
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.deckInfo.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.deckInfo.name,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${l10n?.flashcards ?? 'Flashcard deck'} · $totalCards ${l10n?.cards ?? 'cards'}',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        if (widget.deckInfo.description != null &&
-                            widget.deckInfo.description!.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.deckInfo.description!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        _buildMenuButton(context, isShared, l10n, colorScheme),
                       ],
                     ),
-                  ),
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_vert,
-                        color: colorScheme.onSurfaceVariant),
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'edit':
-                          widget.onEdit();
-                          break;
-                        case 'delete':
-                          widget.onDelete();
-                          break;
-                        case 'share':
-                          widget.onShare();
-                          break;
-                        case 'remove_shared':
-                          widget.onRemoveShared();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      if (!isShared) ...[
-                        PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.edit, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n?.edit ?? 'Edit'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'share',
-                          child: Row(
-                            children: [
-                              const Icon(Icons.share, size: 18),
-                              const SizedBox(width: 8),
-                              Text(l10n?.share ?? 'Share'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete,
-                                  size: 18, color: colorScheme.error),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n?.delete ?? 'Delete',
-                                style: TextStyle(color: colorScheme.error),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ] else
-                        PopupMenuItem(
-                          value: 'remove_shared',
-                          child: Row(
-                            children: [
-                              Icon(Icons.remove_circle,
-                                  size: 18, color: colorScheme.error),
-                              const SizedBox(width: 8),
-                              Text(
-                                l10n?.removeFromLibrary ?? 'Remove',
-                                style: TextStyle(color: colorScheme.error),
-                              ),
-                            ],
-                          ),
-                        ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Mastery Progress Bar (Prominent)
+                    _buildMasteryBar(context, masteryProgress, masteryPercent, colorScheme),
+                    
+                    const Spacer(),
+                    
+                    // Status Row (Overdue / Due Today)
+                    if (overdueCards > 0 || dueToday > 0) ...[
+                      const SizedBox(height: 12),
+                      _buildStatusRow(overdueCards, dueToday, isShared, l10n, colorScheme),
                     ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              // Badges Row
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _Badge(
-                    icon: Icons.style,
-                    label: '${widget.deckInfo.flashcardCount}',
-                    color: colorScheme.secondary,
-                    bgColor: colorScheme.secondaryContainer,
-                    textColor: colorScheme.onSecondaryContainer,
-                  ),
-                  if (isShared)
-                    _Badge(
-                      icon: Icons.people,
-                      label: l10n?.shared ?? 'Shared',
-                      color: colorScheme.tertiary,
-                      bgColor: colorScheme.tertiaryContainer,
-                      textColor: colorScheme.onTertiaryContainer,
-                    ),
-                  // Show cards due today (scheduled for today)
-                  if (_overdueStats != null && _overdueStats!.dueToday > 0)
-                    _Badge(
-                      icon: Icons.today_rounded,
-                      label: '${_overdueStats!.dueToday} today',
-                      color: colorScheme.primary,
-                      bgColor: colorScheme.primaryContainer,
-                      textColor: colorScheme.onPrimaryContainer,
-                    ),
-                  // Show overdue cards (past their review date)
-                  if (_overdueStats != null && _overdueStats!.overdueCards > 0)
-                    _Badge(
-                      icon: Icons.warning_amber_rounded,
-                      label: '${_overdueStats!.overdueCards} overdue',
-                      color: colorScheme.error,
-                      bgColor: colorScheme.errorContainer,
-                      textColor: colorScheme.onErrorContainer,
-                    ),
-                ],
-              ),
-
-              const Spacer(),
-              const Divider(height: 24),
-
-              // Bottom Row: Date & Action
-              Row(
-                children: [
-                  if (widget.deckInfo.lastSession != null)
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n?.lastSession ?? 'Last studied',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.outline,
-                              fontSize: 10,
-                            ),
-                          ),
-                          Text(
-                            _formatDate(widget.deckInfo.lastSession!),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Full-width Study Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: widget.onStudy,
+                        icon: const Icon(Icons.play_arrow, size: 20),
+                        label: Text(
+                          overdueCards > 0 
+                            ? '${l10n?.study ?? 'Study'} ($overdueCards overdue)'
+                            : dueToday > 0
+                              ? '${l10n?.study ?? 'Study'} ($dueToday today)'
+                              : l10n?.study ?? 'Study',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          backgroundColor: overdueCards > 0 
+                            ? colorScheme.error 
+                            : null,
+                          foregroundColor: overdueCards > 0 
+                            ? colorScheme.onError 
+                            : null,
+                        ),
                       ),
                     ),
-                  FilledButton.icon(
-                    onPressed: widget.onStudy,
-                    icon: const Icon(Icons.play_arrow, size: 18),
-                    label: Text(l10n?.study ?? 'Study'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ),
-                ],
+                    
+                    // Last studied (subtle footer)
+                    if (widget.deckInfo.lastSession != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '${l10n?.lastSession ?? 'Last studied'}: ${_formatDate(widget.deckInfo.lastSession!)}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.outline,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
+    );
+  }
+  
+  Color _getStatusColor(ColorScheme colorScheme) {
+    final overdueCards = _overdueStats?.overdueCards ?? 0;
+    final dueToday = _overdueStats?.dueToday ?? 0;
+    
+    if (overdueCards > 0) return Colors.red.shade400;
+    if (dueToday > 0) return Colors.orange;
+    if (_overdueStats != null && _overdueStats!.totalCards > 0) return Colors.green;
+    return colorScheme.outline;
+  }
+  
+  Widget _buildMenuButton(BuildContext context, bool isShared, AppLocalizations? l10n, ColorScheme colorScheme) {
+    return PopupMenuButton<String>(
+      icon: Icon(Icons.more_vert, color: colorScheme.onSurfaceVariant),
+      onSelected: (value) {
+        switch (value) {
+          case 'edit': widget.onEdit(); break;
+          case 'delete': widget.onDelete(); break;
+          case 'share': widget.onShare(); break;
+          case 'remove_shared': widget.onRemoveShared(); break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (!isShared) ...[
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(children: [
+              const Icon(Icons.edit, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n?.edit ?? 'Edit'),
+            ]),
+          ),
+          PopupMenuItem(
+            value: 'share',
+            child: Row(children: [
+              const Icon(Icons.share, size: 18),
+              const SizedBox(width: 8),
+              Text(l10n?.share ?? 'Share'),
+            ]),
+          ),
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(children: [
+              Icon(Icons.delete, size: 18, color: colorScheme.error),
+              const SizedBox(width: 8),
+              Text(l10n?.delete ?? 'Delete', style: TextStyle(color: colorScheme.error)),
+            ]),
+          ),
+        ] else
+          PopupMenuItem(
+            value: 'remove_shared',
+            child: Row(children: [
+              Icon(Icons.remove_circle, size: 18, color: colorScheme.error),
+              const SizedBox(width: 8),
+              Text(l10n?.removeFromLibrary ?? 'Remove', style: TextStyle(color: colorScheme.error)),
+            ]),
+          ),
+      ],
+    );
+  }
+  
+  Widget _buildMasteryBar(BuildContext context, double progress, int percent, ColorScheme colorScheme) {
+    final progressColor = percent >= 80 ? Colors.green : (percent >= 50 ? Colors.orange : colorScheme.primary);
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Mastery',
+              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+            ),
+            Text(
+              '$percent%',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: progressColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: colorScheme.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            minHeight: 6,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildStatusRow(int overdueCards, int dueToday, bool isShared, AppLocalizations? l10n, ColorScheme colorScheme) {
+    return Wrap(
+      spacing: 16,
+      runSpacing: 8,
+      children: [
+        if (overdueCards > 0)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red.shade400, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                '$overdueCards overdue',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.red.shade400,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        if (dueToday > 0)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.today_rounded, color: Colors.orange, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                '$dueToday today',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        if (isShared)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.people, color: colorScheme.tertiary, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                l10n?.shared ?? 'Shared',
+                style: TextStyle(fontSize: 12, color: colorScheme.tertiary),
+              ),
+            ],
+          ),
+      ],
     );
   }
 
@@ -956,6 +1040,71 @@ class _Badge extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ============================================================================
+// MASTERY PROGRESS LINE
+// ============================================================================
+
+class _MasteryProgressLine extends StatelessWidget {
+  final int studied;
+  final int total;
+
+  const _MasteryProgressLine({
+    required this.studied,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final progress = total > 0 ? (studied / total).clamp(0.0, 1.0) : 0.0;
+    final percentage = (progress * 100).toInt();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '$studied / $total mastered',
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              '$percentage%',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: _getProgressColor(progress, colorScheme),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: colorScheme.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _getProgressColor(progress, colorScheme),
+            ),
+            minHeight: 4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getProgressColor(double progress, ColorScheme colorScheme) {
+    if (progress >= 0.8) return Colors.green;
+    if (progress >= 0.5) return Colors.orange;
+    return colorScheme.primary;
   }
 }
 

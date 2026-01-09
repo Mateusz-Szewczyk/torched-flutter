@@ -2,6 +2,8 @@ import 'dart:ui'; // Required for BackdropFilter (if using anywhere locally)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:provider/provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/file_service.dart';
 import '../category_dropdown.dart';
@@ -64,6 +66,10 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
     setState(() {
       _files = [..._files, ...newFiles];
     });
+    // Refresh subscription stats (file quota)
+    if (mounted) {
+      context.read<SubscriptionProvider>().fetchStats();
+    }
     // If mobile, switch to files tab
     if (MediaQuery.of(context).size.width < 768) {
       _tabController.animateTo(1);
@@ -74,6 +80,10 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
     setState(() {
       _files = _files.where((f) => f.id != fileId).toList();
     });
+    // Refresh subscription stats (file quota)
+    if (mounted) {
+      context.read<SubscriptionProvider>().fetchStats();
+    }
   }
 
   @override
@@ -736,9 +746,13 @@ class _GlassFileItem extends StatelessWidget {
                 ],
               ),
             ),
-             IconButton(
-               icon: Icon(Icons.delete_outline, color: cs.error.withValues(alpha: 0.7)),
-               onPressed: onDelete,
+             Semantics(
+               label: 'Delete ${file.name}',
+               button: true,
+               child: IconButton(
+                 icon: Icon(Icons.delete_outline, color: cs.error.withValues(alpha: 0.7)),
+                 onPressed: onDelete,
+               ),
              ),
           ],
         ),

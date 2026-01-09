@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../config/constants.dart';
 import 'base_glass_dialog.dart';
+import '../common/glass_components.dart';
 
 /// Login/Register Dialog - Glassmorphism & Futuristic Minimalist Design
 /// Supports email/password auth and OAuth (Google, GitHub)
@@ -637,34 +638,35 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
             key: _loginFormKey,
             child: Column(
               children: [
-                _GlassTextField(
+                GhostTextField(
                   controller: _loginEmailController,
-                  label: 'Email',
+                  labelText: 'Email',
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: _validateEmail,
-                  colorScheme: colorScheme,
-                  isDark: isDark,
                 ),
                 const SizedBox(height: 14),
-                _GlassTextField(
+                GhostTextField(
                   controller: _loginPasswordController,
-                  label: 'Password',
+                  labelText: 'Password',
                   prefixIcon: Icons.lock_outline_rounded,
                   obscureText: _obscureLoginPassword,
-                  suffixIcon: _obscureLoginPassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  onSuffixTap: () => setState(
-                      () => _obscureLoginPassword = !_obscureLoginPassword),
+                  suffixIcon: GestureDetector(
+                    onTap: () => setState(
+                        () => _obscureLoginPassword = !_obscureLoginPassword),
+                    child: Icon(
+                      _obscureLoginPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 18,
+                    ),
+                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Password is required';
                     }
                     return null;
                   },
-                  colorScheme: colorScheme,
-                  isDark: isDark,
                 ),
                 const SizedBox(height: 24),
                 _buildPrimaryButton(
@@ -711,50 +713,56 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
             key: _registerFormKey,
             child: Column(
               children: [
-                _GlassTextField(
+                GhostTextField(
                   controller: _registerEmailController,
-                  label: 'Email',
+                  labelText: 'Email',
                   prefixIcon: Icons.email_outlined,
                   keyboardType: TextInputType.emailAddress,
                   validator: _validateEmail,
-                  colorScheme: colorScheme,
-                  isDark: isDark,
                 ),
                 const SizedBox(height: 14),
-                _GlassTextField(
+                GhostTextField(
                   controller: _registerPasswordController,
-                  label: 'Password',
+                  labelText: 'Password',
                   prefixIcon: Icons.lock_outline_rounded,
                   obscureText: _obscureRegisterPassword,
-                  suffixIcon: _obscureRegisterPassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  onSuffixTap: () => setState(() =>
-                      _obscureRegisterPassword = !_obscureRegisterPassword),
+                  suffixIcon: GestureDetector(
+                    onTap: () => setState(() =>
+                        _obscureRegisterPassword = !_obscureRegisterPassword),
+                    child: Icon(
+                      _obscureRegisterPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 18,
+                    ),
+                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Password is required';
                     }
                     return null;
                   },
-                  colorScheme: colorScheme,
-                  isDark: isDark,
                 ),
 
                 // Password strength indicator
                 _buildPasswordStrength(colorScheme, isDark),
 
                 const SizedBox(height: 14),
-                _GlassTextField(
+                GhostTextField(
                   controller: _confirmPasswordController,
-                  label: 'Confirm Password',
+                  labelText: 'Confirm Password',
                   prefixIcon: Icons.lock_outline_rounded,
                   obscureText: _obscureConfirmPassword,
-                  suffixIcon: _obscureConfirmPassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                  onSuffixTap: () => setState(() =>
-                      _obscureConfirmPassword = !_obscureConfirmPassword),
+                  suffixIcon: GestureDetector(
+                    onTap: () => setState(() =>
+                        _obscureConfirmPassword = !_obscureConfirmPassword),
+                    child: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      size: 18,
+                    ),
+                  ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please confirm password';
@@ -764,8 +772,6 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                     }
                     return null;
                   },
-                  colorScheme: colorScheme,
-                  isDark: isDark,
                 ),
                 const SizedBox(height: 24),
                 _buildPrimaryButton(
@@ -1092,14 +1098,12 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 28),
-            _GlassTextField(
+            GhostTextField(
               controller: _forgotEmailController,
-              label: 'Email',
+              labelText: 'Email',
               prefixIcon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
               validator: _validateEmail,
-              colorScheme: colorScheme,
-              isDark: isDark,
             ),
             const SizedBox(height: 24),
             _buildPrimaryButton(
@@ -1159,16 +1163,21 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 28),
-            _GlassTextField(
+            GhostTextField(
               controller: _resetPasswordController,
-              label: 'New Password',
+              labelText: 'New Password',
               prefixIcon: Icons.lock_outline_rounded,
               obscureText: _obscureResetPassword,
-              suffixIcon: _obscureResetPassword
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              onSuffixTap: () => setState(
-                  () => _obscureResetPassword = !_obscureResetPassword),
+              suffixIcon: GestureDetector(
+                onTap: () => setState(
+                    () => _obscureResetPassword = !_obscureResetPassword),
+                child: Icon(
+                  _obscureResetPassword
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 18,
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Password is required';
@@ -1178,20 +1187,23 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                 }
                 return null;
               },
-              colorScheme: colorScheme,
-              isDark: isDark,
             ),
             const SizedBox(height: 14),
-            _GlassTextField(
+            GhostTextField(
               controller: _resetConfirmController,
-              label: 'Confirm New Password',
+              labelText: 'Confirm New Password',
               prefixIcon: Icons.lock_outline_rounded,
               obscureText: _obscureResetConfirm,
-              suffixIcon: _obscureResetConfirm
-                  ? Icons.visibility_off_outlined
-                  : Icons.visibility_outlined,
-              onSuffixTap: () => setState(
-                  () => _obscureResetConfirm = !_obscureResetConfirm),
+              suffixIcon: GestureDetector(
+                onTap: () => setState(
+                    () => _obscureResetConfirm = !_obscureResetConfirm),
+                child: Icon(
+                  _obscureResetConfirm
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                  size: 18,
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please confirm password';
@@ -1201,8 +1213,6 @@ class _LoginRegisterDialogState extends State<LoginRegisterDialog>
                 }
                 return null;
               },
-              colorScheme: colorScheme,
-              isDark: isDark,
             ),
             const SizedBox(height: 24),
             _buildPrimaryButton(
@@ -1295,119 +1305,7 @@ class _GlassIconButtonState extends State<_GlassIconButton> {
   }
 }
 
-/// Glass-style Text Field
-class _GlassTextField extends StatefulWidget {
-  final TextEditingController controller;
-  final String label;
-  final IconData prefixIcon;
-  final IconData? suffixIcon;
-  final VoidCallback? onSuffixTap;
-  final bool obscureText;
-  final TextInputType? keyboardType;
-  final String? Function(String?)? validator;
-  final ColorScheme colorScheme;
-  final bool isDark;
 
-  const _GlassTextField({
-    required this.controller,
-    required this.label,
-    required this.prefixIcon,
-    this.suffixIcon,
-    this.onSuffixTap,
-    this.obscureText = false,
-    this.keyboardType,
-    this.validator,
-    required this.colorScheme,
-    required this.isDark,
-  });
-
-  @override
-  State<_GlassTextField> createState() => _GlassTextFieldState();
-}
-
-class _GlassTextFieldState extends State<_GlassTextField> {
-  bool _isFocused = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: _isFocused
-              ? widget.colorScheme.primary.withOpacity(0.6)
-              : (widget.isDark
-                  ? Colors.white.withOpacity(0.08)
-                  : Colors.black.withOpacity(0.08)),
-          width: _isFocused ? 1.5 : 1,
-        ),
-        boxShadow: _isFocused
-            ? [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 6,
-                  spreadRadius: 0,
-                ),
-              ]
-            : null,
-      ),
-      child: Focus(
-        onFocusChange: (focused) => setState(() => _isFocused = focused),
-        child: TextFormField(
-          controller: widget.controller,
-          obscureText: widget.obscureText,
-          keyboardType: widget.keyboardType,
-          validator: widget.validator,
-          style: TextStyle(
-            color: widget.colorScheme.onSurface,
-            fontSize: 14,
-          ),
-          decoration: InputDecoration(
-            labelText: widget.label,
-            labelStyle: TextStyle(
-              color: _isFocused
-                  ? widget.colorScheme.primary
-                  : widget.colorScheme.onSurfaceVariant,
-              fontSize: 13,
-              letterSpacing: 0.3,
-            ),
-            prefixIcon: Icon(
-              widget.prefixIcon,
-              size: 18,
-              color: _isFocused
-                  ? widget.colorScheme.primary
-                  : widget.colorScheme.onSurfaceVariant.withOpacity(0.7),
-            ),
-            suffixIcon: widget.suffixIcon != null
-                ? GestureDetector(
-                    onTap: widget.onSuffixTap,
-                    child: Icon(
-                      widget.suffixIcon,
-                      size: 18,
-                      color: widget.colorScheme.onSurfaceVariant.withOpacity(0.7),
-                    ),
-                  )
-                : null,
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
-            focusedErrorBorder: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
-            filled: true,
-            fillColor: widget.isDark
-                ? Colors.white.withOpacity(0.03)
-                : Colors.black.withOpacity(0.02),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// OAuth Button with Glass Style
 class _OAuthButton extends StatefulWidget {

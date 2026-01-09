@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../theme/dimens.dart';
 import '../services/dashboard_service.dart';
 import 'learning_calendar_widget.dart';
+import 'dashboard/mastery_overview_widget.dart';
 
 class DashboardWidget extends StatefulWidget {
   const DashboardWidget({super.key});
@@ -104,15 +106,57 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                                     _DashboardHeader(extendedSummary: extendedSummary),
                                     const SizedBox(height: 24),
 
-                                    // 2. Top Section: Goal (Left) + Actions (Right)
-                                    _TopSection(
-                                      flashcardsDone: extendedSummary.flashcardsToday,
-                                      flashcardsGoal: extendedSummary.cardsDueToday,
-                                      onFlashcardsTap: () => context.go('/flashcards'),
-                                      onTestsTap: () => context.go('/tests'),
-                                      isMobile: isMobile,
-                                    ),
-
+                                    // 2. Top Section: Goal (Left) + Mastery (Middle) + Actions (Right)
+                                    // On mobile, keep vertical stack. On desktop, use Row.
+                                    if (isMobile) ...[
+                                      _TopSection(
+                                        flashcardsDone: extendedSummary.flashcardsToday,
+                                        flashcardsGoal: extendedSummary.cardsDueToday,
+                                        onFlashcardsTap: () => context.go('/flashcards'),
+                                        onTestsTap: () => context.go('/tests'),
+                                        isMobile: true,
+                                      ),
+                                      if (_data?.flashcardMastery != null) ...[
+                                        const SizedBox(height: 24),
+                                        MasteryOverviewWidget(mastery: _data!.flashcardMastery!),
+                                      ],
+                                    ] else ...[
+                                      // Desktop/Tablet Layout: Goal | Mastery | Actions
+                                      IntrinsicHeight(
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                                          children: [
+                                            // Goal Section
+                                            Expanded(
+                                              flex: 3,
+                                              child: _DailyGoalCard(
+                                                done: extendedSummary.flashcardsToday,
+                                                goal: extendedSummary.cardsDueToday, // Using cards due as dynamic goal
+                                              ),
+                                            ),
+                                            if (_data?.flashcardMastery != null) ...[
+                                              const SizedBox(width: 24),
+                                              Expanded(
+                                                flex: 4,
+                                                child: MasteryOverviewWidget(mastery: _data!.flashcardMastery!),
+                                              ),
+                                            ],
+                                            const SizedBox(width: 24),
+                                            // Actions Section
+                                            Expanded(
+                                              flex: 3,
+                                              child: _ActionButtons(
+                                                onStudy: () => context.go('/flashcards'),
+                                                onExam: () => context.go('/tests'),
+                                                isMobile: false,
+                                                cardsDue: extendedSummary.cardsDueToday,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    
                                     const SizedBox(height: 24),
 
                                     // 3. Main Content: Exams (Left Sidebar) + Calendar (Main Stage)
@@ -184,25 +228,48 @@ class _DashboardHeader extends StatelessWidget {
           ),
         ),
         if (extendedSummary.studyStreak > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF332200),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.orange.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  '${extendedSummary.studyStreak} Days',
-                  style: const TextStyle(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
+          Tooltip(
+            message: 'Longest streak: ${extendedSummary.streakLongest} days',
+            child: Semantics(
+              label: 'Study streak. Current streak: ${extendedSummary.studyStreak} days. Best streak: ${extendedSummary.streakLongest} days.',
+              container: true,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF332200),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
                 ),
-              ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${extendedSummary.studyStreak} Days',
+                          style: const TextStyle(
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        if (extendedSummary.streakLongest > extendedSummary.studyStreak)
+                          Text(
+                            'Best: ${extendedSummary.streakLongest}',
+                            style: TextStyle(
+                              color: Colors.orange.withOpacity(0.7),
+                              fontSize: 10,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
       ],
@@ -242,6 +309,7 @@ class _TopSection extends StatelessWidget {
             onStudy: onFlashcardsTap,
             onExam: onTestsTap,
             isMobile: true,
+            cardsDue: flashcardsGoal,
           ),
         ],
       );
@@ -262,6 +330,7 @@ class _TopSection extends StatelessWidget {
               onStudy: onFlashcardsTap,
               onExam: onTestsTap,
               isMobile: false,
+              cardsDue: flashcardsGoal,
             ),
           ),
         ],
@@ -359,91 +428,296 @@ class _GoalCard extends StatelessWidget {
   }
 }
 
+class _DailyGoalCard extends StatelessWidget {
+  final int done;
+  final int goal;
+
+  const _DailyGoalCard({
+    required this.done,
+    required this.goal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    // Calculate progress for the ring
+    // Avoid division by zero, cap at 1.0 for the ring (or let it go over?)
+    final progress = goal > 0 ? (done / goal).clamp(0.0, 1.0) : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Daily Goal',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Icon(Icons.track_changes, color: colorScheme.primary, size: 20),
+            ],
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              // Progress Ring
+              SizedBox(
+                width: 64,
+                height: 64,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      backgroundColor: colorScheme.primary.withOpacity(0.1),
+                      color: colorScheme.primary,
+                      strokeWidth: 6,
+                      strokeCap: StrokeCap.round,
+                    ),
+                    Center(
+                      child: Text(
+                        '${(progress * 100).toInt()}%',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Stats
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.baseline,
+                      textBaseline: TextBaseline.alphabetic,
+                      children: [
+                        Text(
+                          '$done',
+                          style: theme.textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            height: 1.0,
+                          ),
+                        ),
+                        Text(
+                          '/$goal',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Cards reviewed',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+}
+
 class _ActionButtons extends StatelessWidget {
   final VoidCallback onStudy;
   final VoidCallback onExam;
   final bool isMobile;
+  final int cardsDue;
 
   const _ActionButtons({
     required this.onStudy,
     required this.onExam,
     required this.isMobile,
+    required this.cardsDue,
   });
 
   @override
   Widget build(BuildContext context) {
+    final studyCard = _buildStudyCard(context);
+    final examCard = _buildExamCard(context);
+
     if (isMobile) {
       return Row(
         children: [
-          Expanded(
-            child: SizedBox(
-              height: 56,
-              child: FilledButton.icon(
-                onPressed: onStudy,
-                icon: const Icon(Icons.style, size: 24),
-                label: const Text('Cards', style: TextStyle(fontSize: 16)),
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFFE0E0E0),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: SizedBox(
-              height: 56,
-              child: OutlinedButton(
-                onPressed: onExam,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E1E1E),
-                  foregroundColor: Colors.white,
-                  side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: const Text('Exams', style: TextStyle(fontSize: 16)),
-              ),
-            ),
-          ),
+          Expanded(child: SizedBox(height: 100, child: studyCard)),
+          const SizedBox(width: AppDimens.gapM),
+          Expanded(child: SizedBox(height: 100, child: examCard)),
         ],
       );
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: onStudy,
-              icon: const Icon(Icons.style, size: 28),
-              label: const Text('Study Flashcards', style: TextStyle(fontSize: 18)),
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFE0E0E0),
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: onExam,
-              style: OutlinedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E1E1E),
-                foregroundColor: Colors.white,
-                side: BorderSide.none,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: const Text('Take Exam', style: TextStyle(fontSize: 18)),
-            ),
-          ),
-        ),
+        Expanded(child: studyCard),
+        const SizedBox(height: AppDimens.gapM),
+        Expanded(child: examCard),
       ],
+    );
+  }
+
+  Widget _buildStudyCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final hasDue = cardsDue > 0;
+    
+    // Dynamic styling for Study Card
+    // Dynamic styling for Study Card (White/Neutral with Orange accent)
+    final bgColor = colorScheme.surfaceContainer;
+    final fgColor = hasDue ? colorScheme.primary : colorScheme.onSurface;
+    final subColor = colorScheme.onSurfaceVariant;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onStudy,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(24),
+            border: hasDue ? Border.all(color: colorScheme.primary, width: 2) : Border.all(color: colorScheme.outlineVariant),
+            // Add subtle shadow if urgent
+            boxShadow: hasDue ? [
+              BoxShadow(
+                color: colorScheme.primary.withOpacity(0.3),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              )
+            ] : null,
+          ),
+          child: Semantics(
+            label: hasDue ? 'Study Flashcards. $cardsDue cards due. Urgent.' : 'Study Flashcards',
+            button: true,
+            excludeSemantics: true,
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimens.paddingL),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Icon(
+                        hasDue ? Icons.access_time_filled : Icons.style,
+                        color: fgColor,
+                        size: 28,
+                      ),
+                      if (hasDue)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2), // Updated to withValues
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Urgent',
+                            style: TextStyle(
+                              color: fgColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    hasDue ? '$cardsDue Due' : 'Flashcards',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: fgColor,
+                      fontWeight: FontWeight.bold,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    hasDue ? 'Study Now' : 'Review Deck',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: subColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExamCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onExam,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Semantics(
+            label: 'Exams. Take or Create exams.',
+            button: true,
+            excludeSemantics: true,
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimens.paddingL),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment, color: colorScheme.onSurface, size: 28),
+                  const Spacer(),
+                  Text(
+                    'Exams',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Take or Create',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

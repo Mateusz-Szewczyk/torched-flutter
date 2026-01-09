@@ -100,19 +100,19 @@ class AppTheme {
   static const Color accentRed = Color(0xFFEF4444);     // red-500 (error)
 
   // ============================================================================
-  // ORANGE BRAND COLORS (Primary accent for TorchED)
+  // BRAND COLORS (Primary accent for TorchED) - Orange (Restored)
   // ============================================================================
-  static const Color brandOrange = Color(0xFFF97316);        // orange-500 - Main brand color
-  static const Color brandOrangeLight = Color(0xFFFB923C);   // orange-400 - Lighter variant
-  static const Color brandOrangeDark = Color(0xFFEA580C);    // orange-600 - Darker variant
-  static const Color brandOrangeSubtle = Color(0xFFFED7AA);  // orange-200 - Very light for backgrounds
-  static const Color brandOrangeMuted = Color(0xFFFFEDD5);   // orange-100 - Subtle background
-  static const Color brandOrangeDeep = Color(0xFFC2410C);    // orange-700 - Deep orange for dark mode
-  static const Color brandOrangeOnDark = Color(0xFFFDBA74);  // orange-300 - For dark mode text/icons
+  static const Color brandPrimary = Color(0xFFF97316);        // orange-500
+  static const Color brandPrimaryLight = Color(0xFFFB923C);   // orange-400
+  static const Color brandPrimaryDark = Color(0xFFEA580C);    // orange-600
+  static const Color brandPrimarySubtle = Color(0xFFFED7AA);  // orange-200
+  static const Color brandPrimaryMuted = Color(0xFFFFEDD5);   // orange-100
+  static const Color brandPrimaryDeep = Color(0xFFC2410C);    // orange-700
+  static const Color brandPrimaryOnDark = Color(0xFFFDBA74);  // orange-300
 
-  // Theme-specific orange variants
-  static const Color brandOrangeLightTheme = Color(0xFFEA580C);  // Darker orange for light mode (orange-600)
-  static const Color brandOrangeDarkTheme = Color(0xFFe66f32);  // Lighter orange for dark mode
+  // Theme-specific variants
+  static const Color brandLightTheme = Color(0xFFEA580C);  // orange-600
+  static const Color brandDarkTheme = Color(0xFFe66f32);   // orange-300 (dark mode safe)
 
   // ============================================================================
   // LIGHT THEME
@@ -132,10 +132,10 @@ class AppTheme {
       onSecondary: lightForeground,
       secondaryContainer: lightMuted,
       onSecondaryContainer: lightMutedForeground,
-      tertiary: brandOrangeLightTheme,
+      tertiary: brandLightTheme,
       onTertiary: Colors.white,
-      tertiaryContainer: brandOrangeMuted,
-      onTertiaryContainer: brandOrangeDeep,
+      tertiaryContainer: brandPrimaryMuted,
+      onTertiaryContainer: brandPrimaryDeep,
       error: lightDestructive,
       onError: Colors.white,
       surface: lightCard,
@@ -180,7 +180,7 @@ class AppTheme {
 
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: brandOrangeLightTheme,
+        backgroundColor: brandLightTheme,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -196,7 +196,7 @@ class AppTheme {
 
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: brandOrangeLightTheme,
+        backgroundColor: brandLightTheme,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
@@ -207,8 +207,8 @@ class AppTheme {
 
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: brandOrangeLightTheme,
-        side: BorderSide(color: brandOrangeLightTheme, width: 1.5),
+        foregroundColor: brandLightTheme,
+        side: BorderSide(color: brandLightTheme, width: 1.5),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -229,7 +229,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: brandOrangeLightTheme, width: 2),
+        borderSide: BorderSide(color: brandLightTheme, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -262,18 +262,18 @@ class AppTheme {
 
     chipTheme: ChipThemeData(
       backgroundColor: lightMuted,
-      selectedColor: brandOrangeLightTheme,
+      selectedColor: brandLightTheme,
       labelStyle: const TextStyle(color: lightForeground),
-      secondarySelectedColor: brandOrangeSubtle,
+      secondarySelectedColor: brandPrimarySubtle,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
     ),
 
     tabBarTheme: const TabBarThemeData(
-      labelColor: brandOrangeLightTheme,
+      labelColor: brandLightTheme,
       unselectedLabelColor: lightMutedForeground,
-      indicatorColor: brandOrangeLightTheme,
+      indicatorColor: brandLightTheme,
     ),
 
     snackBarTheme: SnackBarThemeData(
@@ -287,7 +287,7 @@ class AppTheme {
 
     // Light theme floating action button
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: brandOrangeLightTheme,
+      backgroundColor: brandLightTheme,
       foregroundColor: Colors.white,
       elevation: 4,
       shape: CircleBorder(),
@@ -295,27 +295,27 @@ class AppTheme {
 
     // Light theme progress indicator
     progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: brandOrangeLightTheme,
-      linearTrackColor: brandOrangeMuted,
-      circularTrackColor: brandOrangeMuted,
+      color: brandLightTheme,
+      linearTrackColor: brandPrimaryMuted,
+      circularTrackColor: brandPrimaryMuted,
     ),
 
     // Light theme slider
     sliderTheme: SliderThemeData(
-      activeTrackColor: brandOrangeLightTheme,
-      inactiveTrackColor: brandOrangeSubtle,
-      thumbColor: brandOrangeLightTheme,
-      overlayColor: brandOrangeLightTheme.withValues(alpha: 0.2),
+      activeTrackColor: brandLightTheme,
+      inactiveTrackColor: brandPrimarySubtle,
+      thumbColor: brandLightTheme,
+      overlayColor: brandLightTheme.withValues(alpha: 0.2),
     ),
 
     // Light theme switch
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeLightTheme;
+        if (states.contains(WidgetState.selected)) return brandLightTheme;
         return lightMutedForeground;
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeSubtle;
+        if (states.contains(WidgetState.selected)) return brandPrimarySubtle;
         return lightMuted;
       }),
     ),
@@ -323,7 +323,7 @@ class AppTheme {
     // Light theme checkbox
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeLightTheme;
+        if (states.contains(WidgetState.selected)) return brandLightTheme;
         return Colors.transparent;
       }),
       checkColor: WidgetStateProperty.all(Colors.white),
@@ -333,14 +333,14 @@ class AppTheme {
     // Light theme radio
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeLightTheme;
+        if (states.contains(WidgetState.selected)) return brandLightTheme;
         return lightMutedForeground;
       }),
     ),
 
     // Light theme badge
     badgeTheme: const BadgeThemeData(
-      backgroundColor: brandOrangeLightTheme,
+      backgroundColor: brandLightTheme,
       textColor: Colors.white,
     ),
   );
@@ -363,10 +363,10 @@ class AppTheme {
       onSecondary: darkForeground,
       secondaryContainer: darkMuted,
       onSecondaryContainer: darkMutedForeground,
-      tertiary: brandOrangeDarkTheme,
+      tertiary: brandDarkTheme,
       onTertiary: Colors.white,
-      tertiaryContainer: brandOrangeDeep,
-      onTertiaryContainer: brandOrangeOnDark,
+      tertiaryContainer: brandPrimaryDeep,
+      onTertiaryContainer: brandPrimaryOnDark,
       error: darkDestructive,
       onError: darkDestructiveForeground,
       surface: darkCard,
@@ -411,7 +411,7 @@ class AppTheme {
 
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: brandOrangeDarkTheme,
+        backgroundColor: brandDarkTheme,
         foregroundColor: Colors.black,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -423,7 +423,7 @@ class AppTheme {
 
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: brandOrangeDarkTheme,
+        backgroundColor: brandDarkTheme,
         foregroundColor: Colors.black,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
@@ -434,8 +434,8 @@ class AppTheme {
 
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: brandOrangeDarkTheme,
-        side: const BorderSide(color: brandOrangeDarkTheme, width: 1.5),
+        foregroundColor: brandDarkTheme,
+        side: const BorderSide(color: brandDarkTheme, width: 1.5),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
@@ -456,7 +456,7 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: brandOrangeDarkTheme, width: 2),
+        borderSide: const BorderSide(color: brandDarkTheme, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -489,18 +489,18 @@ class AppTheme {
 
     chipTheme: ChipThemeData(
       backgroundColor: darkMuted,
-      selectedColor: brandOrangeDarkTheme,
+      selectedColor: brandDarkTheme,
       labelStyle: TextStyle(color: darkForeground),
-      secondarySelectedColor: brandOrangeDeep,
+      secondarySelectedColor: brandPrimaryDeep,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
       ),
     ),
 
     tabBarTheme: const TabBarThemeData(
-      labelColor: brandOrangeDarkTheme,
+      labelColor: brandDarkTheme,
       unselectedLabelColor: darkMutedForeground,
-      indicatorColor: brandOrangeDarkTheme,
+      indicatorColor: brandDarkTheme,
     ),
 
     snackBarTheme: SnackBarThemeData(
@@ -550,7 +550,7 @@ class AppTheme {
 
     // Dark theme floating action button
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: brandOrangeDarkTheme,
+      backgroundColor: brandDarkTheme,
       foregroundColor: Colors.black,
       elevation: 4,
       shape: CircleBorder(),
@@ -558,27 +558,27 @@ class AppTheme {
 
     // Dark theme progress indicator
     progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: brandOrangeDarkTheme,
-      linearTrackColor: brandOrangeDeep,
-      circularTrackColor: brandOrangeDeep,
+      color: brandDarkTheme,
+      linearTrackColor: brandPrimaryDeep,
+      circularTrackColor: brandPrimaryDeep,
     ),
 
     // Dark theme slider
     sliderTheme: SliderThemeData(
-      activeTrackColor: brandOrangeDarkTheme,
-      inactiveTrackColor: brandOrangeDeep,
-      thumbColor: brandOrangeDarkTheme,
-      overlayColor: brandOrangeDarkTheme.withValues(alpha: 0.2),
+      activeTrackColor: brandDarkTheme,
+      inactiveTrackColor: brandPrimaryDeep,
+      thumbColor: brandDarkTheme,
+      overlayColor: brandDarkTheme.withValues(alpha: 0.2),
     ),
 
     // Dark theme switch
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeDarkTheme;
+        if (states.contains(WidgetState.selected)) return brandDarkTheme;
         return darkMutedForeground;
       }),
       trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeDeep;
+        if (states.contains(WidgetState.selected)) return brandPrimaryDeep;
         return darkMuted;
       }),
     ),
@@ -586,7 +586,7 @@ class AppTheme {
     // Dark theme checkbox
     checkboxTheme: CheckboxThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeDarkTheme;
+        if (states.contains(WidgetState.selected)) return brandDarkTheme;
         return Colors.transparent;
       }),
       checkColor: WidgetStateProperty.all(Colors.black),
@@ -596,14 +596,14 @@ class AppTheme {
     // Dark theme radio
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) return brandOrangeDarkTheme;
+        if (states.contains(WidgetState.selected)) return brandDarkTheme;
         return darkMutedForeground;
       }),
     ),
 
     // Dark theme badge
     badgeTheme: const BadgeThemeData(
-      backgroundColor: brandOrangeDarkTheme,
+      backgroundColor: brandDarkTheme,
       textColor: Colors.black,
     ),
   );

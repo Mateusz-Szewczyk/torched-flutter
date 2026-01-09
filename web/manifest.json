@@ -1,6 +1,6 @@
 {
-    "name": "torch_ed_flutter",
-    "short_name": "torch_ed_flutter",
+    "name": "torch_ed",
+    "short_name": "torch_ed",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
