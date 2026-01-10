@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../theme/dimens.dart';
 import '../services/dashboard_service.dart';
 import 'learning_calendar_widget.dart';
-import 'dashboard/mastery_overview_widget.dart';
 
 class DashboardWidget extends StatefulWidget {
   const DashboardWidget({super.key});
@@ -70,9 +69,11 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     final extendedSummary = _data!.getExtendedSummary();
     final recentExams = _getRecentExams();
 
-    // Increased max width for a more expansive "Dashboard" feel
-    final maxContentWidth = isDesktop ? 1400.0 : double.infinity;
-    final horizontalPadding = isDesktop ? 40.0 : (isTablet ? 24.0 : 16.0);
+    // Layout Constants from AppDimens
+    final maxContentWidth = AppDimens.maxContentWidth;
+    final horizontalPadding = isDesktop 
+        ? AppDimens.screenPaddingDesktop 
+        : (isTablet ? AppDimens.screenPaddingTablet : AppDimens.screenPaddingMobile);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -95,7 +96,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                             child: SingleChildScrollView(
                               padding: EdgeInsets.symmetric(
                                 horizontal: horizontalPadding,
-                                vertical: isMobile ? 16.0 : 32.0,
+                                vertical: isMobile ? AppDimens.paddingXL : AppDimens.paddingXXL,
                               ),
                               child: ConstrainedBox(
                                 constraints: BoxConstraints(maxWidth: maxContentWidth),
@@ -104,60 +105,18 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                                   children: [
                                     // 1. Header
                                     _DashboardHeader(extendedSummary: extendedSummary),
-                                    const SizedBox(height: 24),
+                                    const SizedBox(height: AppDimens.gapXL),
 
-                                    // 2. Top Section: Goal (Left) + Mastery (Middle) + Actions (Right)
-                                    // On mobile, keep vertical stack. On desktop, use Row.
-                                    if (isMobile) ...[
-                                      _TopSection(
-                                        flashcardsDone: extendedSummary.flashcardsToday,
-                                        flashcardsGoal: extendedSummary.cardsDueToday,
-                                        onFlashcardsTap: () => context.go('/flashcards'),
-                                        onTestsTap: () => context.go('/tests'),
-                                        isMobile: true,
-                                      ),
-                                      if (_data?.flashcardMastery != null) ...[
-                                        const SizedBox(height: 24),
-                                        MasteryOverviewWidget(mastery: _data!.flashcardMastery!),
-                                      ],
-                                    ] else ...[
-                                      // Desktop/Tablet Layout: Goal | Mastery | Actions
-                                      IntrinsicHeight(
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                                          children: [
-                                            // Goal Section
-                                            Expanded(
-                                              flex: 3,
-                                              child: _DailyGoalCard(
-                                                done: extendedSummary.flashcardsToday,
-                                                goal: extendedSummary.cardsDueToday, // Using cards due as dynamic goal
-                                              ),
-                                            ),
-                                            if (_data?.flashcardMastery != null) ...[
-                                              const SizedBox(width: 24),
-                                              Expanded(
-                                                flex: 4,
-                                                child: MasteryOverviewWidget(mastery: _data!.flashcardMastery!),
-                                              ),
-                                            ],
-                                            const SizedBox(width: 24),
-                                            // Actions Section
-                                            Expanded(
-                                              flex: 3,
-                                              child: _ActionButtons(
-                                                onStudy: () => context.go('/flashcards'),
-                                                onExam: () => context.go('/tests'),
-                                                isMobile: false,
-                                                cardsDue: extendedSummary.cardsDueToday,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                    // 2. Top Section: Goal & Actions
+                                    _TopSection(
+                                      flashcardsDone: extendedSummary.flashcardsToday,
+                                      flashcardsGoal: extendedSummary.cardsDueToday,
+                                      onFlashcardsTap: () => context.go('/flashcards'),
+                                      onTestsTap: () => context.go('/tests'),
+                                      isMobile: isMobile,
+                                    ),
                                     
-                                    const SizedBox(height: 24),
+                                    const SizedBox(height: AppDimens.gapXL),
 
                                     // 3. Main Content: Exams (Left Sidebar) + Calendar (Main Stage)
                                     _MainContentSection(
@@ -167,7 +126,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                                       isTablet: isTablet,
                                     ),
 
-                                    const SizedBox(height: 40),
+                                    const SizedBox(height: AppDimens.sectionGap),
                                   ],
                                 ),
                               ),
@@ -234,17 +193,20 @@ class _DashboardHeader extends StatelessWidget {
               label: 'Study streak. Current streak: ${extendedSummary.studyStreak} days. Best streak: ${extendedSummary.streakLongest} days.',
               container: true,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.paddingL, 
+                  vertical: AppDimens.paddingS,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF332200),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(AppDimens.radiusXL),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.local_fire_department, color: Colors.orange, size: AppDimens.iconM),
+                    const SizedBox(width: AppDimens.gapS),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
@@ -261,7 +223,7 @@ class _DashboardHeader extends StatelessWidget {
                           Text(
                             'Best: ${extendedSummary.streakLongest}',
                             style: TextStyle(
-                              color: Colors.orange.withOpacity(0.7),
+                              color: Colors.orange.withValues(alpha: 0.7),
                               fontSize: 10,
                             ),
                           ),
@@ -301,10 +263,10 @@ class _TopSection extends StatelessWidget {
       return Column(
         children: [
           SizedBox(
-            height: 140,
-            child: _GoalCard(done: flashcardsDone, goal: flashcardsGoal)
+            height: 160,
+            child: _DailyGoalCard(done: flashcardsDone, goal: flashcardsGoal)
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppDimens.gapM),
           _ActionButtons(
             onStudy: onFlashcardsTap,
             onExam: onTestsTap,
@@ -320,12 +282,12 @@ class _TopSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            flex: 2,
-            child: _GoalCard(done: flashcardsDone, goal: flashcardsGoal),
+            flex: 5,
+            child: _DailyGoalCard(done: flashcardsDone, goal: flashcardsGoal),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: AppDimens.gapXL),
           Expanded(
-            flex: 3,
+            flex: 4,
             child: _ActionButtons(
               onStudy: onFlashcardsTap,
               onExam: onTestsTap,
@@ -339,94 +301,7 @@ class _TopSection extends StatelessWidget {
   }
 }
 
-class _GoalCard extends StatelessWidget {
-  final int done;
-  final int goal;
 
-  const _GoalCard({required this.done, required this.goal});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final progress = (done / goal).clamp(0.0, 1.0);
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 80,
-            height: 80,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: 1.0,
-                  color: colorScheme.onSurface.withOpacity(0.1),
-                  strokeWidth: 8,
-                ),
-                CircularProgressIndicator(
-                  value: progress,
-                  color: Colors.green,
-                  strokeWidth: 8,
-                  strokeCap: StrokeCap.round,
-                ),
-                if (done >= goal)
-                  const Icon(Icons.check, color: Colors.green, size: 32),
-              ],
-            ),
-          ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Daily Goal',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$done',
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        height: 1.0,
-                      ),
-                    ),
-                    Text(
-                      ' / $goal',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.6),
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  'Cards Reviewed',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _DailyGoalCard extends StatelessWidget {
   final int done;
@@ -447,10 +322,10 @@ class _DailyGoalCard extends StatelessWidget {
     final progress = goal > 0 ? (done / goal).clamp(0.0, 1.0) : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppDimens.paddingXL),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
@@ -465,7 +340,7 @@ class _DailyGoalCard extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Icon(Icons.track_changes, color: colorScheme.primary, size: 20),
+              Icon(Icons.track_changes, color: colorScheme.primary, size: AppDimens.iconM),
             ],
           ),
           const Spacer(),
@@ -480,7 +355,7 @@ class _DailyGoalCard extends StatelessWidget {
                   children: [
                     CircularProgressIndicator(
                       value: progress,
-                      backgroundColor: colorScheme.primary.withOpacity(0.1),
+                      backgroundColor: colorScheme.primary.withValues(alpha: 0.1),
                       color: colorScheme.primary,
                       strokeWidth: 6,
                       strokeCap: StrokeCap.round,
@@ -497,7 +372,7 @@ class _DailyGoalCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppDimens.gapL),
               // Stats
               Expanded(
                 child: Column(
@@ -594,16 +469,16 @@ class _ActionButtons extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onStudy,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
         child: Ink(
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
             border: hasDue ? Border.all(color: colorScheme.primary, width: 2) : Border.all(color: colorScheme.outlineVariant),
             // Add subtle shadow if urgent
             boxShadow: hasDue ? [
               BoxShadow(
-                color: colorScheme.primary.withOpacity(0.3),
+                color: colorScheme.primary.withValues(alpha: 0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               )
@@ -625,14 +500,14 @@ class _ActionButtons extends StatelessWidget {
                       Icon(
                         hasDue ? Icons.access_time_filled : Icons.style,
                         color: fgColor,
-                        size: 28,
+                        size: AppDimens.iconL,
                       ),
                       if (hasDue)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.2), // Updated to withValues
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppDimens.radiusM),
                           ),
                           child: Text(
                             'Urgent',
@@ -654,7 +529,7 @@ class _ActionButtons extends StatelessWidget {
                       height: 1.1,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppDimens.gapXS),
                   Text(
                     hasDue ? 'Study Now' : 'Review Deck',
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -678,11 +553,11 @@ class _ActionButtons extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onExam,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
         child: Ink(
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainer,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
             border: Border.all(color: colorScheme.outlineVariant),
           ),
           child: Semantics(
@@ -695,7 +570,7 @@ class _ActionButtons extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.assignment, color: colorScheme.onSurface, size: 28),
+                  Icon(Icons.assignment, color: colorScheme.onSurface, size: AppDimens.iconL),
                   const Spacer(),
                   Text(
                     'Exams',
@@ -705,7 +580,7 @@ class _ActionButtons extends StatelessWidget {
                       height: 1.1,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppDimens.gapXS),
                   Text(
                     'Take or Create',
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -744,7 +619,7 @@ class _MainContentSection extends StatelessWidget {
       return Column(
         children: [
           _CalendarContainer(lastRefreshTime: lastRefreshTime, minHeight: 400),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppDimens.gapXL),
           _RecentExamsList(exams: recentExams),
         ],
       );
@@ -757,7 +632,7 @@ class _MainContentSection extends StatelessWidget {
           width: isTablet ? 220 : 280,
           child: _RecentExamsList(exams: recentExams),
         ),
-        const SizedBox(width: 24),
+        const SizedBox(width: AppDimens.gapXL),
         Expanded(
           child: _CalendarContainer(
             lastRefreshTime: lastRefreshTime,
@@ -803,10 +678,10 @@ class _RecentExamsList extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppDimens.paddingXL),
       decoration: BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppDimens.radiusL),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,10 +690,10 @@ class _RecentExamsList extends StatelessWidget {
             'Exams',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface.withOpacity(0.7),
+              color: colorScheme.onSurface.withValues(alpha: 0.7),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppDimens.gapL),
           if (exams.isEmpty)
             Text('No exams yet', style: theme.textTheme.bodyMedium)
           else
@@ -826,7 +701,7 @@ class _RecentExamsList extends StatelessWidget {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: exams.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 20),
+              separatorBuilder: (_, __) => const SizedBox(height: AppDimens.gapXL),
               itemBuilder: (context, index) {
                 final exam = exams[index];
                 final score = exam['score'] as int;
@@ -841,8 +716,8 @@ class _RecentExamsList extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.circle, size: 8, color: statusColor),
-                        const SizedBox(width: 8),
+                        Icon(Icons.circle, size: AppDimens.paddingS, color: statusColor),
+                        const SizedBox(width: AppDimens.gapS),
                         Text(
                           '$score%',
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -852,18 +727,18 @@ class _RecentExamsList extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppDimens.gapXS),
                     Text(
                       DateFormat('MMM d').format(date),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.5),
+                        color: colorScheme.onSurface.withValues(alpha: 0.5),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: AppDimens.gapXS / 2),
                     Text(
                       exam['name'],
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurface.withOpacity(0.8),
+                        color: colorScheme.onSurface.withValues(alpha: 0.8),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

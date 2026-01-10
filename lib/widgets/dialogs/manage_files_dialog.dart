@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/file_service.dart';
+import '../../theme/dimens.dart';
 import '../category_dropdown.dart';
 import '../common/glass_components.dart';
 import 'base_glass_dialog.dart';
@@ -140,7 +141,7 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
             labelColor: cs.onPrimaryContainer,
             unselectedLabelColor: cs.onSurfaceVariant,
             labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(AppDimens.paddingXS),
             tabs: const [
               Tab(text: 'Upload'),
               Tab(text: 'Files'),
@@ -333,7 +334,7 @@ class _UploadFormState extends State<_UploadForm> {
               shadowColor: cs.primary.withValues(alpha: 0.5),
               elevation: 8,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+                  borderRadius: BorderRadius.circular(AppDimens.radiusL)),
             ),
             child: _isUploading
                 ? Row(
@@ -390,7 +391,7 @@ class _UploadFormState extends State<_UploadForm> {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.06), blurRadius: 8),
+                    color: Colors.black.withValues(alpha: 0.06), blurRadius: 8),
               ],
             ),
             child: Icon(Icons.add_rounded, size: 32, color: cs.primary),
@@ -680,7 +681,7 @@ class _GlassFileItem extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
           gradient: LinearGradient(
               colors: [cs.error.withValues(alpha: 0.5), cs.error]),
         ),
@@ -723,7 +724,7 @@ class _GlassFileItem extends StatelessWidget {
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: cs.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(AppDimens.radiusXS),
                           border:
                               Border.all(color: cs.primary.withValues(alpha: 0.2)),
                         ),

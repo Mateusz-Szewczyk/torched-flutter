@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/flashcards_provider.dart';
 import '../models/models.dart';
+import '../theme/dimens.dart';
 
 /// Learning Calendar Widget - GitHub-style contribution graph
 /// Shows study history and scheduled flashcard reviews
@@ -58,8 +59,43 @@ class _CalendarCell extends StatefulWidget {
   State<_CalendarCell> createState() => _CalendarCellState();
 }
 
-class _CalendarCellState extends State<_CalendarCell> {
+class _CalendarCellState extends State<_CalendarCell> with SingleTickerProviderStateMixin {
   bool _isHovered = false;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pulse animation for "today" indicator
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.8).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    if (widget.isToday) {
+      _pulseController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _CalendarCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isToday && !_pulseController.isAnimating) {
+      _pulseController.repeat(reverse: true);
+    } else if (!widget.isToday && _pulseController.isAnimating) {
+      _pulseController.stop();
+      _pulseController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,73 +111,83 @@ class _CalendarCellState extends State<_CalendarCell> {
       onExit: (_) => setState(() => _isHovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          width: widget.cellSize,
-          height: widget.cellSize,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(2),
-            border: widget.isToday
-                ? Border.all(
-                    color: widget.colorScheme.primary,
-                    width: 1.5,
-                  )
-                : _isHovered
+        child: AnimatedBuilder(
+          animation: _pulseAnimation,
+          builder: (context, child) {
+            return Container(
+              width: widget.cellSize,
+              height: widget.cellSize,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(3),
+                border: widget.isToday
                     ? Border.all(
-                        color: widget.colorScheme.onSurface.withOpacity(0.3),
-                        width: 1,
+                        color: widget.colorScheme.primary,
+                        width: _pulseAnimation.value,
                       )
+                    : _isHovered
+                        ? Border.all(
+                            color: widget.colorScheme.onSurface.withValues(alpha: 0.3),
+                            width: 1,
+                          )
+                        : null,
+                boxShadow: widget.isToday
+                    ? [
+                        BoxShadow(
+                          color: widget.colorScheme.primary.withValues(alpha: 0.3 * (2 - _pulseAnimation.value)),
+                          blurRadius: 4 * _pulseAnimation.value,
+                          spreadRadius: 0,
+                        ),
+                      ]
                     : null,
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(2),
-            child: Stack(
-              children: [
-                // Base background (or split background)
-                if (widget.isSplit && widget.splitColor != null)
-                  Row(
-                    children: [
-                      // Left half (Primary color - usually history/completed)
-                      Expanded(
-                        child: Container(
-                          color: _isHovered
-                              ? Color.lerp(widget.backgroundColor, Colors.white, 0.15)
-                              : widget.backgroundColor,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: Stack(
+                  children: [
+                    // Diagonal gradient for split states (premium look)
+                    if (widget.isSplit && widget.splitColor != null)
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _isHovered
+                                  ? Color.lerp(widget.backgroundColor, Colors.white, 0.15)!
+                                  : widget.backgroundColor,
+                              _isHovered
+                                  ? Color.lerp(widget.splitColor!, Colors.white, 0.15)!
+                                  : widget.splitColor!,
+                            ],
+                            stops: const [0.45, 0.55],
+                          ),
                         ),
+                      )
+                    else
+                      Container(
+                        color: _isHovered
+                            ? Color.lerp(widget.backgroundColor, Colors.white, 0.15)
+                            : widget.backgroundColor,
                       ),
-                      // Right half (Secondary color - usually overdue/scheduled)
-                      Expanded(
-                        child: Container(
-                          color: _isHovered
-                              ? Color.lerp(widget.splitColor!, Colors.white, 0.15)
-                              : widget.splitColor,
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  Container(
-                    color: _isHovered
-                        ? Color.lerp(widget.backgroundColor, Colors.white, 0.15)
-                        : widget.backgroundColor,
-                  ),
 
-                // Day number on top
-                if (widget.dayNumber != null)
-                  Center(
-                    child: Text(
-                      '${widget.dayNumber}',
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w600,
-                        color: textColor,
-                        height: 1,
+                    // Day number on top
+                    if (widget.dayNumber != null)
+                      Center(
+                        child: Text(
+                          '${widget.dayNumber}',
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                            height: 1,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -153,11 +199,11 @@ class _CalendarCellState extends State<_CalendarCell> {
         preferBelow: true,
         decoration: BoxDecoration(
           color: widget.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(AppDimens.radiusS),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 8,
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: AppDimens.paddingS,
               offset: const Offset(0, 2),
             ),
           ],
@@ -173,6 +219,7 @@ class _CalendarCellState extends State<_CalendarCell> {
     return cellWidget;
   }
 }
+
 
 class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   final DashboardService _dashboardService = DashboardService();
@@ -269,17 +316,17 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         constraints: maxCalendarWidth != null
             ? BoxConstraints(maxWidth: maxCalendarWidth)
             : null,
-        margin: EdgeInsets.symmetric(
-          horizontal: isMobile ? 0 : (isDesktop ? 0 : 8),
-          vertical: 8,
+        margin: const EdgeInsets.symmetric(
+          horizontal: 0,
+          vertical: AppDimens.gapS,
         ),
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppDimens.radiusS),
           border: widget.expandToFill
               ? null
               : Border.all(
-                  color: colorScheme.outlineVariant.withOpacity(0.4),
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
         ),
         child: Column(
@@ -313,7 +360,10 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     final iconSize = widget.largeNavigationButtons ? 32.0 : 24.0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.paddingL, 
+        vertical: AppDimens.paddingS,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -370,10 +420,10 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     final showNavButtons = !widget.sideNavigationButtons || !isDesktop;
 
     return Container(
-      padding: EdgeInsets.all(isMobile ? 12 : (isDesktop ? 12 : 16)),
+      padding: EdgeInsets.all(isMobile ? AppDimens.paddingM : (isDesktop ? AppDimens.paddingM : AppDimens.paddingL)),
       decoration: const BoxDecoration(
         color: Colors.transparent,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppDimens.radiusS)),
       ),
       child: Column(
         children: [
@@ -407,7 +457,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               children: [
                 _buildNavButton(Icons.chevron_left, _previousMonth, colorScheme, isDesktop: isDesktop),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isDesktop ? 16 : 0),
+                  padding: EdgeInsets.symmetric(horizontal: isDesktop ? AppDimens.paddingL : 0),
                   child: Column(
                     children: [
                       Text(
@@ -470,17 +520,17 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppDimens.radiusM),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppDimens.radiusM),
         child: Container(
           width: buttonSize,
           height: buttonSize,
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerHighest,
             border: Border.all(color: colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppDimens.radiusM),
           ),
           child: Icon(icon, size: iconSize, color: colorScheme.onSurface),
         ),
@@ -519,7 +569,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
   Widget _buildErrorState(ColorScheme colorScheme) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppDimens.paddingXL),
       alignment: Alignment.center,
       child: Text('Error loading data', style: TextStyle(color: colorScheme.error)),
     );
@@ -557,7 +607,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     if (widget.expandToFill) {
       return LayoutBuilder(
         builder: (context, constraints) {
-          final availableWidth = constraints.maxWidth - 32;
+          final availableWidth = constraints.maxWidth - AppDimens.paddingXXL;
           final calculatedCellSize = (availableWidth - (cellSpacing * 6)) / 7;
           final cellSize = calculatedCellSize.clamp(16.0, 70.0);
           final totalGridWidth = (cellSize * 7) + (cellSpacing * 6);
@@ -625,10 +675,13 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   ) {
     return Center(
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 12, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: isMobile ? AppDimens.paddingS : AppDimens.paddingM, 
+          vertical: AppDimens.paddingS,
+        ),
         constraints: widget.expandToFill
             ? null
-            : BoxConstraints(maxWidth: totalGridWidth + 32),
+            : BoxConstraints(maxWidth: totalGridWidth + AppDimens.paddingXXL),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -648,7 +701,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
                       style: TextStyle(
                         fontSize: isDesktop && !widget.expandToFill ? 8 : (cellSize * 0.35).clamp(8.0, 12.0),
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -709,7 +762,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               height: cellSize,
               margin: EdgeInsets.only(right: isLast ? 0 : cellSpacing),
               decoration: BoxDecoration(
-                color: emptyColor.withOpacity(0.3),
+                color: emptyColor.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -853,7 +906,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               height: cellSize,
               margin: EdgeInsets.only(right: isLast ? 0 : cellSpacing),
               decoration: BoxDecoration(
-                color: emptyColor.withOpacity(0.3),
+                color: emptyColor.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -992,150 +1045,194 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     bool isToday,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 600;
 
     final hasOverdue = overdueDay != null && overdueDay.count > 0;
     final hasScheduled = scheduledDay != null && scheduledDay.count > 0;
     final hasHistory = historyDay != null && historyDay.count > 0;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: isMobile ? 0.5 : 0.4,
-        minChildSize: 0.3,
-        maxChildSize: 0.7,
-        expand: false,
-        builder: (context, scrollController) => Padding(
-          padding: EdgeInsets.all(isMobile ? 16 : 20),
-          child: ListView(
-            controller: scrollController,
+    // Build the content widget (shared between dialog and sheet)
+    Widget buildContent() {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row
+          Row(
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: hasOverdue
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : (isPast
+                          ? const Color(0xFF216E39).withValues(alpha: 0.1)
+                          : Colors.blue.withValues(alpha: 0.1)),
+                  borderRadius: BorderRadius.circular(AppDimens.radiusM),
+                ),
+                child: Icon(
+                  hasOverdue
+                      ? Icons.warning_amber_rounded
+                      : (isPast ? Icons.history : (isToday ? Icons.today : Icons.event)),
+                  color: hasOverdue
+                      ? Colors.red.shade700
+                      : (isPast ? const Color(0xFF216E39) : Colors.blue),
+                  size: 24,
                 ),
               ),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: hasOverdue
-                          ? Colors.red.withOpacity(0.1)
-                          : (isPast
-                              ? const Color(0xFF216E39).withOpacity(0.1)
-                              : Colors.blue.withOpacity(0.1)),
-                      borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: AppDimens.gapM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatDisplayDate(dateString),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                    child: Icon(
-                      hasOverdue
-                          ? Icons.warning_amber_rounded
-                          : (isPast ? Icons.history : (isToday ? Icons.today : Icons.event)),
-                      color: hasOverdue
-                          ? Colors.red.shade700
-                          : (isPast ? const Color(0xFF216E39) : Colors.blue),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _formatDisplayDate(dateString),
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        if (isToday)
-                          Text(
-                            'Today',
-                            style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.w500),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
+                    if (isToday)
+                      Text(
+                        'Today',
+                        style: TextStyle(fontSize: 12, color: colorScheme.primary, fontWeight: FontWeight.w500),
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 20),
-
-              // Completed Section
-              if (hasHistory) ...[
-                _buildDetailSection(
-                  context,
-                  'Studied',
-                  '${historyDay!.count}',
-                  Icons.check_circle,
-                  const Color(0xFF216E39),
-                ),
-                const SizedBox(height: 8),
-                ...historyDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, false)),
-                const SizedBox(height: 16),
-              ],
-
-              // Overdue Section (Only shows if Today)
-              if (isToday && hasOverdue) ...[
-                _buildDetailSection(
-                  context,
-                  'Overdue',
-                  '${overdueDay!.count}',
-                  Icons.warning_amber_rounded,
-                  Colors.red.shade700,
-                ),
-                const SizedBox(height: 8),
-                ...overdueDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, true)),
-                const SizedBox(height: 16),
-              ],
-
-              // Scheduled Section
-              if (hasScheduled && (isToday || isFuture)) ...[
-                _buildDetailSection(
-                  context,
-                  isToday ? 'Due Today' : 'Scheduled',
-                  '${scheduledDay!.count}',
-                  Icons.schedule,
-                  Colors.blue,
-                ),
-                const SizedBox(height: 8),
-                ...scheduledDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, true, false)),
-              ],
-
-              // No activity message
-              if (!hasHistory && !hasOverdue && !hasScheduled)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Text('No activity', style: TextStyle(color: colorScheme.onSurfaceVariant)),
-                  ),
+              // Close button for desktop dialog
+              if (!isMobile)
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  iconSize: 20,
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: 'Close',
                 ),
             ],
           ),
+          const SizedBox(height: AppDimens.gapL),
+
+          // Overdue Section (Priority for Today)
+          if (isToday && hasOverdue) ...[
+            _buildDetailSection(
+              context,
+              'Overdue',
+              '${overdueDay!.count}',
+              Icons.warning_amber_rounded,
+              Colors.red.shade700,
+            ),
+            const SizedBox(height: AppDimens.gapS),
+            ...overdueDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, true)),
+            const SizedBox(height: AppDimens.gapL),
+          ],
+
+          // Due Today / Scheduled Section
+          if (hasScheduled && (isToday || isFuture)) ...[
+            _buildDetailSection(
+              context,
+              isToday ? 'Due Today' : 'Scheduled',
+              '${scheduledDay!.count}',
+              Icons.schedule,
+              Colors.blue,
+            ),
+            const SizedBox(height: AppDimens.gapS),
+            ...scheduledDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, true, false)),
+            const SizedBox(height: AppDimens.gapL),
+          ],
+
+          // Completed Section (Lower priority in display)
+          if (hasHistory) ...[
+            _buildDetailSection(
+              context,
+              'Studied',
+              '${historyDay!.count}',
+              Icons.check_circle,
+              const Color(0xFF216E39),
+            ),
+            const SizedBox(height: AppDimens.gapS),
+            ...historyDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, false)),
+          ],
+
+          // No activity message
+          if (!hasHistory && !hasOverdue && !hasScheduled)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppDimens.paddingXL),
+                child: Text('No activity', style: TextStyle(color: colorScheme.onSurfaceVariant)),
+              ),
+            ),
+        ],
+      );
+    }
+
+    if (isMobile) {
+      // Mobile: Use Bottom Sheet
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: colorScheme.surface,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXL)),
         ),
-      ),
-    );
+        builder: (context) => DraggableScrollableSheet(
+          initialChildSize: 0.55,
+          minChildSize: 0.3,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (context, scrollController) => SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(AppDimens.paddingL),
+            child: Column(
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: AppDimens.paddingL),
+                    decoration: BoxDecoration(
+                      color: colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                buildContent(),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Desktop/Tablet: Use centered Dialog
+      showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          backgroundColor: colorScheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppDimens.radiusXL),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 550),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppDimens.paddingXL),
+              child: buildContent(),
+            ),
+          ),
+        ),
+      );
+    }
   }
+
 
   Widget _buildDetailSection(BuildContext context, String title, String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1154,72 +1251,117 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   }
 
   Widget _buildDeckRow(BuildContext context, DeckCount deck, ColorScheme colorScheme, bool isScheduled, bool isOverdue) {
-    final Color dotColor;
+    final Color accentColor;
     if (isOverdue) {
-      dotColor = Colors.red.shade700;
+      accentColor = Colors.red.shade700;
     } else if (isScheduled) {
-      dotColor = Colors.blue;
+      accentColor = Colors.blue;
     } else {
-      dotColor = const Color(0xFF216E39);
+      accentColor = const Color(0xFF216E39);
     }
 
+    final bool canStudy = deck.id != null && (isScheduled || isOverdue);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Container(
-            width: 8, height: 8,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.gapXS),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppDimens.radiusM),
+        child: InkWell(
+          onTap: canStudy ? () => _startStudySession(context, deck) : null,
+          borderRadius: BorderRadius.circular(AppDimens.radiusM),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimens.paddingM,
+              vertical: AppDimens.paddingM,
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              deck.name,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontWeight: FontWeight.w500,
+            decoration: BoxDecoration(
+              color: canStudy 
+                  ? accentColor.withValues(alpha: 0.08) 
+                  : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(AppDimens.radiusM),
+              border: Border.all(
+                color: canStudy 
+                    ? accentColor.withValues(alpha: 0.3) 
+                    : colorScheme.outlineVariant.withValues(alpha: 0.3),
               ),
             ),
-          ),
-          Text(
-            '${deck.count}',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: isOverdue ? Colors.red.shade700 : colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (deck.id != null) ...[
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.play_arrow_rounded),
-              iconSize: 20,
-              color: colorScheme.primary,
-              tooltip: 'Study ${deck.name}',
-              onPressed: () {
-                // Close dialog
-                Navigator.of(context).pop();
-                // Start study session
-                context.read<FlashcardsProvider>().startStudy(
-                  DeckInfo(
-                    id: deck.id!,
-                    name: deck.name,
-                    flashcardCount: deck.count,
-                    createdAt: DateTime.now().toIso8601String(),
+            child: Row(
+              children: [
+                Container(
+                  width: 10, height: 10,
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    shape: BoxShape.circle,
                   ),
-                );
-                // Navigate to flashcards
-                context.go('/flashcards');
-              },
+                ),
+                const SizedBox(width: AppDimens.gapM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        deck.name,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (canStudy)
+                        Text(
+                          '${deck.count} cards ${isOverdue ? 'overdue' : 'due'}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: accentColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (canStudy) ...[
+                  Icon(
+                    Icons.play_circle_fill_rounded,
+                    color: accentColor,
+                    size: AppDimens.iconL,
+                  ),
+                ] else ...[
+                  Text(
+                    '${deck.count}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }
+
+  void _startStudySession(BuildContext context, DeckCount deck) {
+    // Close dialog/sheet
+    Navigator.of(context).pop();
+    // Start study session
+    context.read<FlashcardsProvider>().startStudy(
+      DeckInfo(
+        id: deck.id!,
+        name: deck.name,
+        flashcardCount: deck.count,
+        createdAt: DateTime.now().toIso8601String(),
+      ),
+    );
+    // Navigate to flashcards
+    context.go('/flashcards');
+  }
+
 
   String _getMonthName(int month) {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

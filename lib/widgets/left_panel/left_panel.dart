@@ -7,6 +7,7 @@ import '../../providers/conversation_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/workspace_provider.dart';
 import '../../services/workspace_service.dart' show WorkspaceModel;
+import '../../theme/dimens.dart';
 import '../dialogs/login_register_dialog.dart';
 import '../dialogs/settings_dialog.dart';
 import '../dialogs/profile_dialog.dart';
@@ -100,20 +101,20 @@ class _LeftPanelState extends State<LeftPanel> {
               end: Alignment.bottomRight,
               colors: isDark
                   ? [
-                      colorScheme.surface.withOpacity(0.85),
-                      colorScheme.surfaceContainerLow.withOpacity(0.75),
+                      colorScheme.surface.withValues(alpha: 0.85),
+                      colorScheme.surfaceContainerLow.withValues(alpha: 0.75),
                     ]
                   : [
-                      colorScheme.surface.withOpacity(0.92),
-                      colorScheme.surfaceContainerLow.withOpacity(0.88),
+                      colorScheme.surface.withValues(alpha: 0.92),
+                      colorScheme.surfaceContainerLow.withValues(alpha: 0.88),
                     ],
             ),
             // Subtle inner glow / border for glass effect
             border: Border(
               right: BorderSide(
                 color: isDark
-                    ? Colors.white.withOpacity(0.04)
-                    : Colors.black.withOpacity(0.03),
+                    ? Colors.white.withValues(alpha: 0.04)
+                    : Colors.black.withValues(alpha: 0.03),
                 width: 1,
               ),
             ),
@@ -125,26 +126,28 @@ class _LeftPanelState extends State<LeftPanel> {
 
               // Main navigation
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Primary navigation
-                      _buildPrimaryNavigation(context, isAuthenticated),
+                child: IntrinsicHeight(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(vertical: AppDimens.paddingM),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Primary navigation
+                        _buildPrimaryNavigation(context, isAuthenticated),
 
-                      // Workspaces section (only if authenticated)
-                      if (isAuthenticated) ...[
-                        const SizedBox(height: 20),
-                        _buildWorkspacesSection(context),
-                      ],
+                        // Workspaces section (only if authenticated)
+                        if (isAuthenticated) ...[
+                          const SizedBox(height: AppDimens.gapXL),
+                          _buildWorkspacesSection(context),
+                        ],
 
-                      // Conversations section (only if authenticated)
-                      if (isAuthenticated) ...[
-                        const SizedBox(height: 20),
-                        _buildConversationsSection(context),
+                        // Conversations section (only if authenticated)
+                        if (isAuthenticated) ...[
+                          const SizedBox(height: AppDimens.gapXL),
+                          _buildConversationsSection(context),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -159,10 +162,11 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimens.paddingXL, 
+        vertical: AppDimens.paddingL,
+      ),
       // No harsh border - use subtle color shift instead
       child: widget.isPanelVisible
           ? Row(
@@ -181,13 +185,13 @@ class _LeftPanelState extends State<LeftPanel> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              colorScheme.tertiary.withOpacity(0.2),
-                              colorScheme.tertiary.withOpacity(0.1),
+                              Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.2),
+                              Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.1),
                             ],
                           ),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppDimens.radiusS),
                           border: Border.all(
-                            color: colorScheme.tertiary.withOpacity(0.3),
+                            color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
@@ -197,22 +201,20 @@ class _LeftPanelState extends State<LeftPanel> {
                             width: 22,
                             height: 22,
                             fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) => Icon(
+                            errorBuilder: (context, error, stackTrace) => const Icon(
                               Icons.local_fire_department_rounded,
                               size: 20,
-                              color: colorScheme.tertiary,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Text(
+                      const SizedBox(width: AppDimens.gapM),
+                      const Text(
                         'TorchED',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.3,
-                          color: colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -262,7 +264,7 @@ class _LeftPanelState extends State<LeftPanel> {
 
   Widget _buildPrimaryNavigation(BuildContext context, bool isAuthenticated) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -317,7 +319,7 @@ class _LeftPanelState extends State<LeftPanel> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -330,7 +332,7 @@ class _LeftPanelState extends State<LeftPanel> {
                 _HeaderIconButton(
                   icon: Icons.add_rounded,
                   tooltip: 'New workspace',
-                  size: 18,
+                  size: AppDimens.iconS,
                   onPressed: () => _showCreateWorkspaceDialog(context),
                 ),
               ],
@@ -339,35 +341,38 @@ class _LeftPanelState extends State<LeftPanel> {
             // Workspaces list
             if (isLoading)
               const Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppDimens.paddingL),
                 child: Center(
                   child: SizedBox(
-                    width: 20,
-                    height: 20,
+                    width: AppDimens.iconM,
+                    height: AppDimens.iconM,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
                 ),
               )
             else if (workspaces.isEmpty)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimens.paddingXS, 
+                  vertical: AppDimens.paddingL,
+                ),
                 child: Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppDimens.paddingL),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(12),
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(AppDimens.radiusM),
                     border: Border.all(
-                      color: colorScheme.outlineVariant.withOpacity(0.3),
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Column(
                     children: [
                       Icon(
                         Icons.workspaces_outline,
-                        size: 28,
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                        size: AppDimens.iconL,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppDimens.gapS),
                       Text(
                         'No workspaces yet',
                         style: TextStyle(
@@ -375,13 +380,16 @@ class _LeftPanelState extends State<LeftPanel> {
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppDimens.gapM),
                       TextButton.icon(
                         onPressed: () => _showCreateWorkspaceDialog(context),
-                        icon: const Icon(Icons.add_rounded, size: 16),
+                        icon: const Icon(Icons.add_rounded, size: AppDimens.iconS),
                         label: const Text('Create workspace'),
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppDimens.paddingL, 
+                            vertical: AppDimens.paddingS,
+                          ),
                           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                         ),
                       ),
@@ -463,7 +471,7 @@ class _LeftPanelState extends State<LeftPanel> {
 
   Widget _buildConversationsSection(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -506,27 +514,27 @@ class _LeftPanelState extends State<LeftPanel> {
       top: false,
       child: Container(
         // Glass card effect for footer
-        margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.all(AppDimens.paddingM),
+        padding: const EdgeInsets.all(AppDimens.paddingM),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isDark
                 ? [
-                    colorScheme.surfaceContainerHigh.withOpacity(0.6),
-                    colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                    colorScheme.surfaceContainerHigh.withValues(alpha: 0.6),
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                   ]
                 : [
-                    colorScheme.surfaceContainerHigh.withOpacity(0.7),
-                    colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    colorScheme.surfaceContainerHigh.withValues(alpha: 0.7),
+                    colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   ],
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppDimens.radiusL),
           border: Border.all(
             color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.04),
+                ? Colors.white.withValues(alpha: 0.06)
+                : Colors.black.withValues(alpha: 0.04),
             width: 1,
           ),
         ),
@@ -541,7 +549,7 @@ class _LeftPanelState extends State<LeftPanel> {
               ),
 
             if (isAuthenticated && widget.isPanelVisible)
-              const SizedBox(height: 12),
+              const SizedBox(height: AppDimens.gapM),
 
             // Profile / Login button
             if (isAuthenticated)
@@ -610,7 +618,7 @@ class _SectionHeader extends StatelessWidget {
           fontSize: 10,
           fontWeight: FontWeight.w600,
           letterSpacing: 1.2,
-          color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
         ),
       ),
     );
@@ -651,12 +659,12 @@ class _HeaderIconButtonState extends State<_HeaderIconButton> {
           onTap: widget.onPressed,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(AppDimens.paddingS),
             decoration: BoxDecoration(
               color: _isHovered
-                  ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.8)
                   : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppDimens.radiusS),
             ),
             child: Icon(
               widget.icon,
@@ -732,7 +740,7 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
               borderRadius: BorderRadius.circular(12),
               border: _isHovered
                   ? Border.all(
-                      color: colorScheme.outline.withOpacity(0.1),
+                      color: colorScheme.outline.withValues(alpha: 0.1),
                       width: 1,
                     )
                   : null,
@@ -784,7 +792,7 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
                           '${widget.workspace.categories.length} ${widget.workspace.categories.length == 1 ? 'category' : 'categories'}',
                           style: TextStyle(
                             fontSize: widget.isMobile ? 11 : 10,
-                            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -964,7 +972,7 @@ class _NavItemState extends State<_NavItem> {
                     )
                   : _isHovered && !isFilledVariant
                       ? Border.all(
-                          color: colorScheme.outline.withOpacity(0.1),
+                          color: colorScheme.outline.withValues(alpha: 0.1),
                           width: 1,
                         )
                       : null,
@@ -1126,7 +1134,7 @@ class _SubscriptionInfo extends StatelessWidget {
                         ]
                       : [
                           colorScheme.tertiary.withOpacity(0.2),
-                          colorScheme.tertiary.withOpacity(0.1),
+                          colorScheme.tertiary.withValues(alpha: 0.1),
                         ],
                 ),
                 borderRadius: BorderRadius.circular(20),
@@ -1156,7 +1164,7 @@ class _SubscriptionInfo extends StatelessWidget {
                 onPressed: () => _showSubscriptionView(context),
                 style: TextButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  backgroundColor: colorScheme.tertiary.withOpacity(0.1),
+                  backgroundColor: colorScheme.tertiary.withValues(alpha: 0.1),
                   foregroundColor: colorScheme.tertiary,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(20),
@@ -1234,7 +1242,7 @@ class _SubscriptionInfo extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
             ),
             Text(
@@ -1263,7 +1271,7 @@ class _SubscriptionInfo extends StatelessWidget {
                 gradient: LinearGradient(
                   colors: [
                     progressColor,
-                    progressColor.withOpacity(0.7),
+                    progressColor.withValues(alpha: 0.7),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(2),

@@ -1,6 +1,8 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
+import '../../theme/dimens.dart';
+
 // =============================================================================
 // MINIMALISTIC GLASS COMPONENTS
 // Clean, simple UI components without complex liquid glass effects
@@ -35,7 +37,7 @@ class GlassTile extends StatelessWidget {
     this.opacity = 0.08,
     this.color,
     this.onTap,
-    this.cornerRadius = 16.0,
+    this.cornerRadius = AppDimens.radiusL,
     this.bezelThickness = 0, // Ignored, kept for compatibility
     this.border,
   });
@@ -51,12 +53,12 @@ class GlassTile extends StatelessWidget {
     Widget content = Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: bgColor.withOpacity(isDark ? opacity : opacity * 1.5),
+        color: bgColor.withValues(alpha: isDark ? opacity : opacity * 1.5),
         borderRadius: BorderRadius.circular(cornerRadius),
         border: border ?? Border.all(
           color: isDark 
-              ? Colors.white.withOpacity(0.06) 
-              : Colors.black.withOpacity(0.04),
+              ? Colors.white.withValues(alpha: 0.06) 
+              : Colors.black.withValues(alpha: 0.04),
           width: 1,
         ),
       ),
@@ -159,23 +161,23 @@ class _GhostTextFieldState extends State<GhostTextField> {
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           decoration: BoxDecoration(
-            color: cs.surfaceContainerHighest.withOpacity(isDark ? 0.3 : 0.5), // Slightly more transparent
-            borderRadius: BorderRadius.circular(14),
+            color: cs.surfaceContainerHighest.withValues(alpha: isDark ? 0.3 : 0.5), // Slightly more transparent
+            borderRadius: BorderRadius.circular(AppDimens.radiusM),
             border: Border.all(
               color: widget.errorText != null
-                  ? cs.error.withOpacity(0.5)
+                  ? cs.error.withValues(alpha: 0.5)
                   : _isFocused
-                      ? cs.primary.withOpacity(0.6)
+                      ? cs.primary.withValues(alpha: 0.6)
                       : (isDark
-                          ? Colors.white.withOpacity(0.08)
-                          : Colors.black.withOpacity(0.08)),
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.08)),
               width: _isFocused ? 1.5 : 1,
             ),
             boxShadow: _isFocused
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 6,
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: AppDimens.paddingS,
                       spreadRadius: 0,
                     ),
                   ]
@@ -203,19 +205,19 @@ class _GhostTextFieldState extends State<GhostTextField> {
                 prefixIcon: widget.prefixIcon != null
                     ? Icon(
                         widget.prefixIcon,
-                        size: 18,
+                        size: AppDimens.iconS,
                         color: _isFocused
                             ? cs.primary
-                            : cs.onSurfaceVariant.withOpacity(0.7),
+                            : cs.onSurfaceVariant.withValues(alpha: 0.7),
                       )
                     : null,
                 suffixIcon: widget.suffixIcon is IconData 
                     ? GestureDetector(
                         onTap: widget.onSuffixTap,
-                        child: Icon(widget.suffixIcon as IconData, size: 18, color: cs.onSurfaceVariant),
+                        child: Icon(widget.suffixIcon as IconData, size: AppDimens.iconS, color: cs.onSurfaceVariant),
                       )
                     : widget.suffixIcon, // Support widget or convert icon data if needed
-                hintStyle: TextStyle(color: cs.onSurfaceVariant.withOpacity(0.6)),
+                hintStyle: TextStyle(color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
                 labelStyle: TextStyle(
                   color: _isFocused
                       ? cs.primary
@@ -226,8 +228,8 @@ class _GhostTextFieldState extends State<GhostTextField> {
                 border: InputBorder.none,
                 counterText: '',
                 contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+                  horizontal: AppDimens.paddingL,
+                  vertical: AppDimens.paddingM,
                 ),
                 // match _GlassTextField feel
                 filled: true,
@@ -264,7 +266,7 @@ class GlassButton extends StatelessWidget {
     required this.child,
     this.onTap,
     this.padding,
-    this.cornerRadius = 12.0,
+    this.cornerRadius = AppDimens.radiusM,
     this.isDestructive = false,
   });
 
@@ -314,24 +316,26 @@ class GlassPill extends StatelessWidget {
     return Material(
       color: selected 
           ? cs.primaryContainer 
-          : cs.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7),
-      borderRadius: BorderRadius.circular(20),
+          : cs.surfaceContainerHighest.withValues(alpha: isDark ? 0.5 : 0.7),
+      borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected 
-                  ? cs.primary.withOpacity(0.3) 
-                  : (isDark 
-                      ? Colors.white.withOpacity(0.06) 
-                      : Colors.black.withOpacity(0.04)),
-              width: 1,
+        borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingL, vertical: AppDimens.paddingS),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingL, vertical: AppDimens.paddingS),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: selected 
+                    ? cs.primary.withValues(alpha: 0.3) 
+                    : (isDark 
+                        ? Colors.white.withValues(alpha: 0.06) 
+                        : Colors.black.withValues(alpha: 0.04)),
+                width: 1,
+              ),
+              borderRadius: BorderRadius.circular(AppDimens.radiusXXL),
             ),
-            borderRadius: BorderRadius.circular(20),
-          ),
           child: DefaultTextStyle(
             style: TextStyle(
               color: selected ? cs.onPrimaryContainer : cs.onSurface,
@@ -341,6 +345,7 @@ class GlassPill extends StatelessWidget {
           ),
         ),
       ),
+     )
     );
   }
 }

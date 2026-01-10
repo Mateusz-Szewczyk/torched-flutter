@@ -27,7 +27,7 @@ class MasteryOverviewWidget extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainer,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimens.radiusL)),
         child: Padding(
-          padding: const EdgeInsets.all(AppDimens.paddingM),
+          padding: const EdgeInsets.all(AppDimens.paddingL),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -43,7 +43,7 @@ class MasteryOverviewWidget extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
-            const SizedBox(height: AppDimens.gapL),
+            const SizedBox(height: AppDimens.gapXL),
             Row(
               children: [
                 // Ring Chart
@@ -80,7 +80,7 @@ class MasteryOverviewWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: AppDimens.gapL),
+                const SizedBox(width: AppDimens.gapXL),
                 // Legend
                 Expanded(
                   child: Column(
@@ -183,7 +183,7 @@ class _RingChartPainter extends CustomPainter {
     final total = mastered + learning + difficult + unstudied;
     if (total == 0) {
       final paint = Paint()
-        ..color = Theme.of(context).colorScheme.outlineVariant.withOpacity(0.3)
+        ..color = Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
         ..strokeCap = StrokeCap.round;
@@ -209,7 +209,7 @@ class _RingChartPainter extends CustomPainter {
     drawSegment(mastered, Colors.green);
     drawSegment(learning, Colors.orange);
     drawSegment(difficult, Colors.red);
-    drawSegment(unstudied, Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5));
+    drawSegment(unstudied, Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5));
   }
 
   @override

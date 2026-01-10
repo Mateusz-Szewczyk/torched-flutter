@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/locale_provider.dart';
+import '../../theme/dimens.dart';
 import '../common/glass_components.dart';
 import 'base_glass_dialog.dart';
 
@@ -27,7 +28,7 @@ class SettingsDialog extends StatelessWidget {
       maxHeight: 750,
       header: _buildHeader(context, cs),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        padding: const EdgeInsets.fromLTRB(AppDimens.paddingXL, 0, AppDimens.paddingXL, AppDimens.paddingXL),
         physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -52,7 +53,7 @@ class SettingsDialog extends StatelessWidget {
 
   Widget _buildHeader(BuildContext context, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(AppDimens.paddingXL),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -136,12 +137,12 @@ class SettingsDialog extends StatelessWidget {
 
     return GlassTile(
       onTap: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingL, vertical: AppDimens.paddingM),
       color: isSelected
-          ? cs.primary.withOpacity(isDark ? 0.15 : 0.1)
+          ? cs.primary.withValues(alpha: isDark ? 0.15 : 0.1)
           : null,
       border: isSelected
-          ? Border.all(color: cs.primary.withOpacity(0.4), width: 1)
+          ? Border.all(color: cs.primary.withValues(alpha: 0.4), width: 1)
           : null,
       child: Row(
         children: [
@@ -167,7 +168,7 @@ class SettingsDialog extends StatelessWidget {
               shape: BoxShape.circle,
               color: isSelected ? cs.primary : Colors.transparent,
               border: Border.all(
-                color: isSelected ? cs.primary : cs.outline.withOpacity(0.4),
+                color: isSelected ? cs.primary : cs.outline.withValues(alpha: 0.4),
                 width: 1.5,
               ),
             ),
@@ -206,15 +207,15 @@ class SettingsDialog extends StatelessWidget {
               color: isSelected
                   ? cs.primary
                   : (isDark
-                      ? Colors.white.withOpacity(0.05)
-                      : Colors.black.withOpacity(0.04)),
-              borderRadius: BorderRadius.circular(10),
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.black.withValues(alpha: 0.04)),
+              borderRadius: BorderRadius.circular(AppDimens.radiusM),
               border: Border.all(
                 color: isSelected
                     ? cs.primary
                     : (isDark
-                        ? Colors.white.withOpacity(0.1)
-                        : Colors.black.withOpacity(0.08)),
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.08)),
                 width: 0.5,
               ),
             ),
@@ -241,7 +242,7 @@ class SettingsDialog extends StatelessWidget {
 
   Widget _buildAboutSection(BuildContext context, ColorScheme cs) {
     return GlassTile(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppDimens.paddingL),
       child: Column(
         children: [
           Row(

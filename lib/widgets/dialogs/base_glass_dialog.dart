@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
+import '../../theme/dimens.dart';
+
 /// A clean, minimalistic frosted glass dialog.
 /// 
 /// Features:
@@ -63,13 +65,13 @@ class BaseGlassDialog extends StatelessWidget {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withOpacity(0.6),
+        barrierColor: Colors.black.withValues(alpha: 0.6),
         builder: (_) => dialogContent,
       );
     } else {
       return showDialog<T>(
         context: context,
-        barrierColor: Colors.black.withOpacity(0.5),
+        barrierColor: Colors.black.withValues(alpha: 0.5),
         builder: (_) => dialogContent,
       );
     }
@@ -93,21 +95,21 @@ class BaseGlassDialog extends StatelessWidget {
     return Container(
       height: MediaQuery.of(context).size.height * 0.92,
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXXL)),
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXXL)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
             decoration: BoxDecoration(
-              color: cs.surface.withOpacity(isDark ? 0.50 : 0.60),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              color: cs.surface.withValues(alpha: isDark ? 0.50 : 0.60),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXXL)),
               border: Border(
                 top: BorderSide(
                   color: isDark 
-                      ? Colors.white.withOpacity(0.1) 
-                      : Colors.black.withOpacity(0.05),
+                      ? Colors.white.withValues(alpha: 0.1) 
+                      : Colors.black.withValues(alpha: 0.05),
                   width: 1,
                 ),
               ),
@@ -117,11 +119,11 @@ class BaseGlassDialog extends StatelessWidget {
                 // Drag handle
                 Center(
                   child: Container(
-                    margin: const EdgeInsets.only(top: 12),
+                    margin: const EdgeInsets.only(top: AppDimens.gapM),
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant.withOpacity(0.3),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -134,7 +136,7 @@ class BaseGlassDialog extends StatelessWidget {
                 // Content
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppDimens.paddingXL),
                     child: child,
                   ),
                 ),
@@ -169,22 +171,22 @@ class BaseGlassDialog extends StatelessWidget {
                 maxHeight: maxHeight ?? screenSize.height * 0.85,
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppDimens.radiusXL),
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: cs.surface.withOpacity(isDark ? 0.55 : 0.65),
-                      borderRadius: BorderRadius.circular(20),
+                      color: cs.surface.withValues(alpha: isDark ? 0.55 : 0.65),
+                      borderRadius: BorderRadius.circular(AppDimens.radiusXL),
                       border: Border.all(
                         color: isDark 
-                            ? Colors.white.withOpacity(0.08) 
-                            : Colors.black.withOpacity(0.05),
+                            ? Colors.white.withValues(alpha: 0.08) 
+                            : Colors.black.withValues(alpha: 0.05),
                         width: 1,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(isDark ? 0.15 : 0.08),
+                          color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.08),
                           blurRadius: 8,
                           spreadRadius: 0,
                         ),
@@ -202,13 +204,13 @@ class BaseGlassDialog extends StatelessWidget {
                           Divider(
                             height: 1,
                             color: isDark
-                                ? Colors.white.withOpacity(0.06)
-                                : Colors.black.withOpacity(0.06),
+                                ? Colors.white.withValues(alpha: 0.06)
+                                : Colors.black.withValues(alpha: 0.06),
                           ),
                         // Content
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(AppDimens.paddingXL),
                             child: child,
                           ),
                         ),
@@ -226,7 +228,12 @@ class BaseGlassDialog extends StatelessWidget {
 
   Widget _buildTitleHeader(BuildContext context, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 16, 12),
+      padding: const EdgeInsets.fromLTRB(
+        AppDimens.paddingXL, 
+        AppDimens.paddingL, 
+        AppDimens.paddingL, 
+        AppDimens.paddingM,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -253,7 +260,7 @@ class BaseGlassDialog extends StatelessWidget {
 
   Widget _buildDesktopHeader(BuildContext context, ColorScheme cs) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppDimens.paddingXL),
       child: Row(
         children: [
           if (title != null)
@@ -357,12 +364,12 @@ class _ConfirmationContent extends StatelessWidget {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(AppDimens.paddingS),
               decoration: BoxDecoration(
                 color: isDestructive
-                    ? colorScheme.errorContainer.withOpacity(0.5)
-                    : colorScheme.primaryContainer.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
+                    ? colorScheme.errorContainer.withValues(alpha: 0.5)
+                    : colorScheme.primaryContainer.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(AppDimens.radiusM),
               ),
               child: Icon(
                 isDestructive
