@@ -6,6 +6,30 @@ import '../providers/flashcards_provider.dart';
 import '../models/models.dart';
 import '../theme/dimens.dart';
 
+/// Helper class to merge overdue and due cards from the same deck
+class _MergedDeck {
+  final int id;
+  final String name;
+  final int overdueCount;
+  final int dueCount;
+  final bool hasValidId;
+  
+  _MergedDeck({
+    required this.id,
+    required this.name,
+    this.overdueCount = 0,
+    this.dueCount = 0,
+    this.hasValidId = true,
+  });
+  
+  int get totalCount => overdueCount + dueCount;
+  bool get hasOverdue => overdueCount > 0;
+  bool get hasDue => dueCount > 0;
+  bool get hasBoth => hasOverdue && hasDue;
+}
+
+
+
 /// Learning Calendar Widget - GitHub-style contribution graph
 /// Shows study history and scheduled flashcard reviews
 class LearningCalendarWidget extends StatefulWidget {
@@ -1054,6 +1078,57 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
     // Build the content widget (shared between dialog and sheet)
     Widget buildContent() {
+      // For TODAY: merge overdue + due decks by ID into unified rows
+      List<_MergedDeck> mergedDecks = [];
+      if (isToday && (hasOverdue || hasScheduled)) {
+        // Use String key to handle decks with null IDs (use name as fallback)
+        final Map<String, _MergedDeck> deckMap = {};
+        
+        // Add overdue decks
+        if (overdueDay != null) {
+          for (final deck in overdueDay.decks) {
+            final key = deck.id?.toString() ?? 'name:${deck.name}';
+            deckMap[key] = _MergedDeck(
+              id: deck.id ?? 0,
+              name: deck.name,
+              overdueCount: deck.count,
+              dueCount: 0,
+              hasValidId: deck.id != null,
+            );
+          }
+        }
+        
+        // Merge due today decks
+        if (scheduledDay != null) {
+          for (final deck in scheduledDay.decks) {
+            final key = deck.id?.toString() ?? 'name:${deck.name}';
+            if (deckMap.containsKey(key)) {
+              // Deck has both overdue and due - merge them
+              final existing = deckMap[key]!;
+              deckMap[key] = _MergedDeck(
+                id: deck.id ?? existing.id,
+                name: existing.name,
+                overdueCount: existing.overdueCount,
+                dueCount: deck.count,
+                hasValidId: existing.hasValidId || deck.id != null,
+              );
+            } else {
+              // Only due today
+              deckMap[key] = _MergedDeck(
+                id: deck.id ?? 0,
+                name: deck.name,
+                overdueCount: 0,
+                dueCount: deck.count,
+                hasValidId: deck.id != null,
+              );
+            }
+          }
+        }
+        
+        mergedDecks = deckMap.values.toList();
+      }
+
+
       return Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1114,35 +1189,35 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           ),
           const SizedBox(height: AppDimens.gapL),
 
-          // Overdue Section (Priority for Today)
-          if (isToday && hasOverdue) ...[
+          // TODAY: Show unified "Today's Review" section with merged decks
+          if (isToday && mergedDecks.isNotEmpty) ...[
             _buildDetailSection(
               context,
-              'Overdue',
-              '${overdueDay!.count}',
-              Icons.warning_amber_rounded,
-              Colors.red.shade700,
+              "Today's Review",
+              '${mergedDecks.fold<int>(0, (sum, d) => sum + d.totalCount)}',
+              Icons.play_circle_outline,
+              colorScheme.primary,
             ),
             const SizedBox(height: AppDimens.gapS),
-            ...overdueDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, true)),
+            ...mergedDecks.map((deck) => _buildMergedDeckRow(context, deck, colorScheme)),
             const SizedBox(height: AppDimens.gapL),
           ],
 
-          // Due Today / Scheduled Section
-          if (hasScheduled && (isToday || isFuture)) ...[
+          // FUTURE: Show scheduled info only (no play button)
+          if (isFuture && hasScheduled) ...[
             _buildDetailSection(
               context,
-              isToday ? 'Due Today' : 'Scheduled',
+              'Scheduled',
               '${scheduledDay!.count}',
               Icons.schedule,
               Colors.blue,
             ),
             const SizedBox(height: AppDimens.gapS),
-            ...scheduledDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, true, false)),
+            ...scheduledDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, false)),
             const SizedBox(height: AppDimens.gapL),
           ],
 
-          // Completed Section (Lower priority in display)
+          // Completed Section (history - always shown if present)
           if (hasHistory) ...[
             _buildDetailSection(
               context,
@@ -1166,6 +1241,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         ],
       );
     }
+
 
     if (isMobile) {
       // Mobile: Use Bottom Sheet
@@ -1345,6 +1421,198 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       ),
     );
   }
+
+  /// Builds a deck row for merged overdue+due cards (TODAY only)
+  Widget _buildMergedDeckRow(BuildContext context, _MergedDeck deck, ColorScheme colorScheme) {
+    // Determine accent color based on what's present
+    final Color accentColor;
+    if (deck.hasBoth) {
+      // Gradient effect - use primary (orange) for combined
+      accentColor = colorScheme.primary;
+    } else if (deck.hasOverdue) {
+      accentColor = Colors.red.shade700;
+    } else {
+      accentColor = Colors.blue;
+    }
+
+    // Only allow tap if deck has valid ID
+    final canStudy = deck.hasValidId;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppDimens.gapXS),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppDimens.radiusM),
+        child: InkWell(
+          onTap: canStudy ? () => _startMergedStudySession(context, deck) : null,
+          borderRadius: BorderRadius.circular(AppDimens.radiusM),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimens.paddingM,
+              vertical: AppDimens.paddingM,
+            ),
+            decoration: BoxDecoration(
+              // Use gradient background for decks with both overdue and due
+              gradient: deck.hasBoth
+                  ? LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.red.shade700.withValues(alpha: 0.1),
+                        Colors.blue.withValues(alpha: 0.1),
+                      ],
+                    )
+                  : null,
+              color: deck.hasBoth ? null : accentColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(AppDimens.radiusM),
+              border: Border.all(
+                color: accentColor.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Color indicator - split dot for both
+                if (deck.hasBoth)
+                  Stack(
+                    children: [
+                      Container(
+                        width: 12, height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      Container(
+                        width: 12, height: 12,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Colors.red.shade700, Colors.blue],
+                            stops: const [0.5, 0.5],
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Container(
+                    width: 10, height: 10,
+                    decoration: BoxDecoration(
+                      color: accentColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                const SizedBox(width: AppDimens.gapM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        deck.name,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      // Show breakdown: "🔴 5 overdue + 🔵 3 due" or just one
+                      Row(
+                        children: [
+                          if (deck.hasOverdue) ...[
+                            Icon(Icons.circle, size: 8, color: Colors.red.shade700),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${deck.overdueCount} overdue',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.red.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                          if (deck.hasBoth) ...[
+                            Text(' + ', style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                          ],
+                          if (deck.hasDue) ...[
+                            Icon(Icons.circle, size: 8, color: Colors.blue),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${deck.dueCount} due',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.blue,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Total count badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(AppDimens.radiusS),
+                  ),
+                  child: Text(
+                    '${deck.totalCount}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+                // Play button - only show if can study
+                if (canStudy) ...[
+                  const SizedBox(width: AppDimens.gapS),
+                  Icon(
+                    Icons.play_circle_fill_rounded,
+                    color: accentColor,
+                    size: AppDimens.iconL,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Future<void> _startMergedStudySession(BuildContext dialogContext, _MergedDeck deck) async {
+    // Get provider reference before closing dialog
+    final flashcardsProvider = dialogContext.read<FlashcardsProvider>();
+    
+    // Close dialog/sheet first
+    Navigator.of(dialogContext).pop();
+    
+    // Start study session
+    final success = await flashcardsProvider.startStudy(
+      DeckInfo(
+        id: deck.id,
+        name: deck.name,
+        flashcardCount: deck.totalCount,
+        createdAt: DateTime.now().toIso8601String(),
+      ),
+    );
+    
+    // Navigate to flashcards if successful (use state's context, not dialog's)
+    if (success && mounted) {
+      context.go('/flashcards');
+    }
+  }
+
+
 
   void _startStudySession(BuildContext context, DeckCount deck) {
     // Close dialog/sheet
