@@ -1059,7 +1059,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   }
 
   void _showDayDetails(
-    BuildContext context,
+    BuildContext parentContext,
     String dateString,
     CalendarDay? historyDay,
     CalendarDay? scheduledDay,
@@ -1068,8 +1068,10 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     bool isFuture,
     bool isToday,
   ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width;
+    // Save parent context for navigation BEFORE showing dialog
+    final navigatorContext = parentContext;
+    final colorScheme = Theme.of(parentContext).colorScheme;
+    final screenWidth = MediaQuery.of(parentContext).size.width;
     final isMobile = screenWidth < 600;
 
     final hasOverdue = overdueDay != null && overdueDay.count > 0;
@@ -1179,11 +1181,13 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               ),
               // Close button for desktop dialog
               if (!isMobile)
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  iconSize: 20,
-                  onPressed: () => Navigator.of(context).pop(),
-                  tooltip: 'Close',
+                Builder(
+                  builder: (dialogCtx) => IconButton(
+                    icon: const Icon(Icons.close),
+                    iconSize: 20,
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                    tooltip: 'Close',
+                  ),
                 ),
             ],
           ),
@@ -1192,42 +1196,42 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
           // TODAY: Show unified "Today's Review" section with merged decks
           if (isToday && mergedDecks.isNotEmpty) ...[
             _buildDetailSection(
-              context,
+              parentContext,
               "Today's Review",
               '${mergedDecks.fold<int>(0, (sum, d) => sum + d.totalCount)}',
               Icons.play_circle_outline,
               colorScheme.primary,
             ),
             const SizedBox(height: AppDimens.gapS),
-            ...mergedDecks.map((deck) => _buildMergedDeckRow(context, deck, colorScheme)),
+            ...mergedDecks.map((deck) => _buildMergedDeckRow(navigatorContext, deck, colorScheme)),
             const SizedBox(height: AppDimens.gapL),
           ],
 
           // FUTURE: Show scheduled info only (no play button)
           if (isFuture && hasScheduled) ...[
             _buildDetailSection(
-              context,
+              parentContext,
               'Scheduled',
               '${scheduledDay!.count}',
               Icons.schedule,
               Colors.blue,
             ),
             const SizedBox(height: AppDimens.gapS),
-            ...scheduledDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, false)),
+            ...scheduledDay.decks.map((deck) => _buildDeckRow(navigatorContext, deck, colorScheme, false, false)),
             const SizedBox(height: AppDimens.gapL),
           ],
 
           // Completed Section (history - always shown if present)
           if (hasHistory) ...[
             _buildDetailSection(
-              context,
+              parentContext,
               'Studied',
               '${historyDay!.count}',
               Icons.check_circle,
               const Color(0xFF216E39),
             ),
             const SizedBox(height: AppDimens.gapS),
-            ...historyDay.decks.map((deck) => _buildDeckRow(context, deck, colorScheme, false, false)),
+            ...historyDay.decks.map((deck) => _buildDeckRow(navigatorContext, deck, colorScheme, false, false)),
           ],
 
           // No activity message
@@ -1246,18 +1250,18 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     if (isMobile) {
       // Mobile: Use Bottom Sheet
       showModalBottomSheet(
-        context: context,
+        context: parentContext,
         backgroundColor: colorScheme.surface,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXL)),
         ),
-        builder: (context) => DraggableScrollableSheet(
+        builder: (sheetContext) => DraggableScrollableSheet(
           initialChildSize: 0.55,
           minChildSize: 0.3,
           maxChildSize: 0.85,
           expand: false,
-          builder: (context, scrollController) => SingleChildScrollView(
+          builder: (_, scrollController) => SingleChildScrollView(
             controller: scrollController,
             padding: const EdgeInsets.all(AppDimens.paddingL),
             child: Column(
@@ -1283,8 +1287,8 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
     } else {
       // Desktop/Tablet: Use centered Dialog
       showDialog(
-        context: context,
-        builder: (context) => Dialog(
+        context: parentContext,
+        builder: (dialogContext) => Dialog(
           backgroundColor: colorScheme.surface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimens.radiusXL),
@@ -1300,6 +1304,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       );
     }
   }
+
 
 
   Widget _buildDetailSection(BuildContext context, String title, String value, IconData icon, Color color) {
@@ -1589,12 +1594,12 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
   }
 
 
-  Future<void> _startMergedStudySession(BuildContext dialogContext, _MergedDeck deck) async {
-    // Get provider reference before closing dialog
-    final flashcardsProvider = dialogContext.read<FlashcardsProvider>();
+  Future<void> _startMergedStudySession(BuildContext _, _MergedDeck deck) async {
+    // Get provider reference
+    final flashcardsProvider = context.read<FlashcardsProvider>();
     
-    // Close dialog/sheet first
-    Navigator.of(dialogContext).pop();
+    // Close any overlay (dialog or bottom sheet) using root navigator
+    Navigator.of(context, rootNavigator: true).pop();
     
     // Start study session
     final success = await flashcardsProvider.startStudy(
@@ -1606,7 +1611,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       ),
     );
     
-    // Navigate to flashcards if successful (use state's context, not dialog's)
+    // Navigate to flashcards if successful
     if (success && mounted) {
       context.go('/flashcards');
     }
@@ -1614,11 +1619,17 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
 
 
-  void _startStudySession(BuildContext context, DeckCount deck) {
+
+
+  Future<void> _startStudySession(BuildContext navContext, DeckCount deck) async {
+    // Get provider reference from state's context
+    final flashcardsProvider = context.read<FlashcardsProvider>();
+    
     // Close dialog/sheet
-    Navigator.of(context).pop();
+    Navigator.of(navContext, rootNavigator: true).pop();
+    
     // Start study session
-    context.read<FlashcardsProvider>().startStudy(
+    final success = await flashcardsProvider.startStudy(
       DeckInfo(
         id: deck.id!,
         name: deck.name,
@@ -1626,9 +1637,13 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
         createdAt: DateTime.now().toIso8601String(),
       ),
     );
-    // Navigate to flashcards
-    context.go('/flashcards');
+    
+    // Navigate to flashcards if successful
+    if (success && mounted) {
+      context.go('/flashcards');
+    }
   }
+
 
 
   String _getMonthName(int month) {
