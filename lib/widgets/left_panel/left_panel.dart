@@ -124,7 +124,6 @@ class _LeftPanelState extends State<LeftPanel> {
               // Panel header
               _buildHeader(context),
 
-              // Main navigation
               Expanded(
                 child: IntrinsicHeight(
                   child: SingleChildScrollView(
@@ -135,15 +134,15 @@ class _LeftPanelState extends State<LeftPanel> {
                         // Primary navigation
                         _buildPrimaryNavigation(context, isAuthenticated),
 
-                        // Workspaces section (only if authenticated)
+                        // Divider + Workspaces section (only if authenticated)
                         if (isAuthenticated) ...[
-                          const SizedBox(height: AppDimens.gapXL),
+                          _buildSectionDivider(context),
                           _buildWorkspacesSection(context),
                         ],
 
-                        // Conversations section (only if authenticated)
+                        // Divider + Conversations section (only if authenticated)
                         if (isAuthenticated) ...[
-                          const SizedBox(height: AppDimens.gapXL),
+                          _buildSectionDivider(context),
                           _buildConversationsSection(context),
                         ],
                       ],
@@ -158,6 +157,26 @@ class _LeftPanelState extends State<LeftPanel> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Subtle divider between sidebar sections
+  Widget _buildSectionDivider(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    if (!widget.isPanelVisible) {
+      return const SizedBox(height: AppDimens.gapL);
+    }
+    
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppDimens.paddingL, 
+        vertical: AppDimens.paddingL,
+      ),
+      height: 1,
+      color: isDark
+          ? Colors.white.withOpacity(0.06)
+          : Colors.black.withOpacity(0.04),
     );
   }
 
@@ -285,6 +304,8 @@ class _LeftPanelState extends State<LeftPanel> {
               isMobile: widget.isMobile,
               isActive: currentRoute.startsWith('/flashcards'),
               onTap: () {
+                // Clear conversation selection to avoid dual active states
+                context.read<ConversationProvider>().setCurrentConversation(null);
                 // Navigate and close panel on mobile to avoid manual closing
                 context.go('/flashcards');
                 if (widget.isMobile) widget.togglePanel();
@@ -298,6 +319,8 @@ class _LeftPanelState extends State<LeftPanel> {
               isMobile: widget.isMobile,
               isActive: currentRoute.startsWith('/tests'),
               onTap: () {
+                // Clear conversation selection to avoid dual active states
+                context.read<ConversationProvider>().setCurrentConversation(null);
                 context.go('/tests');
                 if (widget.isMobile) widget.togglePanel();
               },
@@ -323,6 +346,9 @@ class _LeftPanelState extends State<LeftPanel> {
     final workspaces = workspaceProvider.workspaces;
     final isLoading = workspaceProvider.isLoadingWorkspaces;
     final colorScheme = Theme.of(context).colorScheme;
+    
+    // Get current route to detect active workspace
+    final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
@@ -410,11 +436,15 @@ class _LeftPanelState extends State<LeftPanel> {
                 itemCount: workspaces.length,
                 itemBuilder: (context, index) {
                   final workspace = workspaces[index];
+                  final isActive = currentRoute == '/workspace/${workspace.id}';
                   return _WorkspaceItem(
                     workspace: workspace,
                     isPanelVisible: widget.isPanelVisible,
                     isMobile: widget.isMobile,
+                    isActive: isActive,
                     onTap: () {
+                      // Clear conversation when selecting workspace
+                      context.read<ConversationProvider>().setCurrentConversation(null);
                       context.go('/workspace/${workspace.id}');
                       if (widget.isMobile) widget.togglePanel();
                     },
@@ -691,6 +721,7 @@ class _WorkspaceItem extends StatefulWidget {
   final WorkspaceModel workspace;
   final bool isPanelVisible;
   final bool isMobile;
+  final bool isActive;
   final VoidCallback onTap;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
@@ -699,6 +730,7 @@ class _WorkspaceItem extends StatefulWidget {
     required this.workspace,
     required this.isPanelVisible,
     required this.isMobile,
+    this.isActive = false,
     required this.onTap,
     required this.onDelete,
     required this.onEdit,
@@ -736,9 +768,11 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
           curve: Curves.easeOut,
           transform: Matrix4.translationValues(_isHovered ? -2 : 0, 0, 0),
           child: Material(
-            color: _isHovered
-                ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.08 : 0.12)
-                : colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.04 : 0.06),
+            color: widget.isActive
+                ? colorScheme.tertiary.withOpacity(0.12)
+                : _isHovered
+                    ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.08 : 0.12)
+                    : colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.04 : 0.06),
             borderRadius: BorderRadius.circular(12),
             elevation: _isHovered ? 2 : 0,
             shadowColor: colorScheme.shadow.withOpacity(0.15),
@@ -748,7 +782,8 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
               splashColor: colorScheme.tertiary.withOpacity(0.12),
               highlightColor: colorScheme.tertiary.withOpacity(0.06),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
                 constraints: const BoxConstraints(minHeight: 48),
                 padding: EdgeInsets.symmetric(
                   horizontal: widget.isMobile ? 12 : 10,
@@ -756,12 +791,23 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isHovered
-                        ? colorScheme.tertiary.withOpacity(0.2)
-                        : colorScheme.outline.withOpacity(0.08),
-                    width: 1,
-                  ),
+                  // Active indicator - left border (consistent with NavItem)
+                  border: widget.isActive
+                      ? Border(
+                          left: BorderSide(
+                            color: colorScheme.tertiary,
+                            width: 3,
+                          ),
+                          top: BorderSide(color: colorScheme.tertiary.withOpacity(0.2)),
+                          right: BorderSide(color: colorScheme.tertiary.withOpacity(0.2)),
+                          bottom: BorderSide(color: colorScheme.tertiary.withOpacity(0.2)),
+                        )
+                      : Border.all(
+                          color: _isHovered
+                              ? colorScheme.tertiary.withOpacity(0.2)
+                              : colorScheme.outline.withOpacity(0.08),
+                          width: 1,
+                        ),
                 ),
                 child: Row(
                   children: [

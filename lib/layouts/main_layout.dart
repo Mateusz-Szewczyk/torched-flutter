@@ -28,7 +28,7 @@ class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateM
   double _currentDragX = 0;
   bool _isDragging = false;
 
-  static const double _mobileDrawerWidth = 300.0;
+  static const double _mobileDrawerWidth = 320.0;
   static const double _desktopExpandedWidth = 256.0;
   static const double _desktopCollapsedWidth = 64.0;
   static const double _edgeSwipeAreaWidth = 32.0; // Larger area for easier edge swipe
@@ -237,9 +237,17 @@ class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateM
           bottom: 0,
           left: slideOffset,
           width: _mobileDrawerWidth,
-          child: Material(
-            elevation: 16,
-            shadowColor: Colors.black38,
+          // Use DecoratedBox for shadow without blocking glass effect
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.25),
+                  blurRadius: 24,
+                  offset: const Offset(4, 0),
+                ),
+              ],
+            ),
             child: LeftPanel(
               isPanelVisible: true, // Always show full content in mobile drawer
               isMobile: true,

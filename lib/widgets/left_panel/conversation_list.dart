@@ -415,30 +415,27 @@ class _SwipeableConversationItemState extends State<_SwipeableConversationItem> 
               child: Container(
                 constraints: const BoxConstraints(minHeight: 48),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  // Active indicator - left border (consistent with NavItem)
+                  border: widget.isSelected
+                      ? Border(
+                          left: BorderSide(
+                            color: colorScheme.tertiary,
+                            width: 3,
+                          ),
+                        )
+                      : null,
+                ),
                 child: Row(
                   children: [
-                    // Avatar circle with first letter
-                    Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: widget.isSelected
-                            ? colorScheme.tertiary.withOpacity(0.2)
-                            : colorScheme.tertiary.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.conversation.title.isNotEmpty 
-                              ? widget.conversation.title[0].toUpperCase() 
-                              : '?',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.tertiary,
-                          ),
-                        ),
-                      ),
+                    // Chat icon
+                    Icon(
+                      widget.isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                      size: 16,
+                      color: widget.isSelected
+                          ? colorScheme.tertiary
+                          : colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -490,7 +487,7 @@ class _SwipeableConversationItemState extends State<_SwipeableConversationItem> 
               title: const Text('Edit'),
               onTap: () {
                 Navigator.pop(context);
-                onEdit();
+                widget.onEdit();
               },
             ),
             ListTile(
@@ -498,7 +495,7 @@ class _SwipeableConversationItemState extends State<_SwipeableConversationItem> 
               title: Text('Delete', style: TextStyle(color: colorScheme.error)),
               onTap: () {
                 Navigator.pop(context);
-                onDelete();
+                widget.onDelete();
               },
             ),
           ],
