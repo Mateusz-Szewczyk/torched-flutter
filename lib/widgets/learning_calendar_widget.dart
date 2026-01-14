@@ -1199,7 +1199,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               parentContext,
               "Today's Review",
               '${mergedDecks.fold<int>(0, (sum, d) => sum + d.totalCount)}',
-              Icons.play_circle_outline,
               colorScheme.primary,
             ),
             const SizedBox(height: AppDimens.gapS),
@@ -1213,7 +1212,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               parentContext,
               'Scheduled',
               '${scheduledDay!.count}',
-              Icons.schedule,
               Colors.blue,
             ),
             const SizedBox(height: AppDimens.gapS),
@@ -1227,7 +1225,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
               parentContext,
               'Studied',
               '${historyDay!.count}',
-              Icons.check_circle,
               const Color(0xFF216E39),
             ),
             const SizedBox(height: AppDimens.gapS),
@@ -1307,7 +1304,7 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
 
 
-  Widget _buildDetailSection(BuildContext context, String title, String value, IconData icon, Color color) {
+  Widget _buildDetailSection(BuildContext context, String title, String value, Color color) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1317,8 +1314,6 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       ),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1595,13 +1590,11 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
 
 
   Future<void> _startMergedStudySession(BuildContext _, _MergedDeck deck) async {
-    // Get provider reference
+    // IMPORTANT: Capture references while context is still valid
     final flashcardsProvider = context.read<FlashcardsProvider>();
+    final router = GoRouter.of(context);
     
-    // Close any overlay (dialog or bottom sheet) using root navigator
-    Navigator.of(context, rootNavigator: true).pop();
-    
-    // Start study session
+    // Start study session FIRST (while still in overlay)
     final success = await flashcardsProvider.startStudy(
       DeckInfo(
         id: deck.id,
@@ -1611,24 +1604,28 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       ),
     );
     
-    // Navigate to flashcards if successful
-    if (success && mounted) {
-      context.go('/flashcards');
-    }
+    // Only proceed if successful and widget is still mounted
+    if (!success || !mounted) return;
+    
+    // Navigate directly using GoRouter.go() which will:
+    // 1. Pop any overlay routes (dialog/bottom sheet)
+    // 2. Navigate to the target route
+    // This is the correct way to navigate from inside modal overlays
+    router.go('/flashcards');
   }
 
 
 
 
 
+
+
   Future<void> _startStudySession(BuildContext navContext, DeckCount deck) async {
-    // Get provider reference from state's context
+    // IMPORTANT: Capture references while context is still valid
     final flashcardsProvider = context.read<FlashcardsProvider>();
+    final router = GoRouter.of(context);
     
-    // Close dialog/sheet
-    Navigator.of(navContext, rootNavigator: true).pop();
-    
-    // Start study session
+    // Start study session FIRST (while still in overlay)
     final success = await flashcardsProvider.startStudy(
       DeckInfo(
         id: deck.id!,
@@ -1638,11 +1635,18 @@ class _LearningCalendarWidgetState extends State<LearningCalendarWidget> {
       ),
     );
     
-    // Navigate to flashcards if successful
-    if (success && mounted) {
-      context.go('/flashcards');
-    }
+    // Only proceed if successful and widget is still mounted
+    if (!success || !mounted) return;
+    
+    // Navigate directly using GoRouter.go() which will:
+    // 1. Pop any overlay routes (dialog/bottom sheet)
+    // 2. Navigate to the target route
+    // This is the correct way to navigate from inside modal overlays
+    router.go('/flashcards');
   }
+
+
+
 
 
 

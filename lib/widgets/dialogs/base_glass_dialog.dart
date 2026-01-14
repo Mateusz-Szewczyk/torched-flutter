@@ -100,16 +100,17 @@ class BaseGlassDialog extends StatelessWidget {
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXXL)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
           child: Container(
             decoration: BoxDecoration(
-              color: cs.surface.withValues(alpha: isDark ? 0.50 : 0.60),
+              // More transparent for visible glass effect
+              color: cs.surface.withValues(alpha: isDark ? 0.35 : 0.45),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(AppDimens.radiusXXL)),
               border: Border(
                 top: BorderSide(
                   color: isDark 
-                      ? Colors.white.withValues(alpha: 0.1) 
-                      : Colors.black.withValues(alpha: 0.05),
+                      ? Colors.white.withValues(alpha: 0.15) 
+                      : Colors.black.withValues(alpha: 0.08),
                   width: 1,
                 ),
               ),

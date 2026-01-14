@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../providers/conversation_provider.dart';
+import '../dialogs/base_glass_dialog.dart';
+import '../common/glass_components.dart';
 
 /// Conversation list widget - equivalent to conversation-list.tsx
 /// Shows list of conversations with swipe actions and pull-to-refresh
@@ -311,31 +313,11 @@ class _ConversationListState extends State<ConversationList> {
   }
 
   Future<void> _editConversation(BuildContext context, Conversation conversation) async {
-    final controller = TextEditingController(text: conversation.title);
-
-    final result = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Edit Conversation'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'Title',
-            hintText: 'Enter conversation title',
-          ),
-          autofocus: true,
-          onSubmitted: (value) => Navigator.pop(dialogContext, value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
+    final result = await BaseGlassDialog.show<String>(
+      context,
+      maxWidth: 400,
+      child: _EditConversationContent(
+        initialTitle: conversation.title,
       ),
     );
 
@@ -345,8 +327,6 @@ class _ConversationListState extends State<ConversationList> {
         result,
       );
     }
-
-    controller.dispose();
   }
 
   Future<void> _deleteConversation(BuildContext context, Conversation conversation) async {
@@ -365,7 +345,7 @@ class _ConversationListState extends State<ConversationList> {
 }
 
 /// Swipeable conversation item using native Dismissible
-class _SwipeableConversationItem extends StatelessWidget {
+class _SwipeableConversationItem extends StatefulWidget {
   final Conversation conversation;
   final bool isSelected;
   final VoidCallback onTap;
@@ -382,6 +362,13 @@ class _SwipeableConversationItem extends StatelessWidget {
   });
 
   @override
+  State<_SwipeableConversationItem> createState() => _SwipeableConversationItemState();
+}
+
+class _SwipeableConversationItemState extends State<_SwipeableConversationItem> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -389,7 +376,7 @@ class _SwipeableConversationItem extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       child: Dismissible(
-        key: ValueKey(conversation.id),
+        key: ValueKey(widget.conversation.id),
         direction: DismissDirection.endToStart,
         background: Container(
           alignment: Alignment.centerRight,
@@ -408,48 +395,79 @@ class _SwipeableConversationItem extends StatelessWidget {
           HapticFeedback.mediumImpact();
           return true;
         },
-        onDismissed: (direction) => onDelete(),
-        child: Material(
-          color: isSelected
-              ? colorScheme.primaryContainer.withValues(alpha: 0.3)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          child: InkWell(
-            onTap: onTap,
-            onLongPress: () => _showContextMenu(context),
+        onDismissed: (direction) => widget.onDelete(),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: Material(
+            color: widget.isSelected
+                ? colorScheme.tertiary.withOpacity(0.12)
+                : _isHovered
+                    ? colorScheme.tertiary.withOpacity(0.06)
+                    : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
-                    size: 16,
-                    color: isSelected
-                        ? colorScheme.primary
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TypewriterText(
-                      conversation.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected
-                            ? colorScheme.onSurface
-                            : colorScheme.onSurfaceVariant,
+            child: InkWell(
+              onTap: widget.onTap,
+              onLongPress: () => _showContextMenu(context),
+              borderRadius: BorderRadius.circular(8),
+              splashColor: colorScheme.tertiary.withOpacity(0.12),
+              highlightColor: colorScheme.tertiary.withOpacity(0.06),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 48),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                child: Row(
+                  children: [
+                    // Avatar circle with first letter
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: widget.isSelected
+                            ? colorScheme.tertiary.withOpacity(0.2)
+                            : colorScheme.tertiary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(9),
                       ),
-                      duration: const Duration(milliseconds: 60),
+                      child: Center(
+                        child: Text(
+                          widget.conversation.title.isNotEmpty 
+                              ? widget.conversation.title[0].toUpperCase() 
+                              : '?',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.tertiary,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  // Subtle swipe hint
-                  Icon(
-                    Icons.chevron_left,
-                    size: 14,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TypewriterText(
+                        widget.conversation.title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: widget.isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: widget.isSelected
+                              ? colorScheme.onSurface
+                              : colorScheme.onSurfaceVariant,
+                        ),
+                        duration: const Duration(milliseconds: 60),
+                      ),
+                    ),
+                    // Animated chevron - rotates on hover
+                    AnimatedRotation(
+                      turns: _isHovered ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 100),
+                      child: Icon(
+                        Icons.chevron_left,
+                        size: 14,
+                        color: _isHovered
+                            ? colorScheme.onSurfaceVariant.withOpacity(0.6)
+                            : colorScheme.onSurfaceVariant.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -558,6 +576,85 @@ class _TypewriterTextState extends State<TypewriterText> {
       style: widget.style,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// Content widget for editing conversation title using BaseGlassDialog
+class _EditConversationContent extends StatefulWidget {
+  final String initialTitle;
+
+  const _EditConversationContent({required this.initialTitle});
+
+  @override
+  State<_EditConversationContent> createState() => _EditConversationContentState();
+}
+
+class _EditConversationContentState extends State<_EditConversationContent> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialTitle);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.edit_outlined, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              Text(
+                'Edit Conversation',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          GhostTextField(
+            controller: _controller,
+            labelText: 'Title',
+            hintText: 'Enter conversation title',
+            autofocus: true,
+            onSubmitted: (_) => Navigator.pop(context, _controller.text),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context, _controller.text),
+                  child: const Text('Save'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

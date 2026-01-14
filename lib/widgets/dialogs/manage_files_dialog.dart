@@ -543,53 +543,13 @@ class _FilesListState extends State<_FilesList> {
 
   Future<void> _deleteFile(UploadedFileInfo file) async {
     HapticFeedback.mediumImpact();
-    final cs = Theme.of(context).colorScheme;
 
-    // Using BaseGlassDialog for delete confirmation?
-    // Or just a quick dialog since it's an alert.
-    // Let's use showDialog with GlassTile.
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.7),
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.transparent,
-        contentPadding: EdgeInsets.zero,
-        content: GlassTile(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.delete_forever, size: 48, color: cs.error),
-              const SizedBox(height: 16),
-              const Text('Delete File?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(
-                'Are you sure you want to delete "${file.name}"?',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(backgroundColor: cs.error),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Delete'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: 'Delete File?',
+      content: 'Are you sure you want to delete "${file.name}"?',
+      confirmLabel: 'Delete',
+      isDestructive: true,
     );
 
     if (confirmed != true) return;

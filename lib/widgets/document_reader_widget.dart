@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 // Ensure this import points to your actual file structure
 import '../services/workspace_service.dart';
 import '../services/storage_service.dart';
+import 'dialogs/base_glass_dialog.dart';
 
 // ==========================================
 // READER SETTINGS MODEL
@@ -1607,20 +1608,12 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
   // --- DELETE DOCUMENT ---
   
   Future<void> _deleteDocument() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Document'),
-        content: const Text('Are you sure you want to delete this document from the workspace? This action cannot be undone.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true), 
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: 'Delete Document',
+      content: 'Are you sure you want to delete this document from the workspace? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
     );
     
     if (confirmed == true) {

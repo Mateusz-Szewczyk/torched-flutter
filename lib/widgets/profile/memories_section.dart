@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../services/memory_service.dart';
+import '../dialogs/base_glass_dialog.dart';
 
 /// Memories management widget for the Profile dialog
 /// Provides a beautiful UI for viewing, adding, and deleting user memories
@@ -133,55 +134,15 @@ class _MemoriesSectionState extends State<MemoriesSection> with SingleTickerProv
   }
 
   Future<void> _deleteMemory(Memory memory) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade600),
-            const SizedBox(width: 8),
-            const Text('Delete Memory'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Are you sure you want to delete this memory?'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                memory.text.length > 100
-                    ? '${memory.text.substring(0, 100)}...'
-                    : memory.text,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final previewText = memory.text.length > 100
+        ? '${memory.text.substring(0, 100)}...'
+        : memory.text;
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: 'Delete Memory',
+      content: 'Are you sure you want to delete this memory?\n\n"$previewText"',
+      confirmLabel: 'Delete',
+      isDestructive: true,
     );
 
     if (confirmed == true) {
@@ -226,43 +187,12 @@ class _MemoriesSectionState extends State<MemoriesSection> with SingleTickerProv
   }
 
   Future<void> _deleteAllMemories() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.delete_forever, color: Colors.red.shade600),
-            const SizedBox(width: 8),
-            const Text('Delete All Memories'),
-          ],
-        ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This action is irreversible!',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text('All your memories will be permanently deleted. Are you sure?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-            ),
-            child: const Text('Delete All'),
-          ),
-        ],
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: 'Delete All Memories',
+      content: 'This action is irreversible!\n\nAll your memories will be permanently deleted. Are you sure?',
+      confirmLabel: 'Delete All',
+      isDestructive: true,
     );
 
     if (confirmed == true) {
@@ -817,23 +747,12 @@ class _MemoryCard extends StatelessWidget {
       direction: DismissDirection.endToStart,
       onDismissed: (_) => onDelete(),
       confirmDismiss: (_) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Memory?'),
-            content: const Text('This action cannot be undone.'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
+        return await GlassConfirmationDialog.show(
+          context,
+          title: 'Delete Memory?',
+          content: 'This action cannot be undone.',
+          confirmLabel: 'Delete',
+          isDestructive: true,
         );
       },
       background: Container(

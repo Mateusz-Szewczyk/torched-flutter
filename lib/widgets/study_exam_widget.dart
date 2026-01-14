@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/exams_provider.dart';
 import '../services/exam_service.dart';
+import 'dialogs/base_glass_dialog.dart';
 
 /// Widget for studying/taking an exam
 class StudyExamWidget extends StatefulWidget {
@@ -205,23 +206,13 @@ class _StudyExamWidgetState extends State<StudyExamWidget> {
     }
 
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n?.exitExam ?? 'Exit Exam?'),
-        content: Text(l10n?.exitExamWarning ??
-            'Your progress will be lost. Are you sure you want to exit?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n?.cancel ?? 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(l10n?.exit ?? 'Exit'),
-          ),
-        ],
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: l10n?.exitExam ?? 'Exit Exam?',
+      content: l10n?.exitExamWarning ??
+          'Your progress will be lost. Are you sure you want to exit?',
+      confirmLabel: l10n?.exit ?? 'Exit',
+      isDestructive: true,
     );
 
     if (confirmed == true) {

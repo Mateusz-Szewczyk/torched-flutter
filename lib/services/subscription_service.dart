@@ -54,6 +54,50 @@ class CheckoutSession {
   }
 }
 
+/// Data needed for native Payment Sheet initialization
+class PaymentIntentData {
+  final String clientSecret;
+  final String ephemeralKey;
+  final String customerId;
+  final String paymentIntentId;
+
+  PaymentIntentData({
+    required this.clientSecret,
+    required this.ephemeralKey,
+    required this.customerId,
+    required this.paymentIntentId,
+  });
+
+  factory PaymentIntentData.fromJson(Map<String, dynamic> json) {
+    final clientSecret = json['client_secret'];
+    final ephemeralKey = json['ephemeral_key'];
+    final customerId = json['customer_id'];
+    final paymentIntentId = json['payment_intent_id'];
+
+    // Validate required fields - null values indicate backend/Stripe configuration issues
+    if (clientSecret == null || clientSecret is! String) {
+      throw Exception('Invalid response: client_secret is missing or null');
+    }
+    if (ephemeralKey == null || ephemeralKey is! String) {
+      throw Exception('Invalid response: ephemeral_key is missing or null');
+    }
+    if (customerId == null || customerId is! String) {
+      throw Exception('Invalid response: customer_id is missing or null');
+    }
+    if (paymentIntentId == null || paymentIntentId is! String) {
+      throw Exception('Invalid response: payment_intent_id is missing or null');
+    }
+
+    return PaymentIntentData(
+      clientSecret: clientSecret,
+      ephemeralKey: ephemeralKey,
+      customerId: customerId,
+      paymentIntentId: paymentIntentId,
+    );
+  }
+}
+
+
 class SubscriptionService {
   final ApiService _apiService;
 
@@ -89,7 +133,7 @@ class SubscriptionService {
     }
   }
 
-  /// Creates a Stripe Checkout session for the selected plan
+  /// Creates a Stripe Checkout session for the selected plan (legacy - browser redirect)
   Future<CheckoutSession> createCheckoutSession(String planId) async {
     try {
       debugPrint('[SubscriptionService] Creating checkout session for plan: $planId');
@@ -102,6 +146,23 @@ class SubscriptionService {
     } catch (e) {
       debugPrint('[SubscriptionService] Error creating checkout session: $e');
       throw Exception('Failed to create checkout session: $e');
+    }
+  }
+
+  /// Creates a PaymentIntent for native Payment Sheet (recommended)
+  /// Returns data needed to initialize Stripe Payment Sheet in-app
+  Future<PaymentIntentData> createPaymentIntent(String planId) async {
+    try {
+      debugPrint('[SubscriptionService] Creating payment intent for plan: $planId');
+      final response = await _apiService.ragPost(
+        '/payments/create-payment-intent',
+        data: {'plan_id': planId},
+      );
+      debugPrint('[SubscriptionService] Payment intent created: ${response.data}');
+      return PaymentIntentData.fromJson(response.data);
+    } catch (e) {
+      debugPrint('[SubscriptionService] Error creating payment intent: $e');
+      throw Exception('Failed to create payment intent: $e');
     }
   }
 

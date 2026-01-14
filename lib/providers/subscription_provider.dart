@@ -82,6 +82,29 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
+  /// Creates PaymentIntent for native Payment Sheet (recommended flow)
+  Future<PaymentIntentData?> createPaymentIntent(String planId) async {
+    if (_isCreatingCheckout) return null;
+
+    _isCreatingCheckout = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      debugPrint('[SubscriptionProvider] Creating payment intent for plan: $planId');
+      final paymentData = await _subscriptionService.createPaymentIntent(planId);
+      debugPrint('[SubscriptionProvider] Payment intent created: ${paymentData.paymentIntentId}');
+      return paymentData;
+    } catch (e) {
+      debugPrint('[SubscriptionProvider] Error creating payment intent: $e');
+      _error = e.toString();
+      return null;
+    } finally {
+      _isCreatingCheckout = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> refreshAfterPayment() async {
     debugPrint('[SubscriptionProvider] Refreshing after payment...');
 

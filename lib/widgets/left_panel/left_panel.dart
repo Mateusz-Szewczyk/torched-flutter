@@ -263,6 +263,9 @@ class _LeftPanelState extends State<LeftPanel> {
   }
 
   Widget _buildPrimaryNavigation(BuildContext context, bool isAuthenticated) {
+    // Get current route for active state detection
+    final currentRoute = GoRouterState.of(context).matchedLocation;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
       child: Column(
@@ -280,6 +283,7 @@ class _LeftPanelState extends State<LeftPanel> {
               route: '/flashcards',
               isPanelVisible: widget.isPanelVisible,
               isMobile: widget.isMobile,
+              isActive: currentRoute.startsWith('/flashcards'),
               onTap: () {
                 // Navigate and close panel on mobile to avoid manual closing
                 context.go('/flashcards');
@@ -292,6 +296,7 @@ class _LeftPanelState extends State<LeftPanel> {
               route: '/tests',
               isPanelVisible: widget.isPanelVisible,
               isMobile: widget.isMobile,
+              isActive: currentRoute.startsWith('/tests'),
               onTap: () {
                 context.go('/tests');
                 if (widget.isMobile) widget.togglePanel();
@@ -311,6 +316,7 @@ class _LeftPanelState extends State<LeftPanel> {
       ),
     );
   }
+
 
   Widget _buildWorkspacesSection(BuildContext context) {
     final workspaceProvider = context.watch<WorkspaceProvider>();
@@ -725,131 +731,150 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
-        child: GestureDetector(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.isMobile ? 12 : 10,
-              vertical: widget.isMobile ? 12 : 10,
-            ),
-            decoration: BoxDecoration(
-              color: _isHovered
-                  ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7)
-                  : Colors.transparent,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          transform: Matrix4.translationValues(_isHovered ? -2 : 0, 0, 0),
+          child: Material(
+            color: _isHovered
+                ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.08 : 0.12)
+                : colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.04 : 0.06),
+            borderRadius: BorderRadius.circular(12),
+            elevation: _isHovered ? 2 : 0,
+            shadowColor: colorScheme.shadow.withOpacity(0.15),
+            child: InkWell(
+              onTap: widget.onTap,
               borderRadius: BorderRadius.circular(12),
-              border: _isHovered
-                  ? Border.all(
-                      color: colorScheme.outline.withValues(alpha: 0.1),
-                      width: 1,
-                    )
-                  : null,
-            ),
-            child: Row(
-              children: [
-                // Workspace icon with gradient
-                Container(
-                  width: widget.isMobile ? 36 : 32,
-                  height: widget.isMobile ? 36 : 32,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        colorScheme.tertiary.withOpacity(0.15),
-                        colorScheme.tertiary.withOpacity(0.08),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: colorScheme.tertiary.withOpacity(0.2),
-                      width: 1,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.workspaces_rounded,
-                    size: widget.isMobile ? 18 : 16,
-                    color: colorScheme.tertiary,
+              splashColor: colorScheme.tertiary.withOpacity(0.12),
+              highlightColor: colorScheme.tertiary.withOpacity(0.06),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                constraints: const BoxConstraints(minHeight: 48),
+                padding: EdgeInsets.symmetric(
+                  horizontal: widget.isMobile ? 12 : 10,
+                  vertical: widget.isMobile ? 10 : 8,
+                ),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isHovered
+                        ? colorScheme.tertiary.withOpacity(0.2)
+                        : colorScheme.outline.withOpacity(0.08),
+                    width: 1,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.workspace.name,
-                        style: TextStyle(
-                          fontSize: widget.isMobile ? 14 : 13,
-                          fontWeight: FontWeight.w500,
-                          color: colorScheme.onSurface,
+                child: Row(
+                  children: [
+                    // Workspace icon with gradient
+                    Container(
+                      width: widget.isMobile ? 36 : 32,
+                      height: widget.isMobile ? 36 : 32,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            colorScheme.tertiary.withOpacity(0.18),
+                            colorScheme.tertiary.withOpacity(0.10),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: colorScheme.tertiary.withOpacity(0.25),
+                          width: 1,
+                        ),
                       ),
-                      if (widget.workspace.categories.isNotEmpty)
-                        Text(
-                          '${widget.workspace.categories.length} ${widget.workspace.categories.length == 1 ? 'category' : 'categories'}',
-                          style: TextStyle(
-                            fontSize: widget.isMobile ? 11 : 10,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                      child: Icon(
+                        Icons.workspaces_rounded,
+                        size: widget.isMobile ? 18 : 16,
+                        color: colorScheme.tertiary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Tooltip(
+                            message: widget.workspace.name,
+                            waitDuration: const Duration(milliseconds: 500),
+                            child: Text(
+                              widget.workspace.name,
+                              style: TextStyle(
+                                fontSize: widget.isMobile ? 14 : 13,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                    ],
-                  ),
-                ),
-                // Show menu only on hover (desktop) or always (mobile)
-                AnimatedOpacity(
-                  opacity: _isHovered || widget.isMobile ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 150),
-                  child: PopupMenuButton<String>(
-                    icon: Icon(
-                      Icons.more_horiz_rounded,
-                      size: widget.isMobile ? 20 : 18,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    onSelected: (value) {
-                      switch (value) {
-                        case 'edit':
-                          widget.onEdit();
-                          break;
-                        case 'delete':
-                          widget.onDelete();
-                          break;
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit_rounded, size: 18, color: colorScheme.onSurface),
-                            const SizedBox(width: 8),
-                            const Text('Edit Details'),
-                          ],
-                        ),
+                          if (widget.workspace.categories.isNotEmpty)
+                            Text(
+                              '${widget.workspace.categories.length} ${widget.workspace.categories.length == 1 ? 'category' : 'categories'}',
+                              style: TextStyle(
+                                fontSize: widget.isMobile ? 11 : 10,
+                                color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
                       ),
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_rounded, size: 18, color: colorScheme.error),
-                            const SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: colorScheme.error)),
-                          ],
+                    ),
+                    // Show menu only on hover (desktop) or always (mobile)
+                    AnimatedOpacity(
+                      opacity: _isHovered || widget.isMobile ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 150),
+                      child: PopupMenuButton<String>(
+                        icon: Icon(
+                          Icons.more_horiz_rounded,
+                          size: widget.isMobile ? 20 : 18,
+                          color: colorScheme.onSurfaceVariant,
                         ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'edit':
+                              widget.onEdit();
+                              break;
+                            case 'delete':
+                              widget.onDelete();
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit_rounded, size: 18, color: colorScheme.onSurface),
+                                const SizedBox(width: 8),
+                                const Text('Edit Details'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_rounded, size: 18, color: colorScheme.error),
+                                const SizedBox(width: 8),
+                                Text('Delete', style: TextStyle(color: colorScheme.error)),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -857,6 +882,7 @@ class _WorkspaceItemState extends State<_WorkspaceItem> {
     );
   }
 }
+
 
 // Navigation item widget
 enum _NavItemVariant { ghost, filled, outline }
@@ -918,7 +944,7 @@ class _NavItemState extends State<_NavItem> {
             child: Text(
               widget.label,
               style: TextStyle(
-                fontWeight: FontWeight.w500,
+                fontWeight: widget.isActive ? FontWeight.w600 : FontWeight.w500,
                 fontSize: widget.isMobile ? 14 : 13,
                 color: isFilledVariant
                     ? colorScheme.onPrimary
@@ -942,42 +968,50 @@ class _NavItemState extends State<_NavItem> {
         label: widget.label,
         button: true,
         selected: widget.isActive,
-        child: GestureDetector(
-          onTap: widget.onTap ?? (widget.route != null ? () => context.go(widget.route!) : null),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: widget.isPanelVisible
-                ? EdgeInsets.symmetric(
-                    horizontal: widget.isMobile ? 14 : 12,
-                    vertical: widget.isMobile ? 12 : 10,
-                  )
-                : EdgeInsets.all(widget.isMobile ? 10 : 8),
-            decoration: BoxDecoration(
-              // Filled variant uses tertiary (orange) color
-              color: isFilledVariant
-                  ? colorScheme.tertiary
-                  : widget.isActive
-                      ? colorScheme.tertiary.withOpacity(0.12)
-                      : _isHovered
-                          ? colorScheme.surfaceContainerHighest.withOpacity(isDark ? 0.5 : 0.7)
-                          : Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
-              // Active indicator - left border
-              border: widget.isActive && !isFilledVariant
-                  ? Border(
-                      left: BorderSide(
-                        color: colorScheme.tertiary,
-                        width: 3,
-                      ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap ?? (widget.route != null ? () => context.go(widget.route!) : null),
+            borderRadius: BorderRadius.circular(12),
+            splashColor: colorScheme.tertiary.withOpacity(0.15),
+            highlightColor: colorScheme.tertiary.withOpacity(0.08),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOutCubic,
+              constraints: const BoxConstraints(minHeight: 48), // Material Design touch target
+              padding: widget.isPanelVisible
+                  ? EdgeInsets.symmetric(
+                      horizontal: widget.isMobile ? 14 : 12,
+                      vertical: widget.isMobile ? 12 : 10,
                     )
-                  : _isHovered && !isFilledVariant
-                      ? Border.all(
-                          color: colorScheme.outline.withValues(alpha: 0.1),
-                          width: 1,
-                        )
-                      : null,
+                  : EdgeInsets.all(widget.isMobile ? 10 : 8),
+              decoration: BoxDecoration(
+                // Filled variant uses tertiary (orange) color
+                color: isFilledVariant
+                    ? colorScheme.tertiary
+                    : widget.isActive
+                        ? colorScheme.tertiary.withOpacity(0.12)
+                        : _isHovered
+                            ? colorScheme.tertiary.withOpacity(0.08)
+                            : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                // Active indicator - left border with smooth animation
+                border: widget.isActive && !isFilledVariant
+                    ? Border(
+                        left: BorderSide(
+                          color: colorScheme.tertiary,
+                          width: 3,
+                        ),
+                      )
+                    : _isHovered && !isFilledVariant
+                        ? Border.all(
+                            color: colorScheme.outline.withValues(alpha: 0.1),
+                            width: 1,
+                          )
+                        : null,
+              ),
+              child: content,
             ),
-            child: content,
           ),
         ),
       ),
@@ -995,50 +1029,51 @@ class _NavItemState extends State<_NavItem> {
   }
 }
 
-Future<void> _showSubscriptionView(BuildContext context) async {
-  // Pre-fetch plans if needed, though SubscriptionSection initState also handles it.
-  // await context.read<SubscriptionProvider>().fetchPlans();
 
+Future<void> _showSubscriptionView(BuildContext context) async {
   if (!context.mounted) return;
 
-  final width = MediaQuery.of(context).size.width;
-  final isDesktop = width > 600; // Breakpoint for desktop/tablet
+  final screenHeight = MediaQuery.of(context).size.height;
 
-  if (isDesktop) {
-    // DESKTOP: Show as a Dialog
-    await showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 700),
-          child: const _SubscriptionWrapper(
-            showCloseButton: true, // Add explicit close button for dialog
+  // Use BaseGlassDialog for consistent glass design (sheet on mobile, dialog on desktop)
+  await BaseGlassDialog.show(
+    context,
+    maxWidth: 550,
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: screenHeight * 0.70, // Max 70% of screen height
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+            child: Row(
+              children: [
+                Text(
+                  'Subscription Plans',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
           ),
-        ),
+          const Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: SubscriptionSection(),
+            ),
+          ),
+        ],
       ),
-    );
-  } else {
-    // MOBILE: Show as Bottom Sheet with swipe-to-close
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, // Allows full height
-      useSafeArea: true,
-      showDragHandle: true, // Adds the small grey handle indicator
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9, // Opens at 90% height
-        minChildSize: 0.5,     // Can be dragged down to 50%
-        maxChildSize: 1.0,     // Can be dragged up to full screen
-        expand: false,         // Respects content size
-        builder: (_, scrollController) => _SubscriptionWrapper(
-          scrollController: scrollController,
-        ),
-      ),
-    );
-  }
+    ),
+  );
 }
 
 /// Wrapper to handle scroll controller injection for the bottom sheet

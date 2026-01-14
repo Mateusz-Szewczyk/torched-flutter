@@ -44,6 +44,9 @@ dependencies:
   flutter_web_auth_2: ^4.1.0
   url_launcher: ^6.2.2
 
+  # Stripe Payments
+  flutter_stripe: ^11.3.0
+
   # Forms & validation
   flutter_form_builder: ^10.2.0
   form_builder_validators: ^11.0.0

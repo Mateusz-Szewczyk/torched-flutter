@@ -126,105 +126,11 @@ class _WorkspaceFormDialogState extends State<WorkspaceFormDialog> {
   }
 
   Future<void> _showAddCategoryDialog() async {
-    final l10n = AppLocalizations.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-    final controller = TextEditingController();
-    final isCreatingNotifier = ValueNotifier<bool>(false);
-
-    final result = await showDialog<CategoryModel?>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.create_new_folder_rounded, color: colorScheme.primary),
-            const SizedBox(width: 12),
-            Text(l10n?.addNewCategory ?? 'New Category'),
-          ],
-        ),
-        content: ValueListenableBuilder<bool>(
-          valueListenable: isCreatingNotifier,
-          builder: (context, isCreating, _) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                autofocus: true,
-                enabled: !isCreating,
-                decoration: InputDecoration(
-                  labelText: l10n?.categoryName ?? 'Category Name',
-                  hintText: 'e.g., Biology, History',
-                  prefixIcon: const Icon(Icons.folder_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest.withAlpha(100),
-                ),
-                onSubmitted: isCreating ? null : (value) async {
-                  if (value.trim().isNotEmpty) {
-                    isCreatingNotifier.value = true;
-                    try {
-                      final newCategory = await _categoryService.createCategory(value.trim());
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop(newCategory);
-                      }
-                    } catch (e) {
-                      isCreatingNotifier.value = false;
-                      if (dialogContext.mounted) {
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          SnackBar(
-                            content: Text('Failed to create category: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  }
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text(l10n?.cancel ?? 'Cancel'),
-          ),
-          ValueListenableBuilder<bool>(
-            valueListenable: isCreatingNotifier,
-            builder: (context, isCreating, _) => FilledButton(
-              onPressed: isCreating ? null : () async {
-                if (controller.text.trim().isNotEmpty) {
-                  isCreatingNotifier.value = true;
-                  try {
-                    final newCategory = await _categoryService.createCategory(controller.text.trim());
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop(newCategory);
-                    }
-                  } catch (e) {
-                    isCreatingNotifier.value = false;
-                    if (dialogContext.mounted) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to create category: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              child: isCreating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : Text(l10n?.create ?? 'Create'),
-            ),
-          ),
-        ],
+    final result = await BaseGlassDialog.show<CategoryModel?>(
+      context,
+      maxWidth: 400,
+      child: _AddCategoryContent(
+        categoryService: _categoryService,
       ),
     );
 
@@ -450,5 +356,112 @@ class _WorkspaceFormDialogState extends State<WorkspaceFormDialog> {
     _nameController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+}
+
+/// Content widget for adding a new category using BaseGlassDialog
+class _AddCategoryContent extends StatefulWidget {
+  final CategoryService categoryService;
+
+  const _AddCategoryContent({required this.categoryService});
+
+  @override
+  State<_AddCategoryContent> createState() => _AddCategoryContentState();
+}
+
+class _AddCategoryContentState extends State<_AddCategoryContent> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isCreating = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _createCategory() async {
+    final value = _controller.text.trim();
+    if (value.isEmpty) return;
+
+    setState(() => _isCreating = true);
+
+    try {
+      final newCategory = await widget.categoryService.createCategory(value);
+      if (mounted) {
+        Navigator.of(context).pop(newCategory);
+      }
+    } catch (e) {
+      setState(() => _isCreating = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create category: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.create_new_folder_rounded, color: colorScheme.primary),
+              const SizedBox(width: 12),
+              Text(
+                l10n?.addNewCategory ?? 'New Category',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          GhostTextField(
+            controller: _controller,
+            labelText: l10n?.categoryName ?? 'Category Name',
+            hintText: 'e.g., Biology, History',
+            prefixIcon: Icons.folder_outlined,
+            autofocus: true,
+            enabled: !_isCreating,
+            onSubmitted: _isCreating ? null : (_) => _createCategory(),
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isCreating ? null : () => Navigator.of(context).pop(),
+                  child: Text(l10n?.cancel ?? 'Cancel'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _isCreating ? null : _createCategory,
+                  child: _isCreating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(l10n?.create ?? 'Create'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

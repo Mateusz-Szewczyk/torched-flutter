@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'config/theme.dart';
 import 'config/router.dart';
+import 'config/stripe_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
@@ -19,6 +22,17 @@ import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Stripe (only on mobile - web uses JS SDK)
+  if (!kIsWeb && StripeConfig.isConfigured) {
+    try {
+      Stripe.publishableKey = StripeConfig.publishableKey;
+      await Stripe.instance.applySettings();
+    } catch (e) {
+      debugPrint('[Main] Stripe initialization failed: $e');
+    }
+  }
+
 
   // Initialize services
   final storageService = StorageService();

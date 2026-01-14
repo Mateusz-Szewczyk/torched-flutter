@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import '../../providers/subscription_provider.dart';
 import '../../services/subscription_service.dart';
+import '../subscription/plan_confirmation_sheet.dart';
+import '../subscription/payment_success_screen.dart';
 
 /// Subscription management section for profile dialog
 /// Shows current plan and allows upgrade to Pro/Expert
@@ -13,15 +17,31 @@ class SubscriptionSection extends StatefulWidget {
   State<SubscriptionSection> createState() => _SubscriptionSectionState();
 }
 
-class _SubscriptionSectionState extends State<SubscriptionSection> {
+class _SubscriptionSectionState extends State<SubscriptionSection>
+    with TickerProviderStateMixin {
   String? _upgradingPlanId;
+  late AnimationController _animationController;
+  bool _hasAnimated = false;
 
   @override
   void initState() {
     super.initState();
+    
+    // Animation controller for staggered card animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SubscriptionProvider>().fetchPlans();
     });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
@@ -30,6 +50,12 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
     final subscriptionProvider = context.watch<SubscriptionProvider>();
     final stats = subscriptionProvider.stats;
     final plans = subscriptionProvider.plans;
+
+    // Trigger animation when plans are loaded
+    if (plans != null && !_hasAnimated) {
+      _hasAnimated = true;
+      _animationController.forward();
+    }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -43,14 +69,14 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
 
           // Section Header
           Text(
-            'Choose Your Plan',
+            'Wybierz swój plan',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Unlock more features with a premium subscription',
+            'Odblokuj więcej funkcji z subskrypcją premium',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
             ),
@@ -66,13 +92,15 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                 child: CircularProgressIndicator(),
               ),
             )
-          // Plans list
+          // Plans list with staggered animation
           else if (plans != null)
-            ...plans.map((plan) => _buildPlanCard(
+            ...plans.asMap().entries.map((entry) => _buildAnimatedPlanCard(
               context,
-              plan,
+              entry.value,
+              index: entry.key,
+              totalPlans: plans.length,
               currentRole: stats?.role ?? 'user',
-              isUpgrading: _upgradingPlanId == plan.id,
+              isUpgrading: _upgradingPlanId == entry.value.id,
               cs: cs,
             ))
           // Error state
@@ -81,9 +109,52 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
 
           const SizedBox(height: 24),
 
-          // Info box
-          _buildInfoBox(context, cs),
+          // Trust signals
+          _buildTrustSignals(context, cs),
         ],
+      ),
+    );
+  }
+
+  /// Wraps plan card with staggered animation
+  Widget _buildAnimatedPlanCard(
+    BuildContext context,
+    SubscriptionPlan plan, {
+    required int index,
+    required int totalPlans,
+    required String currentRole,
+    required bool isUpgrading,
+    required ColorScheme cs,
+  }) {
+    final delayFraction = index / (totalPlans + 1);
+    final endFraction = (index + 1) / (totalPlans + 1);
+
+    final slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.3),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Interval(delayFraction, endFraction, curve: Curves.easeOutCubic),
+    ));
+
+    final fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Interval(delayFraction, endFraction, curve: Curves.easeOut),
+      ),
+    );
+
+    return SlideTransition(
+      position: slideAnimation,
+      child: FadeTransition(
+        opacity: fadeAnimation,
+        child: _buildPlanCard(
+          context,
+          plan,
+          currentRole: currentRole,
+          isUpgrading: isUpgrading,
+          cs: cs,
+        ),
       ),
     );
   }
@@ -126,7 +197,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Current Plan',
+                  'Aktualny plan',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: isPro ? cs.onPrimaryContainer.withAlpha(180) : cs.onSurfaceVariant,
                   ),
@@ -155,7 +226,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                   const Icon(Icons.check_circle, color: Colors.green, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    'Active',
+                    'Aktywny',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: Colors.green,
                       fontWeight: FontWeight.bold,
@@ -209,7 +280,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                   Icon(Icons.star, color: cs.onPrimary, size: 18),
                   const SizedBox(width: 8),
                   Text(
-                    'MOST POPULAR',
+                    'NAJPOPULARNIEJSZY',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: cs.onPrimary,
                       fontWeight: FontWeight.w800,
@@ -312,7 +383,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                             const Icon(Icons.check, color: Colors.green, size: 18),
                             const SizedBox(width: 8),
                             Text(
-                              'Current Plan',
+                              'Aktualny plan',
                               style: TextStyle(color: Colors.green.shade700),
                             ),
                           ],
@@ -322,7 +393,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                       ? const SizedBox.shrink()
                       : isUpgrade
                         ? FilledButton(
-                            onPressed: isUpgrading ? null : () => _handleUpgrade(plan.id),
+                            onPressed: isUpgrading ? null : () => _handleUpgrade(plan),
                             style: FilledButton.styleFrom(
                               backgroundColor: plan.popular ? cs.primary : cs.primaryContainer,
                               foregroundColor: plan.popular ? cs.onPrimary : cs.onPrimaryContainer,
@@ -344,7 +415,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                                   children: [
                                     const Icon(Icons.upgrade, size: 18),
                                     const SizedBox(width: 8),
-                                    Text('Upgrade to ${plan.name}'),
+                                    Text('Wybierz ${plan.name}'),
                                   ],
                                 ),
                           )
@@ -355,7 +426,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            child: const Text('Not available'),
+                            child: const Text('Niedostępne'),
                           ),
                 ),
               ],
@@ -378,7 +449,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
           Icon(Icons.error_outline, color: cs.error, size: 40),
           const SizedBox(height: 12),
           Text(
-            'Failed to load plans',
+            'Nie udało się załadować planów',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: cs.error,
             ),
@@ -394,7 +465,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
           const SizedBox(height: 16),
           OutlinedButton(
             onPressed: () => context.read<SubscriptionProvider>().fetchPlans(),
-            child: const Text('Retry'),
+            child: const Text('Spróbuj ponownie'),
           ),
         ],
       ),
@@ -441,6 +512,178 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
     );
   }
 
+  Widget _buildTrustSignals(BuildContext context, ColorScheme cs) {
+    return Column(
+      children: [
+        // Trust badges row
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest.withAlpha(80),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              // Secure payment badge
+              Expanded(
+                child: _buildTrustBadge(
+                  context,
+                  icon: Icons.lock_outline,
+                  label: 'Bezpieczna\npłatność',
+                  cs: cs,
+                ),
+              ),
+              
+              // Vertical divider
+              Container(
+                width: 1,
+                height: 40,
+                color: cs.outlineVariant.withAlpha(100),
+              ),
+              
+              // Cancel anytime badge
+              Expanded(
+                child: _buildTrustBadge(
+                  context,
+                  icon: Icons.event_available_outlined,
+                  label: 'Anuluj kiedy\nchcesz',
+                  cs: cs,
+                ),
+              ),
+              
+              // Vertical divider
+              Container(
+                width: 1,
+                height: 40,
+                color: cs.outlineVariant.withAlpha(100),
+              ),
+              
+              // Payment methods
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildPaymentMethodIcon('VISA', cs),
+                        const SizedBox(width: 6),
+                        _buildPaymentMethodIcon('MC', cs),
+                        const SizedBox(width: 6),
+                        _buildPaymentMethodIcon('BLIK', cs),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Metody płatności',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Stripe powered by text
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.verified_user_outlined,
+              size: 14,
+              color: cs.onSurfaceVariant.withAlpha(150),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              'Płatności obsługiwane przez Stripe',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant.withAlpha(150),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTrustBadge(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required ColorScheme cs,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 22,
+          color: cs.primary,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            fontSize: 10,
+            height: 1.2,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentMethodIcon(String method, ColorScheme cs) {
+    Color bgColor;
+    String label;
+    
+    switch (method) {
+      case 'VISA':
+        bgColor = const Color(0xFF1A1F71);
+        label = 'VISA';
+        break;
+      case 'MC':
+        bgColor = const Color(0xFFEB001B);
+        label = 'MC';
+        break;
+      case 'BLIK':
+        bgColor = const Color(0xFFE6007E);
+        label = 'BLIK';
+        break;
+      default:
+        bgColor = cs.primary;
+        label = method;
+    }
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+
   bool _isUpgrade(String currentRole, String targetPlan) {
     final roleOrder = {'user': 0, 'free': 0, 'pro': 1, 'expert': 2};
     final currentOrder = roleOrder[currentRole.toLowerCase()] ?? 0;
@@ -448,39 +691,99 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
     return targetOrder > currentOrder;
   }
 
-  Future<void> _handleUpgrade(String planId) async {
-    setState(() => _upgradingPlanId = planId);
+  Future<void> _handleUpgrade(SubscriptionPlan plan) async {
+    // Step 1: Show confirmation sheet using glass dialog
+    final confirmed = await PlanConfirmationSheet.show(context, plan);
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _upgradingPlanId = plan.id);
 
     try {
       final subscriptionProvider = context.read<SubscriptionProvider>();
-      final session = await subscriptionProvider.createCheckoutSession(planId);
 
-      if (session != null && mounted) {
-        // Open Stripe Checkout in browser
-        final uri = Uri.parse(session.checkoutUrl);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Step 2: Create PaymentIntent for native Payment Sheet
+      final paymentData = await subscriptionProvider.createPaymentIntent(plan.id);
 
-          // Show info dialog after redirect
-          if (mounted) {
-            _showPaymentInProgressDialog();
-          }
-        } else {
-          throw Exception('Could not open payment page');
+      if (paymentData == null) {
+        if (subscriptionProvider.error != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(subscriptionProvider.error!),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
         }
-      } else if (subscriptionProvider.error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(subscriptionProvider.error!),
-            backgroundColor: Theme.of(context).colorScheme.error,
+        return;
+      }
+
+      if (!mounted) return;
+
+      // Step 3: Initialize Payment Sheet
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          merchantDisplayName: 'TorchED',
+          customerId: paymentData.customerId,
+          customerEphemeralKeySecret: paymentData.ephemeralKey,
+          paymentIntentClientSecret: paymentData.clientSecret,
+          style: Theme.of(context).brightness == Brightness.dark
+              ? ThemeMode.dark
+              : ThemeMode.light,
+          appearance: PaymentSheetAppearance(
+            colors: PaymentSheetAppearanceColors(
+              primary: Theme.of(context).colorScheme.primary,
+            ),
+            shapes: const PaymentSheetShape(
+              borderRadius: 16,
+            ),
           ),
-        );
+        ),
+      );
+
+      // Step 4: Present Payment Sheet
+      await Stripe.instance.presentPaymentSheet();
+
+      // Step 5: Payment successful - haptic feedback
+      HapticFeedback.mediumImpact();
+
+      if (!mounted) return;
+
+      // Step 6: Navigate to success screen
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => PaymentSuccessScreen(
+            planId: plan.id,
+            planName: plan.name,
+          ),
+        ),
+      );
+
+      // Step 7: Refresh subscription data
+      if (result == true) {
+        await subscriptionProvider.refreshAfterPayment();
+      }
+
+    } on StripeException catch (e) {
+      // Handle Stripe-specific errors (e.g., user cancelled)
+      if (e.error.code == FailureCode.Canceled) {
+        // User cancelled - no error message needed
+        debugPrint('[SubscriptionSection] Payment cancelled by user');
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Błąd płatności: ${e.error.localizedMessage ?? e.error.message}'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
       }
     } catch (e) {
+      debugPrint('[SubscriptionSection] Error during payment: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: $e'),
+            content: Text('Błąd: $e'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -492,6 +795,7 @@ class _SubscriptionSectionState extends State<SubscriptionSection> {
     }
   }
 
+  /// Legacy method for browser-based checkout (fallback)
   void _showPaymentInProgressDialog() {
     showDialog(
       context: context,
@@ -551,7 +855,7 @@ class _PaymentProgressDialogState extends State<_PaymentProgressDialog> {
             color: _upgraded ? Colors.green : Colors.blue,
           ),
           const SizedBox(width: 12),
-          Text(_upgraded ? 'Subscription Updated!' : 'Payment in Progress'),
+          Text(_upgraded ? 'Subskrypcja aktywowana!' : 'Płatność w toku'),
         ],
       ),
       content: Column(
@@ -576,7 +880,7 @@ class _PaymentProgressDialogState extends State<_PaymentProgressDialog> {
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      'Your new features are now active!',
+                      'Nowe funkcje są już aktywne!',
                       style: TextStyle(color: Colors.green),
                     ),
                   ),
@@ -585,8 +889,8 @@ class _PaymentProgressDialogState extends State<_PaymentProgressDialog> {
             ),
           ] else ...[
             const Text(
-              'Complete your payment in the opened browser tab.\n\n'
-              'After payment, click "Check Status" to verify your subscription.',
+              'Dokończ płatność w otwartej karcie przeglądarki.\n\n'
+              'Po płatności kliknij "Sprawdź status", aby zweryfikować subskrypcję.',
             ),
             const SizedBox(height: 16),
             Container(
@@ -601,7 +905,7 @@ class _PaymentProgressDialogState extends State<_PaymentProgressDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Your subscription usually updates within 30 seconds after payment.',
+                      'Subskrypcja zwykle aktualizuje się w ciągu 30 sekund po płatności.',
                       style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
                     ),
                   ),
@@ -621,7 +925,7 @@ class _PaymentProgressDialogState extends State<_PaymentProgressDialog> {
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Check Status'),
+              : const Text('Sprawdź status'),
           ),
         TextButton(
           onPressed: () => Navigator.pop(context),

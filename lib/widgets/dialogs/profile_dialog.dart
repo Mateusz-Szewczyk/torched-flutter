@@ -1,4 +1,3 @@
-import 'dart:ui'; // Required for BackdropFilter
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -47,69 +46,44 @@ class _ProfileDialogState extends State<ProfileDialog> with SingleTickerProvider
   }
 
   void _showSubscriptionSheet(BuildContext context) {
-    // ... reusing the mobile sheet logic for simplicity across platforms or keep separate?
-    // The previous implementation had distinct logic.
-    // We'll use a modal bottom sheet for both
-    final cs = Theme.of(context).colorScheme;
-
-    // Using BaseGlassDialog for subscription sheet as well?
-    // It might stack weirdly if we abuse it. Let's use showModalBottomSheet with a custom glass container.
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-               decoration: BoxDecoration(
-                color: cs.surface.withOpacity(0.9),
-                border: Border(top: BorderSide(color: Colors.white.withOpacity(0.1))),
-              ),
-              child: Column(
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Use BaseGlassDialog for responsive behavior (sheet on mobile, dialog on desktop)
+    BaseGlassDialog.show(
+      context,
+      maxWidth: 550,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: screenHeight * 0.70, // Max 70% of screen height
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+              child: Row(
                 children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(2),
+                  Text(
+                    'Subscription Plans',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Subscription Plans',
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      controller: scrollController,
-                      child: const SubscriptionSection(),
-                    ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-          ),
+            const Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: SubscriptionSection(),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -689,46 +663,12 @@ class _ProfileContentState extends State<_ProfileContent> {
   VoidCallback? get onUpgradeTap => widget.onUpgradeTap;
 
   Future<void> _handleLogout(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.7),
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.transparent,
-        contentPadding: EdgeInsets.zero,
-        content: GlassTile(
-          opacity: 0.9,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.logout, size: 48, color: cs.primary),
-              const SizedBox(height: 16),
-              const Text('Disconnect?', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Are you sure you want to log out?', textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Logout'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    final confirmed = await GlassConfirmationDialog.show(
+      context,
+      title: 'Disconnect?',
+      content: 'Are you sure you want to log out?',
+      confirmLabel: 'Logout',
+      isDestructive: false,
     );
 
     if (confirmed == true && context.mounted) {
