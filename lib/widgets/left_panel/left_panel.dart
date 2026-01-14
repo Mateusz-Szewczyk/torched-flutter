@@ -89,7 +89,140 @@ class _LeftPanelState extends State<LeftPanel> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Glassmorphism panel
+    // =========================================================================
+    // COLLAPSED STATE: Completely separate, simple layout
+    // =========================================================================
+    if (!widget.isPanelVisible && !widget.isMobile) {
+      return ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            width: 64,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        colorScheme.surface.withValues(alpha: 0.85),
+                        colorScheme.surfaceContainerLow.withValues(alpha: 0.75),
+                      ]
+                    : [
+                        colorScheme.surface.withValues(alpha: 0.92),
+                        colorScheme.surfaceContainerLow.withValues(alpha: 0.88),
+                      ],
+              ),
+              border: Border(
+                right: BorderSide(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.03),
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                // Logo / expand button at top
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: _CollapsedIconButton(
+                    icon: Icons.menu_rounded,
+                    tooltip: 'Expand panel',
+                    onTap: widget.togglePanel,
+                  ),
+                ),
+                
+                const SizedBox(height: 8),
+                
+                // Navigation icons
+                if (isAuthenticated) ...[
+                  _CollapsedIconButton(
+                    icon: Icons.style_rounded,
+                    tooltip: 'Flashcards',
+                    isActive: GoRouterState.of(context).matchedLocation.startsWith('/flashcards'),
+                    onTap: () {
+                      context.read<ConversationProvider>().setCurrentConversation(null);
+                      context.go('/flashcards');
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _CollapsedIconButton(
+                    icon: Icons.quiz_rounded,
+                    tooltip: 'Tests',
+                    isActive: GoRouterState.of(context).matchedLocation.startsWith('/tests'),
+                    onTap: () {
+                      context.read<ConversationProvider>().setCurrentConversation(null);
+                      context.go('/tests');
+                    },
+                  ),
+                  const SizedBox(height: 4),
+                  _CollapsedIconButton(
+                    icon: Icons.folder_rounded,
+                    tooltip: 'My Files',
+                    onTap: () => ManageFilesDialog.show(context),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Workspaces icon
+                  _CollapsedIconButton(
+                    icon: Icons.workspaces_rounded,
+                    tooltip: 'Workspaces',
+                    onTap: widget.togglePanel, // Expand to show workspaces
+                  ),
+                  
+                  const SizedBox(height: 4),
+                  
+                  // Conversations icon
+                  _CollapsedIconButton(
+                    icon: Icons.chat_rounded,
+                    tooltip: 'Conversations',
+                    onTap: widget.togglePanel, // Expand to show conversations
+                  ),
+                ],
+                
+                const Spacer(),
+                
+                // Footer icons
+                SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _CollapsedIconButton(
+                          icon: Icons.person_rounded,
+                          tooltip: isAuthenticated ? 'My Profile' : 'Login',
+                          onTap: () {
+                            if (isAuthenticated) {
+                              showProfileDialog(context);
+                            } else {
+                              LoginRegisterDialog.show(context);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 4),
+                        _CollapsedIconButton(
+                          icon: Icons.settings_rounded,
+                          tooltip: 'Settings',
+                          onTap: () => showSettingsDialog(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // =========================================================================
+    // EXPANDED STATE: Full panel with all content
+    // =========================================================================
     return ClipRRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
@@ -286,9 +419,14 @@ class _LeftPanelState extends State<LeftPanel> {
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
+      // No horizontal padding for collapsed state - icons need full width
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.isPanelVisible ? AppDimens.paddingM : 0,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: widget.isPanelVisible 
+            ? CrossAxisAlignment.start 
+            : CrossAxisAlignment.center,
         children: [
           // Subtle section header
           if (widget.isPanelVisible)
@@ -351,9 +489,14 @@ class _LeftPanelState extends State<LeftPanel> {
     final currentRoute = GoRouterState.of(context).matchedLocation;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingM),
+      // No horizontal padding for collapsed state - icons need full width
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.isPanelVisible ? AppDimens.paddingM : 0,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: widget.isPanelVisible 
+            ? CrossAxisAlignment.start 
+            : CrossAxisAlignment.center,
         children: [
           if (widget.isPanelVisible) ...[
             // Subtle section header with add button
@@ -545,7 +688,7 @@ class _LeftPanelState extends State<LeftPanel> {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // Mobile-first: use SafeArea to respect system UI
+    // EXPANDED STATE: Glass card with full content
     return SafeArea(
       top: false,
       child: Container(
@@ -578,13 +721,13 @@ class _LeftPanelState extends State<LeftPanel> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Subscription Info
-            if (isAuthenticated && widget.isPanelVisible)
+            if (isAuthenticated)
               _SubscriptionInfo(
                 isPanelVisible: widget.isPanelVisible,
                 isMobile: widget.isMobile,
               ),
 
-            if (isAuthenticated && widget.isPanelVisible)
+            if (isAuthenticated)
               const SizedBox(height: AppDimens.gapM),
 
             // Profile / Login button
@@ -630,11 +773,81 @@ class _LeftPanelState extends State<LeftPanel> {
       ),
     );
   }
+
 }
 
 // =============================================================================
 // HELPER WIDGETS
 // =============================================================================
+
+/// Collapsed state icon button - 48x48 centered icon with hover effect and active state
+class _CollapsedIconButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final bool isActive;
+
+  const _CollapsedIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.isActive = false,
+  });
+
+  @override
+  State<_CollapsedIconButton> createState() => _CollapsedIconButtonState();
+}
+
+class _CollapsedIconButtonState extends State<_CollapsedIconButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(12),
+            splashColor: colorScheme.tertiary.withOpacity(0.15),
+            highlightColor: colorScheme.tertiary.withOpacity(0.08),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: widget.isActive
+                    ? colorScheme.tertiary.withOpacity(0.12)
+                    : _isHovered
+                        ? colorScheme.surfaceContainerHighest.withOpacity(0.8)
+                        : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+                border: widget.isActive
+                    ? Border.all(color: colorScheme.tertiary.withOpacity(0.3), width: 1)
+                    : null,
+              ),
+              child: Icon(
+                widget.icon,
+                size: 20,
+                color: widget.isActive
+                    ? colorScheme.tertiary
+                    : _isHovered
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// Subtle section header with letter-spacing
 class _SectionHeader extends StatelessWidget {
