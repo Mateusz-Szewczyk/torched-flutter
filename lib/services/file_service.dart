@@ -11,6 +11,8 @@ class UploadedFileInfo {
   final String description;
   final String category;
   final String createdAt;
+  final bool isNotionDocument;
+  final String? notionLastSynced;
 
   UploadedFileInfo({
     required this.id,
@@ -18,6 +20,8 @@ class UploadedFileInfo {
     required this.description,
     required this.category,
     required this.createdAt,
+    this.isNotionDocument = false,
+    this.notionLastSynced,
   });
 
   factory UploadedFileInfo.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class UploadedFileInfo {
       description: json['description'] as String? ?? '',
       category: json['category'] as String? ?? '',
       createdAt: json['created_at'] as String? ?? '',
+      isNotionDocument: json['is_notion_document'] as bool? ?? false,
+      notionLastSynced: json['notion_last_synced'] as String?,
     );
   }
 }
@@ -107,12 +113,12 @@ class FileService {
     }
   }
 
-  /// Delete a file by name
-  Future<bool> deleteFile(String fileName) async {
+  /// Delete a file by its ID
+  Future<bool> deleteFile(String documentId) async {
     try {
       final response = await _api.ragDelete<Map<String, dynamic>>(
         '/files/delete-file/',
-        data: {'file_name': fileName},
+        data: {'document_id': documentId},
       );
 
       return response.statusCode == 200;

@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/workspace_service.dart';
 import '../services/storage_service.dart';
 import 'dialogs/base_glass_dialog.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ==========================================
 // READER SETTINGS MODEL
@@ -2963,6 +2964,20 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
     List<BaseStyle> baseStyles,
     List<Highlight> highlights
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // First, parse markdown and convert to styled spans
+    final List<TextSpan> markdownSpans = _parseMarkdownToSpans(context, text, isDark, colorScheme);
+    
+    // If there are no highlights, just return the markdown-parsed spans
+    if (highlights.isEmpty && baseStyles.isEmpty) {
+      return TextSpan(children: markdownSpans);
+    }
+    
+    // If there are highlights or baseStyles, we need to overlay them
+    // For simplicity, rebuild with both markdown and highlights
+    // Note: This is a basic integration - highlights will apply on top of markdown
     final Set<int> splitPoints = {0, text.length};
     for (var s in baseStyles) {
       splitPoints.add(s.start);
@@ -3001,24 +3016,232 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       }
 
       final bgColor = activeHighlight != null
-          ? _getColorFromCode(activeHighlight.colorCode, Theme.of(context).brightness == Brightness.dark)
+          ? _getColorFromCode(activeHighlight.colorCode, isDark)
           : null;
 
-      children.add(
-        TextSpan(
-          text: segmentText,
-          style: TextStyle(
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            fontStyle: isItalic ? FontStyle.italic : null,
-            backgroundColor: bgColor,
-          ),
-          recognizer: activeHighlight != null ? (TapGestureRecognizer()
-            ..onTap = () => _showHighlightMenu(context, activeHighlight!)) : null,
-        ),
-      );
+      // Parse markdown within this segment
+      final segmentSpans = _parseMarkdownToSpans(context, segmentText, isDark, colorScheme,
+          baseBold: isBold, baseItalic: isItalic, bgColor: bgColor, highlight: activeHighlight);
+      
+      children.addAll(segmentSpans);
     }
 
     return TextSpan(children: children);
+  }
+
+  /// Parses markdown-style formatting and returns styled TextSpans
+  /// Handles: **bold**, *italic*, ~~strikethrough~~, `code`, [links](url), - [ ] checkboxes
+  List<TextSpan> _parseMarkdownToSpans(
+    BuildContext context, 
+    String text, 
+    bool isDark,
+    ColorScheme colorScheme, {
+    bool baseBold = false,
+    bool baseItalic = false,
+    Color? bgColor,
+    Highlight? highlight,
+  }) {
+    final List<TextSpan> spans = [];
+    
+    // Regex patterns for markdown elements
+    final patterns = [
+      // Bold: **text** or __text__
+      (RegExp(r'\*\*(.+?)\*\*|__(.+?)__'), 'bold'),
+      // Italic: *text* or _text_ (but not inside ** or __)
+      (RegExp(r'(?<!\*)(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)|(?<!_)_(?!_)(.+?)(?<!_)_(?!_)'), 'italic'),
+      // Strikethrough: ~~text~~
+      (RegExp(r'~~(.+?)~~'), 'strikethrough'),
+      // Code: `text`
+      (RegExp(r'`([^`]+)`'), 'code'),
+      // Link: [text](url)
+      (RegExp(r'\[([^\]]+)\]\(([^)]+)\)'), 'link'),
+      // Checkbox unchecked: - [ ]
+      (RegExp(r'^- \[ \]'), 'checkbox_unchecked'),
+      // Checkbox checked: - [x] or - [X]
+      (RegExp(r'^- \[[xX]\]'), 'checkbox_checked'),
+    ];
+
+    // Process text line by line for checkboxes, then inline for other formatting
+    final lines = text.split('\n');
+    for (int lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      String line = lines[lineIdx];
+      
+      // Check for checkbox patterns at line start
+      bool isCheckbox = false;
+      bool isChecked = false;
+      
+      if (RegExp(r'^- \[ \]').hasMatch(line)) {
+        isCheckbox = true;
+        isChecked = false;
+        line = line.replaceFirst(RegExp(r'^- \[ \]'), '');
+      } else if (RegExp(r'^- \[[xX]\]').hasMatch(line)) {
+        isCheckbox = true;
+        isChecked = true;
+        line = line.replaceFirst(RegExp(r'^- \[[xX]\]'), '');
+      }
+      
+      if (isCheckbox) {
+        // Add checkbox icon
+        spans.add(TextSpan(
+          text: isChecked ? '☑ ' : '☐ ',
+          style: TextStyle(
+            color: isChecked ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ));
+      }
+      
+      // Now parse inline markdown for this line
+      _parseInlineMarkdown(spans, line.trimLeft(), context, isDark, colorScheme, 
+          baseBold: baseBold, baseItalic: baseItalic, bgColor: bgColor, highlight: highlight);
+      
+      // Add newline between lines (except last)
+      if (lineIdx < lines.length - 1) {
+        spans.add(const TextSpan(text: '\n'));
+      }
+    }
+    
+    return spans;
+  }
+  
+  /// Parses inline markdown formatting (bold, italic, strikethrough, code, links)
+  void _parseInlineMarkdown(
+    List<TextSpan> spans,
+    String text,
+    BuildContext context,
+    bool isDark,
+    ColorScheme colorScheme, {
+    bool baseBold = false,
+    bool baseItalic = false,
+    Color? bgColor,
+    Highlight? highlight,
+  }) {
+    if (text.isEmpty) return;
+    
+    // Combined pattern for all inline markdown
+    // Order matters: bold before italic to avoid conflicts
+    final combinedPattern = RegExp(
+      r'(\*\*[^*]+\*\*)|'  // Bold **text**
+      r'(\*[^*]+\*)|'       // Italic *text*
+      r'(~~[^~]+~~)|'       // Strikethrough ~~text~~
+      r'(`[^`]+`)|'         // Code `text`
+      r'(\[[^\]]+\]\([^)]+\))'  // Link [text](url)
+    );
+    
+    int lastEnd = 0;
+    
+    for (final match in combinedPattern.allMatches(text)) {
+      // Add plain text before this match
+      if (match.start > lastEnd) {
+        final plainText = text.substring(lastEnd, match.start);
+        spans.add(_createBaseSpan(plainText, baseBold, baseItalic, bgColor, highlight, context));
+      }
+      
+      final matchText = match.group(0)!;
+      
+      if (matchText.startsWith('**') && matchText.endsWith('**')) {
+        // Bold
+        final content = matchText.substring(2, matchText.length - 2);
+        spans.add(_createBaseSpan(content, true, baseItalic, bgColor, highlight, context));
+      } else if (matchText.startsWith('~~') && matchText.endsWith('~~')) {
+        // Strikethrough
+        final content = matchText.substring(2, matchText.length - 2);
+        spans.add(TextSpan(
+          text: content,
+          style: TextStyle(
+            fontWeight: baseBold ? FontWeight.bold : null,
+            fontStyle: baseItalic ? FontStyle.italic : null,
+            decoration: TextDecoration.lineThrough,
+            backgroundColor: bgColor,
+          ),
+          recognizer: highlight != null ? (TapGestureRecognizer()
+            ..onTap = () => _showHighlightMenu(context, highlight)) : null,
+        ));
+      } else if (matchText.startsWith('`') && matchText.endsWith('`')) {
+        // Code
+        final content = matchText.substring(1, matchText.length - 1);
+        final colorScheme = Theme.of(context).colorScheme;
+        spans.add(TextSpan(
+          text: content,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            backgroundColor: isDark 
+                ? colorScheme.surfaceContainerHighest 
+                : colorScheme.surfaceContainerLow,
+            color: colorScheme.primary,
+            fontSize: 14,
+          ),
+        ));
+      } else if (matchText.startsWith('[') && matchText.contains('](')) {
+        // Link [text](url)
+        final linkMatch = RegExp(r'\[([^\]]+)\]\(([^)]+)\)').firstMatch(matchText);
+        if (linkMatch != null) {
+          final linkText = linkMatch.group(1)!;
+          final linkUrl = linkMatch.group(2)!;
+          spans.add(TextSpan(
+            text: linkText,
+            style: TextStyle(
+              color: colorScheme.primary,
+              decoration: TextDecoration.underline,
+              decorationColor: colorScheme.primary,
+              fontWeight: baseBold ? FontWeight.bold : null,
+              fontStyle: baseItalic ? FontStyle.italic : null,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => _openUrl(linkUrl),
+          ));
+        }
+      } else if (matchText.startsWith('*') && matchText.endsWith('*') && !matchText.startsWith('**')) {
+        // Italic (single asterisk)
+        final content = matchText.substring(1, matchText.length - 1);
+        spans.add(_createBaseSpan(content, baseBold, true, bgColor, highlight, context));
+      } else {
+        // Fallback - add as plain text
+        spans.add(_createBaseSpan(matchText, baseBold, baseItalic, bgColor, highlight, context));
+      }
+      
+      lastEnd = match.end;
+    }
+    
+    // Add remaining plain text
+    if (lastEnd < text.length) {
+      final remainingText = text.substring(lastEnd);
+      spans.add(_createBaseSpan(remainingText, baseBold, baseItalic, bgColor, highlight, context));
+    }
+    
+    // If no matches at all, add the whole text
+    if (lastEnd == 0 && text.isNotEmpty) {
+      spans.add(_createBaseSpan(text, baseBold, baseItalic, bgColor, highlight, context));
+    }
+  }
+  
+  TextSpan _createBaseSpan(String text, bool isBold, bool isItalic, Color? bgColor, Highlight? highlight, BuildContext context) {
+    return TextSpan(
+      text: text,
+      style: TextStyle(
+        fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+        fontStyle: isItalic ? FontStyle.italic : null,
+        backgroundColor: bgColor,
+      ),
+      recognizer: highlight != null ? (TapGestureRecognizer()
+        ..onTap = () => _showHighlightMenu(context, highlight)) : null,
+    );
+  }
+  
+  void _openUrl(String url) async {
+    try {
+      final uri = Uri.parse(url.trim());
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri, 
+          webOnlyWindowName: '_blank',
+        );
+      } else {
+        debugPrint('[DocumentReader] Could not launch URL: $url');
+      }
+    } catch (e) {
+      debugPrint('[DocumentReader] Error launching URL: $e');
+    }
   }
 
   void _showHighlightMenu(BuildContext context, Highlight highlight) {

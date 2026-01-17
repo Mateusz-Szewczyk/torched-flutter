@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/flashcards_provider.dart';
+import '../providers/subscription_provider.dart';
 import '../services/deck_service.dart';
 import '../widgets/study_deck_widget.dart';
 import '../widgets/dialogs/base_glass_dialog.dart';
@@ -456,6 +457,15 @@ class _FlashcardsScreenState extends State<FlashcardsScreen> {
 
   void _showCreateDeckDialog(
       BuildContext context, FlashcardsProvider provider) {
+    // Check subscription limits
+    final subProvider = context.read<SubscriptionProvider>();
+    if (!subProvider.checkLimit(context, 
+        limitKey: 'max_decks', 
+        usageKey: 'decks', 
+        featureName: 'decks')) {
+      return;
+    }
+
     EditDeckDialog.show(
       context,
       onSave: (name, description, flashcards) async {

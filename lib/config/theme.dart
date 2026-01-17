@@ -49,8 +49,8 @@ class AppTheme {
   // ============================================================================
   // DARK THEME COLORS (from React globals.css .dark)
   // ============================================================================
-  // --background: 220 15% 7% → very dark blue-gray
-  static const Color darkBackground = Color(0xFF0F1114);
+  // --background: 220 15% 17% → Further lightened
+  static const Color darkBackground = Color(0xFF25282C);
   // --foreground: 210 40% 92% → light blue-gray
   static const Color darkForeground = Color(0xFFE1E8EF);
 

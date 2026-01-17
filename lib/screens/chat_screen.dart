@@ -7,6 +7,7 @@ import 'dart:math'; // Import for min function
 import '../l10n/app_localizations.dart';
 import '../models/models.dart';
 import '../providers/conversation_provider.dart';
+import '../providers/subscription_provider.dart';
 
 // Configuration constants for the "Reading Column" layout
 const double kMaxContentWidth = 800.0;
@@ -99,6 +100,16 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _sendMessage(ConversationProvider provider) {
+    // Check subscription limits
+    final subProvider = context.read<SubscriptionProvider>();
+    // 'questions_period' tracks messages/questions generated in the current period
+    if (!subProvider.checkLimit(context, 
+        limitKey: 'max_questions_period', 
+        usageKey: 'questions_period', 
+        featureName: 'daily messages')) {
+      return;
+    }
+
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 

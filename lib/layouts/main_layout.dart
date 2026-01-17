@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/left_panel/left_panel.dart';
+import '../widgets/grain_overlay.dart';
 
 /// Main layout wrapper that includes the left panel navigation
 /// Similar to ClientLayout in React version
@@ -220,6 +221,11 @@ class _MainLayoutState extends State<MainLayout> with SingleTickerProviderStateM
             // Desktop: Toggle button on panel edge
             if (!isMobile)
               _buildDesktopToggle(desktopPanelWidth, colorScheme),
+
+            // Grain effect overlay - subtle film grain
+            const Positioned.fill(
+              child: GrainOverlay(opacity: 0.04),
+            ),
           ],
         ),
       ),

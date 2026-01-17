@@ -6,9 +6,11 @@ import 'package:provider/provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/file_service.dart';
+import '../../services/notion_service.dart';
 import '../../theme/dimens.dart';
 import '../category_dropdown.dart';
 import '../common/glass_components.dart';
+import '../connectors_list.dart';
 import 'base_glass_dialog.dart';
 
 /// Manage files dialog
@@ -64,9 +66,8 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
   }
 
   void _handleFileUploaded(List<UploadedFileInfo> newFiles) {
-    setState(() {
-      _files = [..._files, ...newFiles];
-    });
+    // Refresh the file list from backend to ensure consistency
+    _loadFiles();
     // Refresh subscription stats (file quota)
     if (mounted) {
       context.read<SubscriptionProvider>().fetchStats();
@@ -74,6 +75,14 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
     // If mobile, switch to files tab
     if (MediaQuery.of(context).size.width < 768) {
       _tabController.animateTo(1);
+    }
+  }
+
+  void _handleFilesRefresh() {
+    // Full refresh from backend
+    _loadFiles();
+    if (mounted) {
+      context.read<SubscriptionProvider>().fetchStats();
     }
   }
 
@@ -101,7 +110,10 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
             width: 350,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: _UploadForm(onFileUploaded: _handleFileUploaded),
+              child: _UploadForm(
+                onFileUploaded: _handleFileUploaded,
+                onRefresh: _handleFilesRefresh,
+              ),
             )),
         VerticalDivider(width: 1, color: cs.outline.withValues(alpha: 0.1)),
         Expanded(
@@ -155,7 +167,10 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
             children: [
               SingleChildScrollView(
                   padding: const EdgeInsets.all(24),
-                  child: _UploadForm(onFileUploaded: _handleFileUploaded)),
+                  child: _UploadForm(
+                    onFileUploaded: _handleFileUploaded,
+                    onRefresh: _handleFilesRefresh,
+                  )),
               _FilesList(
                 files: _files,
                 isLoading: _isLoading,
@@ -180,8 +195,9 @@ class _ManageFilesDialogState extends State<ManageFilesDialog> with SingleTicker
 
 class _UploadForm extends StatefulWidget {
   final Function(List<UploadedFileInfo>) onFileUploaded;
+  final VoidCallback onRefresh;
 
-  const _UploadForm({required this.onFileUploaded});
+  const _UploadForm({required this.onFileUploaded, required this.onRefresh});
 
   @override
   State<_UploadForm> createState() => _UploadFormState();
@@ -207,6 +223,15 @@ class _UploadFormState extends State<_UploadForm> {
 
   Future<void> _pickFile() async {
     HapticFeedback.selectionClick();
+    
+    // Check limits before picking
+    final subscriptionProvider = context.read<SubscriptionProvider>();
+    final stats = subscriptionProvider.stats;
+    final limits = stats?.limits ?? {};
+
+    // Max file size check (default 10MB if not specified)
+    final maxFileSizeMb = (limits['max_file_size_mb'] as num?)?.toInt() ?? 10;
+    
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -216,6 +241,14 @@ class _UploadFormState extends State<_UploadForm> {
 
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
+        
+        // Check file size
+        final fileSizeMb = file.size / (1024 * 1024);
+        if (fileSizeMb > maxFileSizeMb) {
+          setState(() => _error = 'File too large. Maximum size is ${maxFileSizeMb}MB.');
+          return;
+        }
+
         setState(() {
           _selectedFileName = file.name;
           _selectedFileBytes = file.bytes;
@@ -232,6 +265,23 @@ class _UploadFormState extends State<_UploadForm> {
       setState(() => _error = 'Please select a file first');
       return;
     }
+    
+    // Check limits again before upload
+    final subscriptionProvider = context.read<SubscriptionProvider>();
+    final stats = subscriptionProvider.stats;
+    final limits = stats?.limits ?? {};
+    final usage = stats?.usage ?? {};
+    
+    final maxFiles = (limits['max_files'] as num?)?.toInt() ?? 5;
+    // Backend returns 'files' for file count usage
+    final currentFiles = (usage['files'] as num?)?.toInt() ?? 0;
+    
+    // Check for unlimited (-1) handled manually here or use provider helper
+    if (maxFiles != -1 && currentFiles >= maxFiles) {
+       setState(() => _error = 'File limit reached ($maxFiles files). Please upgrade your plan.');
+       return;
+    }
+
     if (_descriptionController.text.trim().isEmpty) {
       setState(() => _error = 'Please enter a file description');
       return;
@@ -374,6 +424,18 @@ class _UploadFormState extends State<_UploadForm> {
         ],
         if (_error != null) _buildMessage(_error!, true, cs),
         if (_successMessage != null) _buildMessage(_successMessage!, false, cs),
+        
+        // Connectors section (Notion, etc.)
+        const SizedBox(height: 32),
+        Divider(color: cs.outline.withValues(alpha: 0.1)),
+        const SizedBox(height: 16),
+        ConnectorsList(
+          selectedCategoryId: _selectedCategoryId,
+          onFilesImported: (files) {
+            // Refresh file list from backend when import completes
+            widget.onRefresh();
+          },
+        ),
       ],
     );
   }
@@ -555,7 +617,7 @@ class _FilesListState extends State<_FilesList> {
     if (confirmed != true) return;
 
     try {
-      await _fileService.deleteFile(file.name);
+      await _fileService.deleteFile(file.id);
       widget.onDelete(file.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -624,18 +686,50 @@ class _FilesListState extends State<_FilesList> {
   }
 }
 
-class _GlassFileItem extends StatelessWidget {
+class _GlassFileItem extends StatefulWidget {
   final UploadedFileInfo file;
   final VoidCallback onDelete;
 
   const _GlassFileItem({required this.file, required this.onDelete});
 
   @override
+  State<_GlassFileItem> createState() => _GlassFileItemState();
+}
+
+class _GlassFileItemState extends State<_GlassFileItem> {
+  bool _isSyncing = false;
+
+  Future<void> _syncDocument() async {
+    if (_isSyncing || !widget.file.isNotionDocument) return;
+    
+    HapticFeedback.mediumImpact();
+    setState(() => _isSyncing = true);
+    
+    try {
+      final notionService = NotionService();
+      final result = await notionService.syncDocument(widget.file.id);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.updated ? 'Document synced!' : result.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      // Ignore
+    } finally {
+      if (mounted) setState(() => _isSyncing = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
     return Dismissible(
-      key: ValueKey(file.id),
+      key: ValueKey(widget.file.id),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -651,7 +745,7 @@ class _GlassFileItem extends StatelessWidget {
         HapticFeedback.mediumImpact();
         return true;
       },
-      onDismissed: (_) => onDelete(),
+      onDismissed: (_) => widget.onDelete(),
       child: GlassTile(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -659,11 +753,19 @@ class _GlassFileItem extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: cs.secondaryContainer.withValues(alpha: 0.5),
+                color: widget.file.isNotionDocument 
+                    ? Colors.white.withValues(alpha: 0.9)
+                    : cs.secondaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(_getFileIcon(file.name),
-                  color: cs.onSecondaryContainer, size: 24),
+              child: widget.file.isNotionDocument
+                  ? const Text('N', style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ))
+                  : Icon(_getFileIcon(widget.file.name),
+                      color: cs.onSecondaryContainer, size: 24),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -671,7 +773,7 @@ class _GlassFileItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    file.name,
+                    widget.file.name,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -689,7 +791,7 @@ class _GlassFileItem extends StatelessWidget {
                               Border.all(color: cs.primary.withValues(alpha: 0.2)),
                         ),
                         child: Text(
-                          file.category,
+                          widget.file.category,
                           style: TextStyle(
                               fontSize: 10,
                               color: cs.primary,
@@ -698,7 +800,7 @@ class _GlassFileItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        _formatDate(file.createdAt),
+                        _formatDate(widget.file.createdAt),
                         style: TextStyle(
                             fontSize: 12, color: cs.onSurfaceVariant),
                       ),
@@ -707,12 +809,32 @@ class _GlassFileItem extends StatelessWidget {
                 ],
               ),
             ),
+            // Sync button for Notion documents
+            if (widget.file.isNotionDocument)
+              Semantics(
+                label: 'Sync ${widget.file.name}',
+                button: true,
+                child: IconButton(
+                  icon: _isSyncing
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cs.primary,
+                          ),
+                        )
+                      : Icon(Icons.sync, color: cs.primary),
+                  onPressed: _isSyncing ? null : _syncDocument,
+                  tooltip: 'Sync from Notion',
+                ),
+              ),
              Semantics(
-               label: 'Delete ${file.name}',
+               label: 'Delete ${widget.file.name}',
                button: true,
                child: IconButton(
                  icon: Icon(Icons.delete_outline, color: cs.error.withValues(alpha: 0.7)),
-                 onPressed: onDelete,
+                 onPressed: widget.onDelete,
                ),
              ),
           ],

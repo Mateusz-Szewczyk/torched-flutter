@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import '../models/subscription_stats.dart';
 import '../services/subscription_service.dart';
 import '../services/auth_service.dart';
@@ -153,6 +154,67 @@ class SubscriptionProvider extends ChangeNotifier {
 
     debugPrint('[SubscriptionProvider] Subscription update polling timed out');
     return false;
+  }
+
+  // ===================================
+  // LIMIT CHECKING
+  // ===================================
+
+  /// Checks if a limit is reached and shows a dialog if it is.
+  /// Returns true if the action SHOULD proceed (limit NOT reached).
+  /// Returns false if limit is reached (dialog shown).
+  bool checkLimit(BuildContext context, {
+    required String limitKey,
+    required String usageKey,
+    required String featureName,
+  }) {
+    if (_stats == null) return true; // Fail open if no stats
+
+    final limit = _stats!.limits[limitKey];
+    final usage = _stats!.usage[usageKey];
+
+    // If no limit defined, assume unlimited
+    if (limit == null || limit == -1) return true;
+
+    final current = (usage as num?)?.toInt() ?? 0;
+    final max = (limit as num?)?.toInt() ?? 0;
+
+    if (current >= max) {
+      _showUpgradeDialog(context, featureName, max);
+      return false;
+    }
+    return true;
+  }
+  
+  void _showUpgradeDialog(BuildContext context, String featureName, int limit) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Upgrade to use $featureName'),
+        content: Text(
+          'You have reached the limit of $limit $featureName on your current plan.\n\n'
+          'Upgrade to Pro or Expert to get more capacity and advanced features.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              // Navigate to subscription/profile dialog
+              // Getting ProfileDialog (we need to be careful with circular deps or context)
+              // For now simpler: 
+              // BaseGlassDialog.show(context, builder: (_) => const ProfileDialog());
+              // But ProfileDialog isn't imported here.
+              // Just close for now, user needs to find Settings.
+            },
+            child: const Text('Upgrade'),
+          ),
+        ],
+      ),
+    );
   }
 
   void clear() {
