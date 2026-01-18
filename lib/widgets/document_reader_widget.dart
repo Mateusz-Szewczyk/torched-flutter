@@ -3080,6 +3080,45 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
         line = line.replaceFirst(RegExp(r'^- \[[xX]\]'), '');
       }
       
+      // Check for header patterns
+      final headerMatch = RegExp(r'^(#{1,6})\s+(.*)$').firstMatch(line.trimLeft());
+      if (headerMatch != null) {
+        final level = headerMatch.group(1)!.length;
+        final content = headerMatch.group(2)!;
+        
+        // Apply header sizing
+        double fontSize = _readerSettings.fontSize;
+        if (level == 1) fontSize *= 1.6;
+        else if (level == 2) fontSize *= 1.4;
+        else if (level == 3) fontSize *= 1.2;
+        else if (level >= 4) fontSize *= 1.1;
+        
+        // Parse inline markdown within header
+        final headerSpans = <TextSpan>[];
+        _parseInlineMarkdown(headerSpans, content, context, isDark, colorScheme, 
+            baseBold: true,
+            baseItalic: baseItalic, 
+            bgColor: bgColor, 
+            highlight: highlight
+        );
+        
+        spans.add(TextSpan(
+          children: headerSpans,
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.bold,
+            letterSpacing: level == 1 ? -0.5 : null,
+            height: 1.5,
+            color: colorScheme.onSurface,
+          ),
+        ));
+        
+        if (lineIdx < lines.length - 1) {
+          spans.add(const TextSpan(text: '\n'));
+        }
+        continue;
+      }
+
       if (isCheckbox) {
         // Add checkbox icon
         spans.add(TextSpan(
@@ -3339,7 +3378,7 @@ class _DocumentReaderWidgetState extends State<DocumentReaderWidget> with Automa
       if (!line.contains('|')) continue;
 
       // Skip separator lines (---|----|----)
-      if (RegExp(r'^[\s|:-]+$').hasMatch(line)) continue;
+      if (RegExp(r'^[\s|:\-]+$').hasMatch(line)) continue;
 
       // Split by pipe and clean
       var cells = line.split('|')
